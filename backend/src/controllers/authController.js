@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const { successResponse } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const authService = require('../services/authService');
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -31,46 +32,9 @@ const clearRefreshTokenCookie = (res) => {
   });
 };
 
-const VALID_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN', 'PROVIDER', 'STAFF'];
-
 const register = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
-
-  if (!name || !email || !password) {
-    const err = new Error('Name, email, and password are required');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  const roleToUse = role && VALID_ROLES.includes(role) ? role : 'STAFF';
-
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    const err = new Error('Email already registered');
-    err.statusCode = 409;
-    throw err;
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      role: roleToUse,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      clinicId: true,
-      isActive: true,
-      createdAt: true,
-    },
-  });
-
+  const creator = req.user?.role === 'SUPER_ADMIN' ? req.user : null;
+  const user = await authService.registerUser(req.body, creator);
   successResponse(res, 201, 'Registration successful', { user });
 });
 

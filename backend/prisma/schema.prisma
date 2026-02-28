@@ -14,6 +14,18 @@ enum Role {
   STAFF
 }
 
+model Clinic {
+  id               String   @id @default(cuid())
+  name             String
+  email            String
+  subscriptionPlan String   @default("free")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users User[]
+}
+
 model User {
   id        String   @id @default(cuid())
   clinicId  String?
@@ -25,6 +37,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  clinic        Clinic?        @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   refreshTokens RefreshToken[]
 }
 

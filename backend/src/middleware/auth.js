@@ -38,7 +38,13 @@ const protect = async (req, res, next) => {
       throw err;
     }
 
-    req.user = user;
+    req.user = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      clinicId: user.clinicId,
+    };
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
@@ -67,7 +73,45 @@ const authorize = (...roles) => {
   };
 };
 
+const optionalProtect = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyAccessToken(token);
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        clinicId: true,
+        isActive: true,
+      },
+    });
+
+    if (user && user.isActive) {
+      req.user = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        clinicId: user.clinicId,
+      };
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
 module.exports = {
   protect,
   authorize,
+  optionalProtect,
 };
