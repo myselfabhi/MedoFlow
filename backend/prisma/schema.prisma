@@ -7,7 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Placeholder model - required by Prisma to generate client. Remove when adding real models.
-model SchemaPlaceholder {
-  id Int @id @default(autoincrement())
+enum Role {
+  SUPER_ADMIN
+  CLINIC_ADMIN
+  PROVIDER
+  STAFF
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clinicId  String?
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
