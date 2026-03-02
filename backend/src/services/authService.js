@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const clinicService = require('./clinicService');
 
-const VALID_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN', 'PROVIDER', 'STAFF'];
+const VALID_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN', 'PROVIDER', 'STAFF', 'PATIENT'];
 
 const validateRegistration = (body, creatorRole) => {
   const { name, email, password, role, clinicId, clinicName, clinicEmail } = body;
@@ -77,6 +77,16 @@ const registerUser = async (body, creator = null) => {
       throw err;
     }
     resolvedClinicId = body.clinicId;
+  } else if (roleToUse === 'PATIENT' && body.clinicId && creatorRole === 'SUPER_ADMIN') {
+    const exists = await clinicService.clinicExists(body.clinicId);
+    if (!exists) {
+      const err = new Error('Clinic not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    resolvedClinicId = body.clinicId;
+  } else if (roleToUse === 'PATIENT') {
+    resolvedClinicId = null;
   }
 
   const user = await prisma.user.create({

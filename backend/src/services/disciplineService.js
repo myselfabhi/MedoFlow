@@ -20,7 +20,7 @@ const createDiscipline = async (data, clinicId) => {
 
 const getDisciplines = async (where) => {
   return prisma.discipline.findMany({
-    where,
+    where: { ...where, isActive: true },
     orderBy: { name: 'asc' },
     include: { _count: { select: { providers: true } } },
   });
@@ -64,8 +64,26 @@ const updateDiscipline = async (id, data, where) => {
 };
 
 const deleteDiscipline = async (id, where) => {
-  return prisma.discipline.delete({
+  const discipline = await prisma.discipline.findFirst({
+    where: { id, ...where },
+    include: { _count: { select: { services: true } } },
+  });
+  if (!discipline) {
+    const err = new Error('Discipline not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const activeServicesCount = await prisma.service.count({
+    where: { disciplineId: id, isActive: true },
+  });
+  if (activeServicesCount > 0) {
+    const err = new Error('Cannot delete discipline with active services. Archive instead.');
+    err.statusCode = 400;
+    throw err;
+  }
+  return prisma.discipline.update({
     where: { id },
+    data: { isActive: false },
   });
 };
 

@@ -43,7 +43,9 @@ const createProvider = async (data, clinicId) => {
     await checkDuplicateProviderUserLink(data.userId);
   }
 
-  return prisma.provider.create({
+  const hasServices = data.serviceIds && Array.isArray(data.serviceIds) && data.serviceIds.length > 0;
+
+  const provider = await prisma.provider.create({
     data: {
       clinicId,
       userId: data.userId || null,
@@ -58,15 +60,39 @@ const createProvider = async (data, clinicId) => {
       user: { select: { id: true, name: true, email: true } },
     },
   });
+
+  if (hasServices) {
+    for (const serviceId of data.serviceIds) {
+      await validateServiceBelongsToClinic(serviceId, clinicId);
+      await prisma.providerService.create({
+        data: { providerId: provider.id, serviceId },
+      });
+    }
+    return prisma.provider.findUnique({
+      where: { id: provider.id },
+      include: {
+        discipline: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true } },
+        providerServices: {
+          include: { service: { include: { discipline: { select: { id: true, name: true } } } } },
+        },
+      },
+    });
+  }
+
+  return provider;
 };
 
 const getProviders = async (where) => {
   return prisma.provider.findMany({
-    where,
+    where: { ...where, isActive: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     include: {
       discipline: { select: { id: true, name: true } },
       user: { select: { id: true, name: true, email: true } },
+      providerServices: {
+        include: { service: { select: { id: true, name: true, defaultPrice: true } } },
+      },
     },
   });
 };
@@ -138,10 +164,136 @@ const softDeleteProvider = async (id, where) => {
   });
 };
 
+const validateServiceBelongsToClinic = async (serviceId, clinicId) => {
+  const service = await prisma.service.findFirst({
+    where: { id: serviceId, clinicId, isActive: true },
+  });
+  if (!service) {
+    const err = new Error('Service not found or does not belong to this clinic');
+    err.statusCode = 404;
+    throw err;
+  }
+  return service;
+};
+
+const addProviderService = async (providerId, serviceId, priceOverride, clinicId) => {
+  const provider = await getProviderById(providerId, { clinicId });
+  if (!provider) {
+    const err = new Error('Provider not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await validateServiceBelongsToClinic(serviceId, clinicId);
+
+  const existing = await prisma.providerService.findFirst({
+    where: { providerId, serviceId },
+  });
+  if (existing) {
+    const err = new Error('Provider already has this service assigned');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  return prisma.providerService.create({
+    data: {
+      providerId,
+      serviceId,
+      priceOverride: priceOverride ?? null,
+    },
+    include: {
+      service: {
+        include: { discipline: { select: { id: true, name: true } } },
+      },
+    },
+  });
+};
+
+const updateProviderService = async (providerId, serviceId, priceOverride, clinicId) => {
+  const provider = await getProviderById(providerId, { clinicId });
+  if (!provider) {
+    const err = new Error('Provider not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await validateServiceBelongsToClinic(serviceId, clinicId);
+
+  const existing = await prisma.providerService.findFirst({
+    where: { providerId, serviceId },
+  });
+  if (!existing) {
+    const err = new Error('Provider service assignment not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return prisma.providerService.update({
+    where: { id: existing.id },
+    data: { priceOverride: priceOverride ?? null },
+    include: {
+      service: {
+        include: { discipline: { select: { id: true, name: true } } },
+      },
+    },
+  });
+};
+
+const removeProviderService = async (providerId, serviceId, clinicId) => {
+  const provider = await getProviderById(providerId, { clinicId });
+  if (!provider) {
+    const err = new Error('Provider not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const count = await prisma.providerService.count({
+    where: { providerId },
+  });
+  if (count <= 1) {
+    const err = new Error('Provider must have at least one service');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const existing = await prisma.providerService.findFirst({
+    where: { providerId, serviceId },
+  });
+  if (!existing) {
+    const err = new Error('Provider service assignment not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return prisma.providerService.delete({
+    where: { id: existing.id },
+  });
+};
+
+const getProviderServices = async (providerId, clinicId) => {
+  const provider = await getProviderById(providerId, { clinicId });
+  if (!provider) {
+    const err = new Error('Provider not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return prisma.providerService.findMany({
+    where: { providerId },
+    include: {
+      service: {
+        include: { discipline: { select: { id: true, name: true } } },
+      },
+    },
+  });
+};
+
 module.exports = {
   createProvider,
   getProviders,
   getProviderById,
   updateProvider,
   softDeleteProvider,
+  addProviderService,
+  updateProviderService,
+  removeProviderService,
+  getProviderServices,
 };

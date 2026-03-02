@@ -61,10 +61,69 @@ const remove = asyncHandler(async (req, res) => {
   successResponse(res, 200, 'Provider deactivated', { provider });
 });
 
+const addService = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { serviceId, priceOverride } = req.body;
+  const clinicId = req.bypassClinicScope ? req.body.clinicId || req.clinicId : req.clinicId;
+  if (!clinicId) {
+    const err = new Error('Clinic ID is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!serviceId) {
+    const err = new Error('Service ID is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const assignment = await providerService.addProviderService(id, serviceId, priceOverride, clinicId);
+  successResponse(res, 201, 'Service assigned to provider', { providerService: assignment });
+});
+
+const updateService = asyncHandler(async (req, res) => {
+  const { id, serviceId } = req.params;
+  const { priceOverride } = req.body;
+  const clinicId = req.bypassClinicScope ? req.body.clinicId || req.clinicId : req.clinicId;
+  if (!clinicId) {
+    const err = new Error('Clinic ID is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const assignment = await providerService.updateProviderService(id, serviceId, priceOverride, clinicId);
+  successResponse(res, 200, 'Provider service updated', { providerService: assignment });
+});
+
+const removeService = asyncHandler(async (req, res) => {
+  const { id, serviceId } = req.params;
+  const clinicId = req.bypassClinicScope ? req.query.clinicId || req.clinicId : req.clinicId;
+  if (!clinicId) {
+    const err = new Error('Clinic ID is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  await providerService.removeProviderService(id, serviceId, clinicId);
+  successResponse(res, 200, 'Service removed from provider');
+});
+
+const listServices = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const clinicId = req.bypassClinicScope ? req.query.clinicId || req.clinicId : req.clinicId;
+  if (!clinicId) {
+    const err = new Error('Clinic ID is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const providerServices = await providerService.getProviderServices(id, clinicId);
+  successResponse(res, 200, 'Provider services retrieved', { providerServices });
+});
+
 module.exports = {
   create,
   list,
   getById,
   update,
   remove,
+  addService,
+  updateService,
+  removeService,
+  listServices,
 };
