@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
@@ -54,12 +54,6 @@ api.interceptors.response.use(
             return null;
           } catch {
             clearAccessToken();
-            if (typeof window !== 'undefined') {
-              const path = window.location.pathname;
-              if (!path.startsWith('/login') && !path.startsWith('/register')) {
-                window.location.href = '/login';
-              }
-            }
             return null;
           } finally {
             refreshPromise = null;
