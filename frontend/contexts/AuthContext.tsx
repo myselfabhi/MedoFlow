@@ -1,7 +1,8 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import api, { clearAccessToken, hasSessionFlag, setAccessToken } from '@/lib/api';
+import api, { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/api';
 import type { User } from '@/lib/types';
 
 interface AuthContextType {
@@ -15,7 +16,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const PROTECTED_ROUTES = ['/dashboard'];
+
+function isProtectedRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -51,15 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearAccessToken();
       setUser(null);
+      router.push('/');
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
+    if (!isProtectedRoute(pathname)) {
+      setIsLoading(false);
+      return;
+    }
+    if (user && getAccessToken()) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
     const restoreSession = async () => {
-      if (!hasSessionFlag()) {
-        setIsLoading(false);
-        return;
-      }
       try {
         const restoredUser = await getCurrentUser();
         if (!restoredUser) {
@@ -70,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
     restoreSession();
-  }, [getCurrentUser]);
+  }, [pathname, getCurrentUser, user]);
 
   const value: AuthContextType = {
     user,
