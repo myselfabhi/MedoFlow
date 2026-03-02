@@ -19,7 +19,8 @@ export const create = asyncHandler(
     const resolvedPatientId = (patientId as string) || req.user!.id;
     const appointment = await appointmentService.createAppointment(
       { ...rest, patientId: resolvedPatientId },
-      clinicId
+      clinicId,
+      { performedById: req.user!.id }
     );
     successResponse(res, 201, 'Appointment created', { appointment });
   }

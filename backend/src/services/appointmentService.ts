@@ -15,6 +15,10 @@ export interface CreateAppointmentData {
   endTime: string | Date;
 }
 
+export interface CreateAppointmentContext {
+  performedById?: string;
+}
+
 const validateServiceBelongsToClinic = async (
   serviceId: string,
   clinicId: string
@@ -120,9 +124,89 @@ const checkDoubleBooking = async (
   }
 };
 
+const checkSamePatientOverlap = async (
+  patientId: string,
+  startTime: Date,
+  endTime: Date
+): Promise<void> => {
+  const conflicting = await prisma.appointment.findFirst({
+    where: {
+      patientId,
+      status: { not: CANCELLED_STATUS },
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+    },
+  });
+  if (conflicting) {
+    const err = new Error(
+      'You already have another appointment during this time.'
+    ) as ApiError;
+    err.statusCode = 409;
+    throw err;
+  }
+};
+
+const checkMinimumNotice = (
+  startTime: Date,
+  minimumNoticeMinutes: number,
+  clinicId: string,
+  serviceId: string,
+  performedById: string | undefined
+): void => {
+  if (minimumNoticeMinutes <= 0) return;
+  const now = new Date();
+  const diffMinutes = (startTime.getTime() - now.getTime()) / (1000 * 60);
+  if (diffMinutes < minimumNoticeMinutes) {
+    const hours = Math.ceil(minimumNoticeMinutes / 60);
+    const err = new Error(
+      `This service requires at least ${hours} hour${hours !== 1 ? 's' : ''} notice.`
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+};
+
+const checkMaxFutureBooking = (
+  startTime: Date,
+  maxFutureBookingDays: number,
+  clinicId: string,
+  serviceId: string,
+  performedById: string | undefined
+): void => {
+  const now = new Date();
+  const maxDate = new Date(now);
+  maxDate.setDate(maxDate.getDate() + maxFutureBookingDays);
+  maxDate.setHours(23, 59, 59, 999);
+  if (startTime > maxDate) {
+    const err = new Error(
+      `Appointments cannot be booked more than ${maxFutureBookingDays} days in advance.`
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+};
+
+const logBookingRejectedPolicy = async (
+  clinicId: string,
+  serviceId: string,
+  reason: string,
+  performedById: string
+): Promise<void> => {
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Booking',
+    entityId: serviceId,
+    action: 'BOOKING_REJECTED_POLICY',
+    fieldChanged: 'reason',
+    newValue: reason,
+    performedById,
+  });
+};
+
 export const createAppointment = async (
   data: CreateAppointmentData,
-  clinicId: string
+  clinicId: string,
+  context?: CreateAppointmentContext
 ) => {
   const {
     locationId,
@@ -133,7 +217,11 @@ export const createAppointment = async (
     endTime,
   } = data;
 
-  await validateServiceBelongsToClinic(serviceId, clinicId);
+  const performedById = context?.performedById;
+  const startDate = new Date(startTime);
+  const endDate = new Date(endTime);
+
+  const service = await validateServiceBelongsToClinic(serviceId, clinicId);
   const assignment = await validateProviderOffersService(
     providerId,
     serviceId,
@@ -141,11 +229,65 @@ export const createAppointment = async (
   );
   await validateLocationBelongsToClinic(locationId, clinicId);
   await validatePatient(patientId);
-  await checkDoubleBooking(
-    providerId,
-    new Date(startTime),
-    new Date(endTime)
-  );
+
+  try {
+    await checkSamePatientOverlap(patientId, startDate, endDate);
+  } catch (err) {
+    if (performedById) {
+      await logBookingRejectedPolicy(
+        clinicId,
+        serviceId,
+        'You already have another appointment during this time.',
+        performedById
+      );
+    }
+    throw err;
+  }
+
+  const minNotice = service.minimumNoticeMinutes ?? 0;
+  const maxFuture = service.maxFutureBookingDays ?? 365;
+
+  try {
+    checkMinimumNotice(
+      startDate,
+      minNotice,
+      clinicId,
+      serviceId,
+      performedById
+    );
+  } catch (err) {
+    if (performedById) {
+      await logBookingRejectedPolicy(
+        clinicId,
+        serviceId,
+        (err as Error).message,
+        performedById
+      );
+    }
+    throw err;
+  }
+
+  try {
+    checkMaxFutureBooking(
+      startDate,
+      maxFuture,
+      clinicId,
+      serviceId,
+      performedById
+    );
+  } catch (err) {
+    if (performedById) {
+      await logBookingRejectedPolicy(
+        clinicId,
+        serviceId,
+        (err as Error).message,
+        performedById
+      );
+    }
+    throw err;
+  }
+
+  await checkDoubleBooking(providerId, startDate, endDate);
 
   const priceAtBooking =
     assignment.priceOverride ?? assignment.service.defaultPrice;
