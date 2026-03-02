@@ -19,3 +19,8 @@ npx prisma migrate dev --name <migration_name>
 - **AppointmentStatus** enum: DRAFT, PENDING_PAYMENT, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW, RESCHEDULED
 - **Appointment**: id, clinicId, locationId, providerId, serviceId, patientId, startTime, endTime, status, priceAtBooking, timestamps
 - **Role**: Added PATIENT
+
+### add_visit_record_prescription
+- **VisitRecordStatus** enum: DRAFT, FINAL
+- **VisitRecord**: id, clinicId, appointmentId (unique), providerId, patientId, subjective, objective, assessment, plan, status, timestamps
+- **Prescription**: id, clinicId, appointmentId, providerId, patientId, notes, timestamps

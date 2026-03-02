@@ -176,8 +176,8 @@ model Appointment {
   service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   patient  User     @relation(fields: [patientId], references: [id], onDelete: Restrict)
 
-  visitRecord   VisitRecord?
-  prescriptions Prescription[]
+  visitRecords   VisitRecord[]
+  prescriptions  Prescription[]
 
   @@index([providerId])
   @@index([patientId])
@@ -195,9 +195,9 @@ model VisitRecord {
   patientId     String
   subjective    String?
   objective     String?
-  assessment   String?
-  plan         String?
-  status       VisitRecordStatus  @default(DRAFT)
+  assessment    String?
+  plan          String?
+  status        VisitRecordStatus @default(DRAFT)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
