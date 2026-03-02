@@ -87,25 +87,57 @@ model Discipline {
 }
 
 model Provider {
-  id           String   @id @default(cuid())
-  clinicId     String
-  userId       String?  @unique
-  firstName    String
-  lastName     String
-  email        String?
-  phone        String?
-  disciplineId String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  clinicId      String
+  userId        String?  @unique
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  disciplineId  String
+  bufferMinutes Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  clinic            Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  discipline        Discipline       @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
-  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  providerServices  ProviderService[]
-  appointments      Appointment[]
-  visitRecords      VisitRecord[]
-  prescriptions     Prescription[]
+  clinic               Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  discipline           Discipline             @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
+  user                 User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  providerServices     ProviderService[]
+  appointments         Appointment[]
+  visitRecords        VisitRecord[]
+  prescriptions       Prescription[]
+  providerAvailability    ProviderAvailability[]
+  providerUnavailability  ProviderUnavailability[]
+}
+
+model ProviderAvailability {
+  id         String   @id @default(cuid())
+  providerId String
+  weekday    Int
+  startTime  String
+  endTime    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+}
+
+model ProviderUnavailability {
+  id         String    @id @default(cuid())
+  providerId String
+  date       DateTime
+  startTime  String?
+  endTime    String?
+  reason     String?
+  createdAt  DateTime  @default(now())
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([date])
 }
 
 model Location {

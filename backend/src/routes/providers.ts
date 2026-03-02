@@ -1,10 +1,16 @@
 import { Router } from 'express';
 import * as providerController from '../controllers/providerController';
+import * as availabilityController from '../controllers/availabilityController';
 import { protect, authorize } from '../middleware/auth';
 import { enforceClinicScope } from '../middleware/clinicScope';
 import { Role } from '@prisma/client';
 
 const router = Router();
+
+router.get(
+  '/:id/availability',
+  availabilityController.getProviderAvailability
+);
 
 router.use(protect);
 router.use(enforceClinicScope);
@@ -36,6 +42,21 @@ router.delete(
   providerController.removeService
 );
 router.get('/:id', providerController.getById);
+router.post(
+  '/:id/availability',
+  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  availabilityController.createAvailability
+);
+router.put(
+  '/:id/availability/:availabilityId',
+  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  availabilityController.updateAvailability
+);
+router.post(
+  '/:id/unavailability',
+  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  availabilityController.createUnavailability
+);
 router.put(
   '/:id',
   authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
