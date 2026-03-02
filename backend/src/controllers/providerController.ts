@@ -1,0 +1,172 @@
+import { Request, Response, NextFunction } from 'express';
+import * as providerService from '../services/providerService';
+import { successResponse } from '../utils/apiResponse';
+import { asyncHandler } from '../utils/asyncHandler';
+import { getClinicWhere, assertClinicAccess } from '../middleware/clinicScope';
+import { ApiError } from '../types/errors';
+
+export const create = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.bypassClinicScope
+      ? (req.body.clinicId as string)
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const provider = await providerService.createProvider(req.body, clinicId);
+    successResponse(res, 201, 'Provider created', { provider });
+  }
+);
+
+export const list = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const where = getClinicWhere(req);
+    if (Object.keys(where).length === 0) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const providers = await providerService.getProviders(where);
+    successResponse(res, 200, 'Providers retrieved', { providers });
+  }
+);
+
+export const getById = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const provider = await providerService.getProviderById(id);
+    if (!provider) {
+      const err = new Error('Provider not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    assertClinicAccess(req, provider.clinicId);
+    successResponse(res, 200, 'Provider retrieved', { provider });
+  }
+);
+
+export const update = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const where = getClinicWhere(req);
+    if (Object.keys(where).length === 0) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const provider = await providerService.updateProvider(
+      id,
+      req.body,
+      where
+    );
+    successResponse(res, 200, 'Provider updated', { provider });
+  }
+);
+
+export const remove = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const where = getClinicWhere(req);
+    if (Object.keys(where).length === 0) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const provider = await providerService.softDeleteProvider(id, where);
+    successResponse(res, 200, 'Provider deactivated', { provider });
+  }
+);
+
+export const addService = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const { serviceId, priceOverride } = req.body;
+    const clinicId = req.bypassClinicScope
+      ? (req.body.clinicId as string) || req.clinicId
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!serviceId) {
+      const err = new Error('Service ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const assignment = await providerService.addProviderService(
+      id,
+      serviceId,
+      priceOverride,
+      clinicId
+    );
+    successResponse(res, 201, 'Service assigned to provider', {
+      providerService: assignment,
+    });
+  }
+);
+
+export const updateService = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const serviceId = req.params.serviceId as string;
+    const { priceOverride } = req.body;
+    const clinicId = req.bypassClinicScope
+      ? (req.body.clinicId as string) || req.clinicId
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const assignment = await providerService.updateProviderService(
+      id,
+      serviceId,
+      priceOverride,
+      clinicId
+    );
+    successResponse(res, 200, 'Provider service updated', {
+      providerService: assignment,
+    });
+  }
+);
+
+export const removeService = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const serviceId = req.params.serviceId as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string) || req.clinicId
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    await providerService.removeProviderService(id, serviceId, clinicId);
+    successResponse(res, 200, 'Service removed from provider');
+  }
+);
+
+export const listServices = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string) || req.clinicId
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const providerServices = await providerService.getProviderServices(
+      id,
+      clinicId
+    );
+    successResponse(res, 200, 'Provider services retrieved', {
+      providerServices,
+    });
+  }
+);
