@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import api, { clearAccessToken, setAccessToken } from '@/lib/api';
+import api, { clearAccessToken, hasSessionFlag, setAccessToken } from '@/lib/api';
 import type { User } from '@/lib/types';
 
 interface AuthContextType {
@@ -56,6 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const restoreSession = async () => {
+      if (!hasSessionFlag()) {
+        setIsLoading(false);
+        return;
+      }
       try {
         const restoredUser = await getCurrentUser();
         if (!restoredUser) {

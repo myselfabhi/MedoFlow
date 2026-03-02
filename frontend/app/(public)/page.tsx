@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { getClinics } from '@/lib/publicApi';
+import { getClinics } from '@/lib/clinicApi';
 import { Card, CardContent } from '@/components/ui/Card';
 
 export default function PublicHomePage() {
@@ -13,42 +13,61 @@ export default function PublicHomePage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-        </div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-md bg-red-50 p-4 text-red-700">Failed to load clinics.</div>
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
+          Failed to load clinics. Please try again later.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Find a Clinic</h1>
-        <p className="mt-2 text-gray-600">Select a clinic to view services and book an appointment</p>
+    <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="mb-12 text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+          Find a Clinic
+        </h1>
+        <p className="mt-3 text-lg text-gray-600">
+          Select a clinic to view services and book an appointment
+        </p>
       </div>
 
       {!clinics || clinics.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white p-16 text-center shadow-sm">
           <p className="text-gray-500">No clinics available at the moment.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {clinics.map((clinic) => (
             <Link key={clinic.id} href={`/clinic/${clinic.id}`}>
-              <Card className="cursor-pointer transition-shadow hover:shadow-md">
-                <CardContent className="p-6">
-                  <h2 className="text-lg font-semibold text-gray-900">{clinic.name}</h2>
+              <Card className="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+                <CardContent className="flex flex-col p-6">
+                  <h2 className="text-xl font-semibold text-gray-900">{clinic.name}</h2>
                   <p className="mt-1 text-sm text-gray-500">{clinic.email}</p>
-                  <p className="mt-2 text-sm text-primary-600">View services →</p>
+                  <div className="mt-6 flex items-center text-sm font-medium text-primary-600">
+                    View Services
+                    <svg
+                      className="ml-1 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
                 </CardContent>
               </Card>
             </Link>

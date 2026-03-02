@@ -9,18 +9,21 @@ import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import api, { setAccessToken } from '@/lib/api';
+import { getClinic } from '@/lib/clinicApi';
+import { getClinicServices } from '@/lib/serviceApi';
+import { getClinicProviders, getAvailability } from '@/lib/providerApi';
 import {
-  getClinicServices,
-  getClinicProviders,
   getClinicLocations,
-  getAvailability,
   checkPatientExists,
-} from '@/lib/publicApi';
+  createAppointment,
+} from '@/lib/appointmentApi';
+import { LoginModal } from '@/components/LoginModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
 const patientSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email'),
+  phone: z.string().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -43,6 +46,14 @@ export default function BookingPage() {
   const [patientExists, setPatientExists] = useState<boolean | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const { data: clinic } = useQuery({
+    queryKey: ['clinic', clinicId],
+    queryFn: () => getClinic(clinicId),
+    enabled: !!clinicId,
+  });
 
   const { data: services } = useQuery({
     queryKey: ['clinic-services', clinicId],
@@ -80,7 +91,7 @@ export default function BookingPage() {
     formState: { errors },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
-    defaultValues: { name: '', email: '', password: '' },
+    defaultValues: { name: '', email: '', phone: '', password: '' },
   });
 
   const email = watch('email');
@@ -88,36 +99,52 @@ export default function BookingPage() {
   const checkEmail = useCallback(async () => {
     if (!email || !email.includes('@')) return;
     setCheckingEmail(true);
+    setPatientExists(null);
     try {
       const exists = await checkPatientExists(email);
       setPatientExists(exists);
+      if (exists) setShowLoginModal(true);
     } finally {
       setCheckingEmail(false);
     }
   }, [email]);
 
-  const createAppointment = useCallback(
+  const handleLoginSubmit = useCallback(
+    async (loginEmail: string, password: string) => {
+      setLoginError(null);
+      try {
+        await login(loginEmail, password);
+        setShowLoginModal(false);
+      } catch {
+        setLoginError('Invalid email or password. Please try again.');
+      }
+    },
+    [login]
+  );
+
+  const doCreateAppointment = useCallback(
     async (patientId: string) => {
-      const payload = {
+      await createAppointment({
         clinicId,
-        locationId: locations?.[0]?.id,
-        providerId: providerId || providersForService?.[0]?.id,
+        locationId: locations?.[0]?.id!,
+        providerId: providerId || providersForService?.[0]?.id!,
         serviceId,
         patientId,
-        startTime: selectedSlot?.start,
-        endTime: selectedSlot?.end,
-      };
-      const { data } = await api.post<{ success: boolean }>('/appointments', payload);
-      return data;
+        startTime: selectedSlot!.start,
+        endTime: selectedSlot!.end,
+      });
     },
     [clinicId, locations, providerId, providersForService, selectedSlot, serviceId]
   );
 
   const appointmentMutation = useMutation({
-    mutationFn: async (data: { patientId?: string; name?: string; email?: string; password?: string }) => {
-      if (data.patientId) {
-        return createAppointment(data.patientId);
-      }
+    mutationFn: async (data: {
+      patientId?: string;
+      name?: string;
+      email?: string;
+      password?: string;
+    }) => {
+      if (data.patientId) return doCreateAppointment(data.patientId);
       if (!data.email || !data.password) throw new Error('Email and password required');
       await api.post('/auth/register', {
         name: data.name,
@@ -130,7 +157,7 @@ export default function BookingPage() {
         data: { accessToken: string; user: { id: string } };
       }>('/auth/login', { email: data.email, password: data.password });
       setAccessToken(loginRes.data.accessToken);
-      return createAppointment(loginRes.data.user.id);
+      return doCreateAppointment(loginRes.data.user.id);
     },
   });
 
@@ -140,7 +167,6 @@ export default function BookingPage() {
       if (isAuthenticated && user) {
         await appointmentMutation.mutateAsync({ patientId: user.id });
       } else if (patientExists) {
-        await login(data.email, data.password);
         const { data: meRes } = await api.get<{ success: boolean; data: { user: { id: string } } }>(
           '/auth/me'
         );
@@ -153,11 +179,11 @@ export default function BookingPage() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      window.location.href = '/dashboard?booked=1';
+      window.location.href = '/dashboard/appointments';
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
-        setBookingError('This time slot is no longer available. Please select another.');
+        setBookingError('This slot was just booked. Please select another.');
       } else {
         setBookingError(axErr.response?.data?.message || 'Booking failed. Please try again.');
       }
@@ -170,11 +196,11 @@ export default function BookingPage() {
     try {
       await appointmentMutation.mutateAsync({ patientId: user.id });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      window.location.href = '/dashboard?booked=1';
+      window.location.href = '/dashboard/appointments';
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
-        setBookingError('This time slot is no longer available. Please select another.');
+        setBookingError('This slot was just booked. Please select another.');
       } else {
         setBookingError(axErr.response?.data?.message || 'Booking failed. Please try again.');
       }
@@ -196,10 +222,10 @@ export default function BookingPage() {
   if (!clinicId) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="rounded-md bg-red-50 p-4 text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           Invalid booking. Please select a service from a clinic.
         </div>
-        <Link href="/" className="mt-4 inline-block text-primary-600 hover:underline">
+        <Link href="/" className="mt-6 inline-block text-primary-600 hover:underline">
           ← Back to clinics
         </Link>
       </div>
@@ -207,42 +233,50 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
+    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       <div className="mb-8">
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {STEPS.map((s, i) => (
             <div
               key={s}
-              className={`h-2 flex-1 rounded-full ${i <= step ? 'bg-primary-600' : 'bg-gray-200'}`}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i <= step ? 'bg-primary-600' : 'bg-gray-200'
+              }`}
             />
           ))}
         </div>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-3 text-sm text-gray-500">
           Step {step + 1} of 5: {STEPS[step]}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <h1 className="text-xl font-semibold">Book {service?.name || 'Service'}</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-semibold text-gray-900">
+            Book {service?.name || 'Service'}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
             {service?.duration} min · ${service?.defaultPrice}
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="font-medium">Select Provider</h2>
-              <div className="space-y-2">
+              <h2 className="font-medium text-gray-900">Select Provider</h2>
+              <div className="space-y-3">
                 <button
                   type="button"
                   onClick={() => {
                     setProviderId(null);
                     nextStep();
                   }}
-                  className={`block w-full rounded-lg border p-4 text-left ${!providerId ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
+                    !providerId
+                      ? 'border-primary-600 bg-primary-50/50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
                 >
-                  Any Available
+                  <span className="font-medium">Any Available</span>
                 </button>
                 {providersForService?.map((p) => (
                   <button
@@ -252,9 +286,16 @@ export default function BookingPage() {
                       setProviderId(p.id);
                       nextStep();
                     }}
-                    className={`block w-full rounded-lg border p-4 text-left ${providerId === p.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+                    className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
+                      providerId === p.id
+                        ? 'border-primary-600 bg-primary-50/50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
-                    {p.firstName} {p.lastName} ({p.discipline.name})
+                    <span className="font-medium">
+                      {p.firstName} {p.lastName}
+                    </span>
+                    <span className="text-sm text-gray-500">{p.discipline.name}</span>
                   </button>
                 ))}
               </div>
@@ -263,34 +304,43 @@ export default function BookingPage() {
 
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="font-medium">Select Date</h2>
+              <h2 className="font-medium text-gray-900">Select Date</h2>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="block w-full rounded-lg border border-gray-300 px-4 py-3"
               />
-              <button
-                type="button"
-                onClick={nextStep}
-                disabled={!selectedDate}
-                className="rounded-md bg-primary-600 px-4 py-2 text-white disabled:opacity-50"
-              >
-                Next
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={nextStep}
+                  disabled={!selectedDate}
+                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="font-medium">Select Time</h2>
+              <h2 className="font-medium text-gray-900">Select Time</h2>
               {slotsLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-12">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {slots?.map((slot) => (
                     <button
                       key={slot.start}
@@ -299,13 +349,17 @@ export default function BookingPage() {
                         setSelectedSlot(slot);
                         nextStep();
                       }}
-                      className={`rounded-md border p-2 text-sm ${selectedSlot?.start === slot.start ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      className={`rounded-lg border-2 p-3 text-sm font-medium transition-all ${
+                        selectedSlot?.start === slot.start
+                          ? 'border-primary-600 bg-primary-50/50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     >
                       {formatTime(slot.start)}
                     </button>
                   ))}
                   {slots?.length === 0 && (
-                    <p className="col-span-3 text-sm text-gray-500">
+                    <p className="col-span-full text-center text-sm text-gray-500">
                       No slots available. Try another date.
                     </p>
                   )}
@@ -319,18 +373,22 @@ export default function BookingPage() {
 
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="font-medium">Patient Information</h2>
+              <h2 className="font-medium text-gray-900">Patient Details</h2>
               {isAuthenticated && user ? (
                 <div className="rounded-lg bg-gray-50 p-4">
                   <p className="text-sm text-gray-700">Booking as {user.email}</p>
-                  <div className="mt-4 flex gap-2">
-                    <button type="button" onClick={prevStep} className="rounded-md border px-4 py-2">
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm"
+                    >
                       Back
                     </button>
                     <button
                       type="button"
                       onClick={nextStep}
-                      className="rounded-md bg-primary-600 px-4 py-2 text-white"
+                      className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white"
                     >
                       Next
                     </button>
@@ -342,7 +400,7 @@ export default function BookingPage() {
                     <label className="block text-sm font-medium text-gray-700">Name</label>
                     <input
                       {...register('name')}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
                     />
                     {errors.name && (
                       <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -354,7 +412,7 @@ export default function BookingPage() {
                       {...register('email')}
                       type="email"
                       onBlur={checkEmail}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
                     />
                     {checkingEmail && (
                       <p className="mt-1 text-sm text-gray-500">Checking...</p>
@@ -364,35 +422,39 @@ export default function BookingPage() {
                     )}
                     {patientExists === true && (
                       <p className="mt-1 text-sm text-amber-600">
-                        Existing patient. Please{' '}
-                        <Link href={`/login?returnUrl=${encodeURIComponent(`/book/${serviceId}?clinicId=${clinicId}`)}`} className="underline">
-                          log in
-                        </Link>{' '}
-                        or enter your password below.
+                        Existing patient. Sign in to continue.
                       </p>
                     )}
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">Phone</label>
+                    <input
+                      {...register('phone')}
+                      type="tel"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Password
-                      {patientExists === true
-                        ? ' (to confirm your identity)'
-                        : ' (for new account)'}
+                      Password {patientExists === true ? '(to confirm identity)' : '(for new account)'}
                     </label>
                     <input
                       {...register('password')}
                       type="password"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
                     />
                     {errors.password && (
                       <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={prevStep} className="rounded-md border px-4 py-2">
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={prevStep} className="rounded-lg border px-4 py-2">
                       Back
                     </button>
-                    <button type="submit" className="rounded-md bg-primary-600 px-4 py-2 text-white">
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-primary-600 px-4 py-2 font-medium text-white"
+                    >
                       Next
                     </button>
                   </div>
@@ -403,19 +465,20 @@ export default function BookingPage() {
 
           {step === 4 && (
             <div className="space-y-4">
-              <h2 className="font-medium">Confirm Booking</h2>
-              <div className="rounded-lg bg-gray-50 p-4 text-sm">
+              <h2 className="font-medium text-gray-900">Confirm Booking</h2>
+              <div className="rounded-lg bg-gray-50 p-5 text-sm">
+                <p>
+                  <strong>Clinic:</strong> {clinic?.name}
+                </p>
                 <p>
                   <strong>Service:</strong> {service?.name}
                 </p>
                 <p>
-                  <strong>Date:</strong> {selectedDate && formatDate(selectedDate)}
-                </p>
-                <p>
-                  <strong>Time:</strong> {selectedSlot && formatTime(selectedSlot.start)}
-                </p>
-                <p>
                   <strong>Provider:</strong> {providerName}
+                </p>
+                <p>
+                  <strong>Date & Time:</strong> {selectedDate && formatDate(selectedDate)} at{' '}
+                  {selectedSlot && formatTime(selectedSlot.start)}
                 </p>
                 <p>
                   <strong>Price:</strong> ${service?.defaultPrice}
@@ -427,10 +490,12 @@ export default function BookingPage() {
                 )}
               </div>
               {bookingError && (
-                <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{bookingError}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {bookingError}
+                </div>
               )}
-              <div className="flex gap-2">
-                <button type="button" onClick={prevStep} className="rounded-md border px-4 py-2">
+              <div className="flex gap-3">
+                <button type="button" onClick={prevStep} className="rounded-lg border px-4 py-2">
                   Back
                 </button>
                 {isAuthenticated ? (
@@ -438,18 +503,32 @@ export default function BookingPage() {
                     type="button"
                     onClick={handleConfirmAuthenticated}
                     disabled={appointmentMutation.isPending}
-                    className="rounded-md bg-primary-600 px-4 py-2 text-white disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                   >
-                    {appointmentMutation.isPending ? 'Booking...' : 'Confirm Booking'}
+                    {appointmentMutation.isPending ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Booking...
+                      </>
+                    ) : (
+                      'Confirm Booking'
+                    )}
                   </button>
                 ) : (
                   <form onSubmit={handleSubmit(onSubmit)} className="inline">
                     <button
                       type="submit"
                       disabled={appointmentMutation.isPending}
-                      className="rounded-md bg-primary-600 px-4 py-2 text-white disabled:opacity-50"
+                      className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                     >
-                      {appointmentMutation.isPending ? 'Booking...' : 'Confirm Booking'}
+                      {appointmentMutation.isPending ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Booking...
+                        </>
+                      ) : (
+                        'Confirm Booking'
+                      )}
                     </button>
                   </form>
                 )}
@@ -458,6 +537,18 @@ export default function BookingPage() {
           )}
         </CardContent>
       </Card>
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => {
+          setShowLoginModal(false);
+          setLoginError(null);
+        }}
+        email={email}
+        onSubmit={handleLoginSubmit}
+        isLoading={false}
+        error={loginError}
+      />
     </div>
   );
 }

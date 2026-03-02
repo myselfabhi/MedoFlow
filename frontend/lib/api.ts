@@ -2,17 +2,30 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+const SESSION_FLAG_KEY = 'medoflow_has_session';
+
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
 export const setAccessToken = (token: string) => {
   accessToken = token;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(SESSION_FLAG_KEY, '1');
+  }
 };
 
 export const getAccessToken = () => accessToken;
 
 export const clearAccessToken = () => {
   accessToken = null;
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(SESSION_FLAG_KEY);
+  }
+};
+
+export const hasSessionFlag = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return !!window.localStorage.getItem(SESSION_FLAG_KEY);
 };
 
 const api = axios.create({
