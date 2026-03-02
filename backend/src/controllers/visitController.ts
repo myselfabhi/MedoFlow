@@ -52,6 +52,11 @@ export const getByAppointment = asyncHandler(
         throw err;
       }
     }
+    if (req.user?.role === 'PATIENT' && visitRecord.patientId !== req.user.id) {
+      const err = new Error('Access denied') as ApiError;
+      err.statusCode = 403;
+      throw err;
+    }
     successResponse(res, 200, 'Visit record retrieved', { visitRecord });
   }
 );

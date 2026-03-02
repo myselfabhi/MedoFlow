@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -14,8 +15,19 @@ const navItems = [
   { href: '/dashboard/analytics', label: 'Analytics' },
 ];
 
+const patientNavItem = {
+  href: '/dashboard/patient/appointments',
+  label: 'Patient Portal',
+};
+
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const isPatient = user?.role === 'PATIENT';
+
+  const items = isPatient
+    ? [patientNavItem, ...navItems]
+    : navItems;
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-gray-200 bg-white">
@@ -26,7 +38,7 @@ export function Sidebar() {
           </Link>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link

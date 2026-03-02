@@ -235,10 +235,10 @@ export const getAppointmentsByClinic = async (clinicId: string) => {
 
 export const getAppointmentById = async (
   id: string,
-  where: { clinicId?: string } = {}
+  where: { clinicId?: string; patientId?: string } = {}
 ) => {
   return prisma.appointment.findFirst({
-    where: { id, ...where } as { id: string; clinicId?: string },
+    where: { id, ...where } as { id: string; clinicId?: string; patientId?: string },
     include: {
       clinic: { select: { id: true, name: true } },
       location: { select: { id: true, name: true } },

@@ -38,6 +38,25 @@ export const getMy = asyncHandler(
   }
 );
 
+export const getById = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const where: { patientId?: string; clinicId?: string } = {};
+    if (req.user!.role === 'PATIENT') {
+      where.patientId = req.user!.id;
+    } else if (req.clinicId) {
+      where.clinicId = req.clinicId;
+    }
+    const appointment = await appointmentService.getAppointmentById(id, where);
+    if (!appointment) {
+      const err = new Error('Appointment not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    successResponse(res, 200, 'Appointment retrieved', { appointment });
+  }
+);
+
 export const getProvider = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const provider = await appointmentService.getProviderByUserId(req.user!.id);

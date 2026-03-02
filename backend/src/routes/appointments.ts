@@ -76,6 +76,22 @@ router.get(
   appointmentController.getClinic
 );
 
+router.get(
+  '/:id',
+  authorize(Role.PATIENT, Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  (req: Request, _res: Response, next: NextFunction) => {
+    if (req.user!.role === 'PATIENT') {
+      req.bypassClinicScope = true;
+      req.clinicId = null;
+    } else {
+      req.bypassClinicScope = req.user!.role === 'SUPER_ADMIN';
+      req.clinicId = (req.query?.clinicId as string) || req.user?.clinicId || null;
+    }
+    next();
+  },
+  appointmentController.getById
+);
+
 const statusUpdateScope = (
   req: Request,
   res: Response,

@@ -32,10 +32,31 @@ router.post(
   providerScope,
   visitController.create
 );
+const visitGetScope = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void => {
+  if (req.user!.role === 'SUPER_ADMIN') {
+    req.bypassClinicScope = true;
+    req.clinicId =
+      (req.body?.clinicId as string) ||
+      (req.query?.clinicId as string) ||
+      null;
+  } else if (req.user!.role === 'PROVIDER' || req.user!.role === 'CLINIC_ADMIN') {
+    req.bypassClinicScope = false;
+    req.clinicId = req.user!.clinicId;
+  } else if (req.user!.role === 'PATIENT') {
+    req.bypassClinicScope = true;
+    req.clinicId = (req.query?.clinicId as string) || null;
+  }
+  next();
+};
+
 router.get(
   '/appointment/:appointmentId',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  providerScope,
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.PATIENT),
+  visitGetScope,
   visitController.getByAppointment
 );
 router.put(
