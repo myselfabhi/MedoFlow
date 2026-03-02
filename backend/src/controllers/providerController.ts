@@ -125,7 +125,8 @@ export const updateService = asyncHandler(
       id,
       serviceId,
       priceOverride,
-      clinicId
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 200, 'Provider service updated', {
       providerService: assignment,

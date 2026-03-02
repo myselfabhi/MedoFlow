@@ -1,5 +1,6 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
+import * as auditService from './auditService';
 
 export interface CreateDisciplineData {
   name: string;
@@ -87,7 +88,11 @@ export const updateDiscipline = async (
   });
 };
 
-export const deleteDiscipline = async (id: string, where: ClinicWhere) => {
+export const deleteDiscipline = async (
+  id: string,
+  where: ClinicWhere,
+  performedById: string
+) => {
   const findWhere = Object.keys(where).length === 0 ? { id } : { id, ...where };
   const discipline = await prisma.discipline.findFirst({
     where: findWhere as { id: string; clinicId?: string },
@@ -109,8 +114,21 @@ export const deleteDiscipline = async (id: string, where: ClinicWhere) => {
     throw err;
   }
   const updateWhere = Object.keys(where).length === 0 ? { id } : { id, ...where };
-  return prisma.discipline.update({
+  const updated = await prisma.discipline.update({
     where: updateWhere as { id: string; clinicId?: string },
     data: { isActive: false },
   });
+  if (discipline.isActive) {
+    await auditService.logAudit({
+      clinicId: discipline.clinicId,
+      entityType: 'Discipline',
+      entityId: id,
+      action: 'ARCHIVE',
+      fieldChanged: 'isActive',
+      oldValue: true,
+      newValue: false,
+      performedById,
+    });
+  }
+  return updated;
 };

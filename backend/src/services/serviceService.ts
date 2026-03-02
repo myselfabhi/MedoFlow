@@ -1,5 +1,6 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
+import * as auditService from './auditService';
 
 export interface CreateServiceData {
   disciplineId: string;
@@ -85,7 +86,8 @@ export const getServiceById = async (id: string, where: ClinicWhere = {}) => {
 export const updateService = async (
   id: string,
   data: Partial<CreateServiceData & { isActive?: boolean; disciplineId?: string }>,
-  where: ClinicWhere
+  where: ClinicWhere,
+  performedById: string
 ) => {
   const service = await prisma.service.findUnique({ where: { id } });
   if (!service) {
@@ -116,7 +118,7 @@ export const updateService = async (
     await validateDisciplineBelongsToClinic(data.disciplineId, clinicId || service.clinicId);
   }
 
-  return prisma.service.update({
+  const updated = await prisma.service.update({
     where: { id },
     data: {
       ...(data.name && { name: data.name }),
@@ -130,20 +132,53 @@ export const updateService = async (
       discipline: { select: { id: true, name: true } },
     },
   });
+
+  const cid = clinicId || service.clinicId;
+  if (data.defaultPrice !== undefined && String(service.defaultPrice) !== String(data.defaultPrice)) {
+    await auditService.logAudit({
+      clinicId: cid,
+      entityType: 'Service',
+      entityId: id,
+      action: 'UPDATE',
+      fieldChanged: 'defaultPrice',
+      oldValue: service.defaultPrice.toString(),
+      newValue: String(data.defaultPrice),
+      performedById,
+    });
+  }
+
+  return updated;
 };
 
-export const archiveService = async (id: string, where: ClinicWhere) => {
+export const archiveService = async (
+  id: string,
+  where: ClinicWhere,
+  performedById: string
+) => {
   const service = await getServiceById(id, where);
   if (!service) {
     const err = new Error('Service not found') as ApiError;
     err.statusCode = 404;
     throw err;
   }
-  return prisma.service.update({
+  const updated = await prisma.service.update({
     where: { id },
     data: { isActive: false },
     include: {
       discipline: { select: { id: true, name: true } },
     },
   });
+  if (service.isActive) {
+    await auditService.logAudit({
+      clinicId: service.clinicId,
+      entityType: 'Service',
+      entityId: id,
+      action: 'ARCHIVE',
+      fieldChanged: 'isActive',
+      oldValue: true,
+      newValue: false,
+      performedById,
+    });
+  }
+  return updated;
 };

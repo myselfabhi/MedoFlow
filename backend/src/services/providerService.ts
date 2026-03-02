@@ -1,5 +1,6 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
+import * as auditService from './auditService';
 
 export interface CreateProviderData {
   firstName: string;
@@ -264,7 +265,8 @@ export const updateProviderService = async (
   providerId: string,
   serviceId: string,
   priceOverride: number | string | null | undefined,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const provider = await getProviderById(providerId, { clinicId });
   if (!provider) {
@@ -283,15 +285,34 @@ export const updateProviderService = async (
     throw err;
   }
 
-  return prisma.providerService.update({
+  const newPrice = priceOverride ?? null;
+  const oldStr = existing.priceOverride?.toString() ?? null;
+  const newStr = newPrice != null ? String(newPrice) : null;
+
+  const updated = await prisma.providerService.update({
     where: { id: existing.id },
-    data: { priceOverride: priceOverride ?? null },
+    data: { priceOverride: newPrice },
     include: {
       service: {
         include: { discipline: { select: { id: true, name: true } } },
       },
     },
   });
+
+  if (oldStr !== newStr) {
+    await auditService.logAudit({
+      clinicId,
+      entityType: 'ProviderService',
+      entityId: existing.id,
+      action: 'UPDATE',
+      fieldChanged: 'priceOverride',
+      oldValue: oldStr,
+      newValue: newStr,
+      performedById,
+    });
+  }
+
+  return updated;
 };
 
 export const removeProviderService = async (

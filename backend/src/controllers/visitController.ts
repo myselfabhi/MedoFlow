@@ -108,7 +108,8 @@ export const finalize = asyncHandler(
     const visitRecord = await visitService.finalizeVisitRecord(
       id,
       provider.id,
-      clinicId
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 200, 'Visit record finalized', { visitRecord });
   }

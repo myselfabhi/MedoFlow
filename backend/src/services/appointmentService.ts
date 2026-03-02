@@ -2,6 +2,7 @@ import prisma from '../config/prisma';
 import { Request } from 'express';
 import { ApiError } from '../types/errors';
 import { AppointmentStatus } from '@prisma/client';
+import * as auditService from './auditService';
 
 const CANCELLED_STATUS = 'CANCELLED';
 
@@ -310,6 +311,20 @@ export const updateAppointmentStatus = async (
     const err = new Error('Access denied') as ApiError;
     err.statusCode = 403;
     throw err;
+  }
+
+  const performedById = req.user?.id;
+  if (performedById && appointment.status !== status) {
+    await auditService.logAudit({
+      clinicId: appointment.clinicId,
+      entityType: 'Appointment',
+      entityId: id,
+      action: 'UPDATE',
+      fieldChanged: 'status',
+      oldValue: appointment.status,
+      newValue: status,
+      performedById,
+    });
   }
 
   return prisma.appointment.update({

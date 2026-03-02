@@ -47,6 +47,7 @@ model Clinic {
   appointments  Appointment[]
   visitRecords  VisitRecord[]
   prescriptions Prescription[]
+  auditLogs     AuditLog[]
 }
 
 model User {
@@ -66,6 +67,7 @@ model User {
   appointments   Appointment[]
   visitRecords   VisitRecord[]
   prescriptions  Prescription[]
+  auditLogs     AuditLog[]
 }
 
 model Discipline {
@@ -232,4 +234,24 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  clinicId      String
+  entityType    String
+  entityId      String
+  action        String
+  fieldChanged  String?
+  oldValue      Json?
+  newValue      Json?
+  performedById String
+  createdAt     DateTime @default(now())
+
+  clinic      Clinic @relation(fields: [clinicId], references: [id])
+  performedBy User   @relation(fields: [performedById], references: [id])
+
+  @@index([clinicId])
+  @@index([entityType])
+  @@index([entityId])
 }

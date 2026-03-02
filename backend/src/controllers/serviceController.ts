@@ -48,7 +48,12 @@ export const update = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const service = await serviceService.updateService(id, req.body, where);
+    const service = await serviceService.updateService(
+      id,
+      req.body,
+      where,
+      req.user!.id
+    );
     successResponse(res, 200, 'Service updated', { service });
   }
 );
@@ -68,7 +73,11 @@ export const remove = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const service = await serviceService.archiveService(id, where);
+    const service = await serviceService.archiveService(
+      id,
+      where,
+      req.user!.id
+    );
     successResponse(res, 200, 'Service archived', { service });
   }
 );

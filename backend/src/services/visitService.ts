@@ -1,5 +1,6 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
+import * as auditService from './auditService';
 
 export interface CreateVisitRecordData {
   appointmentId: string;
@@ -153,7 +154,8 @@ export const updateVisitRecord = async (
 export const finalizeVisitRecord = async (
   id: string,
   providerId: string,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const record = await getVisitRecordById(id, { clinicId });
   if (!record) {
@@ -169,7 +171,7 @@ export const finalizeVisitRecord = async (
     throw err;
   }
 
-  return prisma.visitRecord.update({
+  const updated = await prisma.visitRecord.update({
     where: { id },
     data: { status: 'FINAL' },
     include: {
@@ -178,6 +180,21 @@ export const finalizeVisitRecord = async (
       patient: { select: { id: true, name: true, email: true } },
     },
   });
+
+  if (record.status !== 'FINAL') {
+    await auditService.logAudit({
+      clinicId,
+      entityType: 'VisitRecord',
+      entityId: id,
+      action: 'FINALIZE',
+      fieldChanged: 'status',
+      oldValue: record.status,
+      newValue: 'FINAL',
+      performedById,
+    });
+  }
+
+  return updated;
 };
 
 export const getVisitRecordsByClinic = async (clinicId: string) => {

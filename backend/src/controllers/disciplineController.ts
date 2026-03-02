@@ -75,7 +75,7 @@ export const remove = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    await disciplineService.deleteDiscipline(id, where);
+    await disciplineService.deleteDiscipline(id, where, req.user!.id);
     successResponse(res, 200, 'Discipline deleted');
   }
 );
