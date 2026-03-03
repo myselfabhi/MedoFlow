@@ -18,6 +18,7 @@ import {
   createAppointment,
 } from '@/lib/appointmentApi';
 import { LoginModal } from '@/components/LoginModal';
+import { WaitlistModal } from '@/components/WaitlistModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
 const patientSchema = z.object({
@@ -49,6 +50,7 @@ export default function BookingPage() {
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
 
   const { data: clinic } = useQuery({
     queryKey: ['clinic', clinicId],
@@ -363,9 +365,20 @@ export default function BookingPage() {
                     </button>
                   ))}
                   {slots?.length === 0 && (
-                    <p className="col-span-full text-center text-sm text-gray-500">
-                      No slots available. Try another date.
-                    </p>
+                    <div className="col-span-full space-y-3 text-center">
+                      <p className="text-sm text-gray-500">
+                        No slots available. Try another date.
+                      </p>
+                      {providersForService && providersForService.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowWaitlistModal(true)}
+                          className="rounded-lg border-2 border-primary-600 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100"
+                        >
+                          Join waitlist
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -552,6 +565,15 @@ export default function BookingPage() {
         onSubmit={handleLoginSubmit}
         isLoading={false}
         error={loginError}
+      />
+      <WaitlistModal
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
+        clinicId={clinicId}
+        providerId={providerId || providersForService?.[0]?.id || ''}
+        serviceId={serviceId}
+        defaultPreferredDate={selectedDate}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['waitlist'] })}
       />
     </div>
   );
