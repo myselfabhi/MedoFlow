@@ -30,6 +30,12 @@ enum VisitRecordStatus {
   FINAL
 }
 
+enum TreatmentPlanStatus {
+  ACTIVE
+  COMPLETED
+  DISCONTINUED
+}
+
 model Clinic {
   id               String   @id @default(cuid())
   name             String
@@ -50,6 +56,7 @@ model Clinic {
   auditLogs       AuditLog[]
   waitlistEntries WaitlistEntry[]
   payments        Payment[]
+  treatmentPlans  TreatmentPlan[]
 }
 
 model User {
@@ -73,6 +80,7 @@ model User {
   waitlistEntries WaitlistEntry[]
   payments        Payment[]
   visitNoteVersions VisitNoteVersion[]
+  treatmentPlans   TreatmentPlan[] @relation("PatientPlans")
 }
 
 model Discipline {
@@ -84,9 +92,10 @@ model Discipline {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  clinic    Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  providers Provider[]
-  services  Service[]
+  clinic         Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  providers      Provider[]
+  services       Service[]
+  treatmentPlans TreatmentPlan[]
 
   @@unique([clinicId, name])
 }
@@ -115,6 +124,7 @@ model Provider {
   providerAvailability    ProviderAvailability[]
   providerUnavailability  ProviderUnavailability[]
   waitlistEntries         WaitlistEntry[]
+  treatmentPlans          TreatmentPlan[]
 }
 
 model ProviderAvailability {
@@ -379,5 +389,32 @@ model WaitlistEntry {
   @@index([serviceId])
   @@index([status])
   @@index([patientId])
+  @@index([clinicId])
+}
+
+model TreatmentPlan {
+  id                String              @id @default(cuid())
+  clinicId          String
+  patientId         String
+  providerId        String
+  disciplineId      String
+  name              String
+  totalSessions     Int
+  sessionsCompleted Int                 @default(0)
+  startDate         DateTime
+  endDate           DateTime?
+  goals             Json?
+  notes             String?
+  status            TreatmentPlanStatus  @default(ACTIVE)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  clinic     Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient    User       @relation("PatientPlans", fields: [patientId], references: [id], onDelete: Restrict)
+  provider   Provider   @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([providerId])
   @@index([clinicId])
 }
