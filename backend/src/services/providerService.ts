@@ -157,6 +157,7 @@ export const getProviderById = async (
     include: {
       discipline: { select: { id: true, name: true } },
       user: { select: { id: true, name: true, email: true } },
+      providerAvailability: true,
     },
   });
 };
