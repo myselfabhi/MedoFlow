@@ -17,6 +17,7 @@ export interface CreateAppointmentData {
 
 export interface CreateAppointmentContext {
   performedById?: string;
+  excludeAppointmentId?: string;
 }
 
 const validateServiceBelongsToClinic = async (
@@ -109,7 +110,7 @@ const checkDoubleBooking = async (
   const conflicting = await prisma.appointment.findFirst({
     where: {
       providerId,
-      status: { not: CANCELLED_STATUS },
+      status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
       startTime: { lt: endTime },
       endTime: { gt: startTime },
       ...(excludeId ? { id: { not: excludeId } } : {}),
@@ -124,17 +125,21 @@ const checkDoubleBooking = async (
   }
 };
 
+const RESCHEDULED_STATUS = 'RESCHEDULED';
+
 const checkSamePatientOverlap = async (
   patientId: string,
   startTime: Date,
-  endTime: Date
+  endTime: Date,
+  excludeId: string | null = null
 ): Promise<void> => {
   const conflicting = await prisma.appointment.findFirst({
     where: {
       patientId,
-      status: { not: CANCELLED_STATUS },
+      status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
       startTime: { lt: endTime },
       endTime: { gt: startTime },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
     },
   });
   if (conflicting) {
@@ -218,6 +223,7 @@ export const createAppointment = async (
   } = data;
 
   const performedById = context?.performedById;
+  const excludeAppointmentId = context?.excludeAppointmentId ?? null;
   const startDate = new Date(startTime);
   const endDate = new Date(endTime);
 
@@ -231,7 +237,7 @@ export const createAppointment = async (
   await validatePatient(patientId);
 
   try {
-    await checkSamePatientOverlap(patientId, startDate, endDate);
+    await checkSamePatientOverlap(patientId, startDate, endDate, excludeAppointmentId);
   } catch (err) {
     if (performedById) {
       await logBookingRejectedPolicy(
@@ -287,7 +293,7 @@ export const createAppointment = async (
     throw err;
   }
 
-  await checkDoubleBooking(providerId, startDate, endDate);
+  await checkDoubleBooking(providerId, startDate, endDate, excludeAppointmentId);
 
   const priceAtBooking =
     assignment.priceOverride ?? assignment.service.defaultPrice;
@@ -317,6 +323,187 @@ export const createAppointment = async (
       patient: { select: { id: true, name: true, email: true } },
     },
   });
+};
+
+export interface CancelAppointmentResult {
+  appointment: Awaited<ReturnType<typeof prisma.appointment.update>>;
+  lateCancellation: boolean;
+  cancellationFee?: { type: string; value: string; amount?: string };
+}
+
+export const cancelAppointment = async (
+  appointmentId: string,
+  reason: string,
+  performedById: string,
+  where: { clinicId?: string; patientId?: string; providerId?: string } = {}
+): Promise<CancelAppointmentResult> => {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, ...where },
+    include: { service: true },
+  });
+  if (!appointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+  if (appointment.status === 'CANCELLED') {
+    const err = new Error('Appointment is already cancelled') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  const windowHours = appointment.service.cancellationWindowHours ?? 0;
+  const now = new Date();
+  const hoursBeforeStart =
+    (appointment.startTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  const withinWindow = hoursBeforeStart <= windowHours;
+  let cancellationFee: CancelAppointmentResult['cancellationFee'] | undefined;
+  const feeType = appointment.service.cancellationFeeType ?? 'NONE';
+  if (withinWindow && feeType !== 'NONE' && appointment.service.cancellationFeeValue != null) {
+    const val = Number(appointment.service.cancellationFeeValue);
+    if (feeType === 'FIXED') {
+      cancellationFee = { type: 'FIXED', value: val.toString(), amount: val.toString() };
+    } else if (feeType === 'PERCENTAGE') {
+      const amount = (Number(appointment.priceAtBooking) * val) / 100;
+      cancellationFee = { type: 'PERCENTAGE', value: val.toString(), amount: amount.toFixed(2) };
+    }
+  }
+  const updated = await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: {
+      status: 'CANCELLED',
+      cancelledAt: now,
+      cancellationReason: reason,
+    },
+    include: {
+      clinic: { select: { id: true, name: true } },
+      location: { select: { id: true, name: true } },
+      provider: {
+        include: {
+          discipline: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true } },
+        },
+      },
+      service: { select: { id: true, name: true, duration: true } },
+      patient: { select: { id: true, name: true, email: true } },
+    },
+  });
+  await auditService.logAudit({
+    clinicId: appointment.clinicId,
+    entityType: 'Appointment',
+    entityId: appointmentId,
+    action: 'APPOINTMENT_CANCELLED',
+    fieldChanged: 'status',
+    oldValue: { status: appointment.status },
+    newValue: {
+      status: 'CANCELLED',
+      reason,
+      withinCancellationWindow: withinWindow,
+    },
+    performedById,
+  });
+  return {
+    appointment: updated,
+    lateCancellation: withinWindow,
+    cancellationFee,
+  };
+};
+
+export interface RescheduleAppointmentData {
+  newStartTime: string | Date;
+  newEndTime: string | Date;
+}
+
+export const rescheduleAppointment = async (
+  oldAppointmentId: string,
+  data: RescheduleAppointmentData,
+  performedById: string,
+  where: { clinicId?: string; patientId?: string; providerId?: string } = {}
+) => {
+  const oldAppointment = await prisma.appointment.findFirst({
+    where: { id: oldAppointmentId, ...where },
+    include: { service: true },
+  });
+  if (!oldAppointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+  if (oldAppointment.status === 'CANCELLED') {
+    const err = new Error('Cannot reschedule a cancelled appointment') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  if (oldAppointment.status === 'RESCHEDULED') {
+    const err = new Error('Appointment has already been rescheduled') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  const { newStartTime, newEndTime } = data;
+  const createData: CreateAppointmentData = {
+    locationId: oldAppointment.locationId,
+    providerId: oldAppointment.providerId,
+    serviceId: oldAppointment.serviceId,
+    patientId: oldAppointment.patientId,
+    startTime: newStartTime,
+    endTime: newEndTime,
+  };
+  const newAppointment = await createAppointment(createData, oldAppointment.clinicId, {
+    performedById,
+    excludeAppointmentId: oldAppointmentId,
+  });
+  await prisma.$transaction([
+    prisma.appointment.update({
+      where: { id: oldAppointmentId },
+      data: { status: 'RESCHEDULED', rescheduledToId: newAppointment.id },
+    }),
+    prisma.appointment.update({
+      where: { id: newAppointment.id },
+      data: { rescheduledFromId: oldAppointmentId },
+    }),
+  ]);
+  const updatedOld = await prisma.appointment.findUnique({
+    where: { id: oldAppointmentId },
+    include: {
+      clinic: { select: { id: true, name: true } },
+      location: { select: { id: true, name: true } },
+      provider: {
+        include: {
+          discipline: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true } },
+        },
+      },
+      service: { select: { id: true, name: true, duration: true } },
+      patient: { select: { id: true, name: true, email: true } },
+      rescheduledTo: {
+        include: {
+          clinic: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true } },
+          provider: {
+            include: {
+              discipline: { select: { id: true, name: true } },
+              user: { select: { id: true, name: true } },
+            },
+          },
+          service: { select: { id: true, name: true, duration: true } },
+          patient: { select: { id: true, name: true, email: true } },
+        },
+      },
+    },
+  });
+  await auditService.logAudit({
+    clinicId: oldAppointment.clinicId,
+    entityType: 'Appointment',
+    entityId: oldAppointmentId,
+    action: 'APPOINTMENT_RESCHEDULED',
+    fieldChanged: 'status',
+    oldValue: { status: oldAppointment.status, appointmentId: oldAppointmentId },
+    newValue: { status: 'RESCHEDULED', newAppointmentId: newAppointment.id },
+    performedById,
+  });
+  return {
+    oldAppointment: updatedOld,
+    newAppointment,
+  };
 };
 
 export const getAppointmentsByPatient = async (
@@ -378,10 +565,10 @@ export const getAppointmentsByClinic = async (clinicId: string) => {
 
 export const getAppointmentById = async (
   id: string,
-  where: { clinicId?: string; patientId?: string } = {}
+  where: { clinicId?: string; patientId?: string; providerId?: string } = {}
 ) => {
   return prisma.appointment.findFirst({
-    where: { id, ...where } as { id: string; clinicId?: string; patientId?: string },
+    where: { id, ...where } as { id: string; clinicId?: string; patientId?: string; providerId?: string },
     include: {
       clinic: { select: { id: true, name: true } },
       location: { select: { id: true, name: true } },

@@ -125,3 +125,58 @@ export const updateStatus = asyncHandler(
     successResponse(res, 200, 'Appointment status updated', { appointment });
   }
 );
+
+const getCancelRescheduleWhere = async (
+  req: Request
+): Promise<{ clinicId?: string; patientId?: string; providerId?: string }> => {
+  if (req.user!.role === 'PATIENT') return { patientId: req.user!.id };
+  if (req.user!.role === 'PROVIDER') {
+    const provider = await appointmentService.getProviderByUserId(req.user!.id);
+    if (provider) return { providerId: provider.id };
+  }
+  if (req.user!.role === 'CLINIC_ADMIN' && req.clinicId) return { clinicId: req.clinicId };
+  return {};
+};
+
+export const cancel = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const { reason } = req.body;
+    const reasonStr = (reason as string)?.trim() ?? '';
+    const where = await getCancelRescheduleWhere(req);
+    const result = await appointmentService.cancelAppointment(
+      id,
+      reasonStr,
+      req.user!.id,
+      where
+    );
+    successResponse(res, 200, 'Appointment cancelled', {
+      appointment: result.appointment,
+      lateCancellation: result.lateCancellation,
+      cancellationFee: result.cancellationFee,
+    });
+  }
+);
+
+export const reschedule = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const { newStartTime, newEndTime } = req.body;
+    if (!newStartTime || !newEndTime) {
+      const err = new Error('newStartTime and newEndTime are required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const where = await getCancelRescheduleWhere(req);
+    const result = await appointmentService.rescheduleAppointment(
+      id,
+      { newStartTime, newEndTime },
+      req.user!.id,
+      where
+    );
+    successResponse(res, 200, 'Appointment rescheduled', {
+      oldAppointment: result.oldAppointment,
+      newAppointment: result.newAppointment,
+    });
+  }
+);

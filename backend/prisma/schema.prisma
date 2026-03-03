@@ -155,18 +155,21 @@ model Location {
 }
 
 model Service {
-  id                    String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   clinicId              String
   disciplineId          String
   name                  String
   duration              Int
-  defaultPrice          Decimal  @db.Decimal(10, 2)
-  taxApplicable         Boolean  @default(false)
-  minimumNoticeMinutes  Int?     @default(0)
-  maxFutureBookingDays  Int?     @default(365)
-  isActive              Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  defaultPrice          Decimal   @db.Decimal(10, 2)
+  taxApplicable         Boolean   @default(false)
+  minimumNoticeMinutes  Int?      @default(0)
+  maxFutureBookingDays  Int?      @default(365)
+  cancellationWindowHours Int?    @default(0)
+  cancellationFeeType  String?    @default("NONE")
+  cancellationFeeValue Decimal?   @db.Decimal(10, 2)
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   clinic            Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   discipline        Discipline        @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
@@ -193,24 +196,31 @@ model ProviderService {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  clinicId       String
-  locationId     String
-  providerId     String
-  serviceId      String
-  patientId      String
-  startTime      DateTime
-  endTime        DateTime
-  status         AppointmentStatus @default(CONFIRMED)
-  priceAtBooking Decimal          @db.Decimal(10, 2)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                  String            @id @default(cuid())
+  clinicId            String
+  locationId          String
+  providerId          String
+  serviceId           String
+  patientId           String
+  startTime           DateTime
+  endTime             DateTime
+  status              AppointmentStatus @default(CONFIRMED)
+  priceAtBooking      Decimal            @db.Decimal(10, 2)
+  cancelledAt         DateTime?
+  cancellationReason String?
+  rescheduledFromId   String?    @unique
+  rescheduledToId     String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   clinic   Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   location Location @relation(fields: [locationId], references: [id], onDelete: Restrict)
   provider Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
   service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   patient  User     @relation(fields: [patientId], references: [id], onDelete: Restrict)
+
+  rescheduledFrom Appointment? @relation("RescheduleFrom", fields: [rescheduledFromId], references: [id])
+  rescheduledTo   Appointment? @relation("RescheduleFrom")
 
   visitRecords   VisitRecord[]
   prescriptions  Prescription[]

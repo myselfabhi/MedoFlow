@@ -110,4 +110,31 @@ router.put(
   appointmentController.updateStatus
 );
 
+const cancelRescheduleScope = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void => {
+  if (req.user!.role === 'CLINIC_ADMIN') {
+    req.clinicId = req.user!.clinicId ?? null;
+  } else if (req.user!.role === 'PATIENT') {
+    req.clinicId = null;
+  }
+  next();
+};
+
+router.post(
+  '/:id/cancel',
+  authorize(Role.PATIENT, Role.PROVIDER, Role.CLINIC_ADMIN),
+  cancelRescheduleScope,
+  appointmentController.cancel
+);
+
+router.post(
+  '/:id/reschedule',
+  authorize(Role.PATIENT, Role.PROVIDER, Role.CLINIC_ADMIN),
+  cancelRescheduleScope,
+  appointmentController.reschedule
+);
+
 export default router;
