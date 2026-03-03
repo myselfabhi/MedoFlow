@@ -60,6 +60,12 @@ router.get(
   visitController.getByAppointment
 );
 router.get(
+  '/patient/:patientId',
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  visitGetScope,
+  visitController.getByPatient
+);
+router.get(
   '/:id',
   authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.PATIENT),
   visitGetScope,

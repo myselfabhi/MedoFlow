@@ -52,6 +52,12 @@ router.get(
   prescriptionController.getProvider
 );
 router.get(
+  '/patient/:patientId',
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  providerScope,
+  prescriptionController.getByPatient
+);
+router.get(
   '/clinic',
   authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
   enforceClinicScope,

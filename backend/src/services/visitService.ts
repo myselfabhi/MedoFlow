@@ -250,6 +250,24 @@ export const finalizeVisitRecord = async (
   return updated;
 };
 
+export const getVisitRecordsByPatient = async (
+  patientId: string,
+  clinicId?: string | null
+) => {
+  const where: { patientId: string; clinicId?: string } = { patientId };
+  if (clinicId) where.clinicId = clinicId;
+  return prisma.visitRecord.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      appointment: { select: { id: true, startTime: true, status: true } },
+      provider: { select: { id: true, firstName: true, lastName: true } },
+      patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
+    },
+  });
+};
+
 export const getVisitRecordsByClinic = async (clinicId: string) => {
   return prisma.visitRecord.findMany({
     where: { clinicId },

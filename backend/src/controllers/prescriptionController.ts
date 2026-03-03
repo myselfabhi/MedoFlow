@@ -43,6 +43,25 @@ export const getMy = asyncHandler(
   }
 );
 
+export const getByPatient = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const patientId = req.params.patientId as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const prescriptions = await prescriptionService.getPrescriptionsByPatient(
+      patientId,
+      clinicId
+    );
+    successResponse(res, 200, 'Prescriptions retrieved', { prescriptions });
+  }
+);
+
 export const getProvider = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const provider = await visitService.getProviderByUserId(req.user!.id);

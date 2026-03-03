@@ -129,6 +129,25 @@ export const getTimeline = asyncHandler(
   }
 );
 
+export const getByPatient = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const patientId = req.params.patientId as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+    if (!clinicId && req.user!.role === 'PROVIDER') {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const appointments = await appointmentService.getAppointmentsByPatient(
+      patientId,
+      clinicId
+    );
+    successResponse(res, 200, 'Appointments retrieved', { appointments });
+  }
+);
+
 export const getProvider = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const provider = await appointmentService.getProviderByUserId(req.user!.id);
