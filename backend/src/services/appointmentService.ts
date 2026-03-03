@@ -299,18 +299,30 @@ export const createAppointment = async (
   const priceAtBooking =
     assignment.priceOverride ?? assignment.service.defaultPrice;
 
-  return prisma.appointment.create({
-    data: {
-      clinicId,
-      locationId,
-      providerId,
-      serviceId,
-      patientId,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      status: 'CONFIRMED',
-      priceAtBooking,
-    },
+  const requirePrepayment = Boolean(service.requirePrepayment);
+  const now = new Date();
+  const slotHoldMinutes = 10;
+  const slotHeldUntil = requirePrepayment
+    ? new Date(now.getTime() + slotHoldMinutes * 60 * 1000)
+    : null;
+
+  const appointmentData = {
+    clinicId,
+    locationId,
+    providerId,
+    serviceId,
+    patientId,
+    startTime: new Date(startTime),
+    endTime: new Date(endTime),
+    status: requirePrepayment ? ('PENDING_PAYMENT' as const) : ('CONFIRMED' as const),
+    priceAtBooking,
+    paymentStatus: requirePrepayment ? 'PENDING' : 'NONE',
+    paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
+    slotHeldUntil,
+  };
+
+  const appointment = await prisma.appointment.create({
+    data: appointmentData,
     include: {
       clinic: { select: { id: true, name: true } },
       location: { select: { id: true, name: true } },
@@ -324,6 +336,22 @@ export const createAppointment = async (
       patient: { select: { id: true, name: true, email: true } },
     },
   });
+
+  if (requirePrepayment && performedById) {
+    await auditService.logAudit({
+      clinicId,
+      entityType: 'Appointment',
+      entityId: appointment.id,
+      action: 'PAYMENT_INITIATED',
+      newValue: {
+        slotHeldUntil: slotHeldUntil?.toISOString(),
+        amount: Number(priceAtBooking),
+      },
+      performedById,
+    });
+  }
+
+  return appointment;
 };
 
 export interface CancelAppointmentResult {
