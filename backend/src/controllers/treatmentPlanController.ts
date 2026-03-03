@@ -23,8 +23,13 @@ export const create = asyncHandler(
       err.statusCode = 400;
       throw err;
     }
+    let body = { ...req.body };
+    if (req.user!.role === 'PROVIDER' && !body.providerId) {
+      const provider = await treatmentPlanService.getProviderByUserId(req.user!.id);
+      if (provider) body.providerId = provider.id;
+    }
     const plan = await treatmentPlanService.createTreatmentPlan(
-      req.body,
+      body,
       clinicId,
       req.user!.id
     );
