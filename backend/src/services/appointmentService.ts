@@ -627,6 +627,58 @@ export const getAppointmentById = async (
   });
 };
 
+export interface AppointmentTimelineEvent {
+  timestamp: Date;
+  action: string;
+  performedById: string;
+  details: { oldValue?: unknown; newValue?: unknown };
+}
+
+export const getAppointmentTimeline = async (
+  appointmentId: string,
+  where: { clinicId?: string; patientId?: string; providerId?: string } = {}
+): Promise<{ appointmentId: string; events: AppointmentTimelineEvent[] }> => {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, ...where },
+    select: { id: true },
+  });
+  if (!appointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      entityType: 'APPOINTMENT',
+      entityId: appointmentId,
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      createdAt: true,
+      action: true,
+      performedById: true,
+      oldValue: true,
+      newValue: true,
+    },
+  });
+
+  const events: AppointmentTimelineEvent[] = logs.map((log) => ({
+    timestamp: log.createdAt,
+    action: log.action,
+    performedById: log.performedById,
+    details: {
+      ...(log.oldValue != null && log.oldValue !== undefined && { oldValue: log.oldValue as unknown }),
+      ...(log.newValue != null && log.newValue !== undefined && { newValue: log.newValue as unknown }),
+    },
+  }));
+
+  return {
+    appointmentId,
+    events,
+  };
+};
+
 export const getProviderByUserId = async (userId: string) => {
   return prisma.provider.findFirst({
     where: { userId },

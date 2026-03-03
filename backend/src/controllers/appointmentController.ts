@@ -58,6 +58,27 @@ export const getById = asyncHandler(
   }
 );
 
+const getTimelineWhere = async (
+  req: Request
+): Promise<{ clinicId?: string; patientId?: string; providerId?: string }> => {
+  if (req.user!.role === 'PATIENT') return { patientId: req.user!.id };
+  if (req.user!.role === 'PROVIDER') {
+    const provider = await appointmentService.getProviderByUserId(req.user!.id);
+    if (provider) return { providerId: provider.id };
+  }
+  if (req.clinicId) return { clinicId: req.clinicId };
+  return {};
+};
+
+export const getTimeline = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const where = await getTimelineWhere(req);
+    const result = await appointmentService.getAppointmentTimeline(id, where);
+    successResponse(res, 200, 'Appointment timeline retrieved', result);
+  }
+);
+
 export const getProvider = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const provider = await appointmentService.getProviderByUserId(req.user!.id);
