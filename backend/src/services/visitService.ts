@@ -38,7 +38,8 @@ const validateAppointmentForProvider = async (
 export const createVisitRecord = async (
   data: CreateVisitRecordData,
   providerId: string,
-  clinicId: string
+  clinicId: string,
+  createdById: string
 ) => {
   const { appointmentId, patientId, subjective, objective, assessment, plan } =
     data;
@@ -66,28 +67,51 @@ export const createVisitRecord = async (
     throw err;
   }
 
-  return prisma.visitRecord.create({
-    data: {
-      clinicId,
-      appointmentId,
-      providerId,
-      patientId: patientId || appointment.patientId,
-      subjective,
-      objective,
-      assessment,
-      plan,
-    },
+  const record = await prisma.$transaction(async (tx) => {
+    const created = await tx.visitRecord.create({
+      data: {
+        clinicId,
+        appointmentId,
+        providerId,
+        patientId: patientId || appointment.patientId,
+        subjective,
+        objective,
+        assessment,
+        plan,
+      },
+    });
+    const version = await tx.visitNoteVersion.create({
+      data: {
+        visitRecordId: created.id,
+        subjective,
+        objective,
+        assessment,
+        plan,
+        createdById,
+      },
+    });
+    await tx.visitRecord.update({
+      where: { id: created.id },
+      data: { currentVersionId: version.id },
+    });
+    return created;
+  });
+
+  return prisma.visitRecord.findFirst({
+    where: { id: record.id },
     include: {
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
     },
   });
 };
 
 export const getVisitRecordByAppointment = async (
   appointmentId: string,
-  clinicId?: string | null
+  clinicId?: string | null,
+  includeHistory = false
 ) => {
   const where: { appointmentId: string; clinicId?: string } = { appointmentId };
   if (clinicId) where.clinicId = clinicId;
@@ -98,13 +122,18 @@ export const getVisitRecordByAppointment = async (
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
+      ...(includeHistory && {
+        versions: { orderBy: { createdAt: 'asc' }, include: { createdBy: { select: { id: true, name: true } } } },
+      }),
     },
   });
 };
 
 export const getVisitRecordById = async (
   id: string,
-  where: { clinicId?: string } | Record<string, never> = {}
+  where: { clinicId?: string } | Record<string, never> = {},
+  includeHistory = false
 ) => {
   return prisma.visitRecord.findFirst({
     where: { id, ...where },
@@ -112,6 +141,10 @@ export const getVisitRecordById = async (
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
+      ...(includeHistory && {
+        versions: { orderBy: { createdAt: 'asc' }, include: { createdBy: { select: { id: true, name: true } } } },
+      }),
     },
   });
 };
@@ -120,7 +153,8 @@ export const updateVisitRecord = async (
   id: string,
   data: Partial<CreateVisitRecordData>,
   providerId: string,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const record = await getVisitRecordById(id, { clinicId });
   if (!record) {
@@ -135,9 +169,28 @@ export const updateVisitRecord = async (
     err.statusCode = 403;
     throw err;
   }
+  const visitRecord = record as { isFinalized?: boolean };
+  if (visitRecord.isFinalized) {
+    const err = new Error('Visit record is finalized and cannot be updated') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const version = await prisma.visitNoteVersion.create({
+    data: {
+      visitRecordId: id,
+      subjective: data.subjective !== undefined ? data.subjective : record.subjective,
+      objective: data.objective !== undefined ? data.objective : record.objective,
+      assessment: data.assessment !== undefined ? data.assessment : record.assessment,
+      plan: data.plan !== undefined ? data.plan : record.plan,
+      createdById: performedById,
+    },
+  });
+
   return prisma.visitRecord.update({
     where: { id },
     data: {
+      currentVersionId: version.id,
       ...(data.subjective !== undefined && { subjective: data.subjective }),
       ...(data.objective !== undefined && { objective: data.objective }),
       ...(data.assessment !== undefined && { assessment: data.assessment }),
@@ -147,6 +200,7 @@ export const updateVisitRecord = async (
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
     },
   });
 };
@@ -173,26 +227,25 @@ export const finalizeVisitRecord = async (
 
   const updated = await prisma.visitRecord.update({
     where: { id },
-    data: { status: 'FINAL' },
+    data: { status: 'FINAL', isFinalized: true },
     include: {
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
     },
   });
 
-  if (record.status !== 'FINAL') {
-    await auditService.logAudit({
-      clinicId,
-      entityType: 'VisitRecord',
-      entityId: id,
-      action: 'FINALIZE',
-      fieldChanged: 'status',
-      oldValue: record.status,
-      newValue: 'FINAL',
-      performedById,
-    });
-  }
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'VisitRecord',
+    entityId: id,
+    action: 'VISIT_FINALIZED',
+    fieldChanged: 'status',
+    oldValue: record.status,
+    newValue: 'FINAL',
+    performedById,
+  });
 
   return updated;
 };
@@ -205,6 +258,7 @@ export const getVisitRecordsByClinic = async (clinicId: string) => {
       appointment: { select: { id: true, startTime: true, status: true } },
       provider: { select: { id: true, firstName: true, lastName: true } },
       patient: { select: { id: true, name: true, email: true } },
+      currentVersion: true,
     },
   });
 };

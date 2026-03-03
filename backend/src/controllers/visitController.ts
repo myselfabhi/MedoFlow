@@ -23,9 +23,44 @@ export const create = asyncHandler(
     const visitRecord = await visitService.createVisitRecord(
       req.body,
       provider.id,
-      clinicId
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 201, 'Visit record created', { visitRecord });
+  }
+);
+
+export const getById = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+    const includeHistory = req.query.includeHistory === 'true';
+    const visitRecord = await visitService.getVisitRecordById(
+      id,
+      clinicId ? { clinicId } : {},
+      includeHistory
+    );
+    if (!visitRecord) {
+      const err = new Error('Visit record not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    if (req.user?.role === 'PROVIDER') {
+      const provider = await visitService.getProviderByUserId(req.user.id);
+      if (!provider || visitRecord.providerId !== provider.id) {
+        const err = new Error('Access denied') as ApiError;
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+    if (req.user?.role === 'PATIENT' && visitRecord.patientId !== req.user.id) {
+      const err = new Error('Access denied') as ApiError;
+        err.statusCode = 403;
+        throw err;
+    }
+    successResponse(res, 200, 'Visit record retrieved', { visitRecord });
   }
 );
 
@@ -35,9 +70,11 @@ export const getByAppointment = asyncHandler(
     const clinicId = req.bypassClinicScope
       ? (req.query.clinicId as string)
       : req.clinicId;
+    const includeHistory = req.query.includeHistory === 'true';
     const visitRecord = await visitService.getVisitRecordByAppointment(
       appointmentId,
-      clinicId
+      clinicId,
+      includeHistory
     );
     if (!visitRecord) {
       const err = new Error('Visit record not found') as ApiError;
@@ -82,7 +119,8 @@ export const update = asyncHandler(
       id,
       req.body,
       provider.id,
-      clinicId
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 200, 'Visit record updated', { visitRecord });
   }
