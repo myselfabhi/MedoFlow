@@ -26,6 +26,56 @@ export const create = asyncHandler(
   }
 );
 
+export const createRecurring = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.bypassClinicScope
+      ? (req.body.clinicId as string)
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const resolvedPatientId = (req.body.patientId as string) || req.user!.id;
+    const {
+      locationId,
+      providerId,
+      serviceId,
+      startTime,
+      endTime,
+      frequency,
+      numberOfSessions,
+      endDate,
+    } = req.body;
+    if (!locationId || !providerId || !serviceId || !startTime || !endTime || frequency !== 'WEEKLY') {
+      const err = new Error(
+        'locationId, providerId, serviceId, startTime, endTime, and frequency (WEEKLY) are required'
+      ) as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const result = await appointmentService.createRecurringSeries(
+      {
+        clinicId,
+        locationId,
+        providerId,
+        serviceId,
+        patientId: resolvedPatientId,
+        firstStartTime: startTime,
+        firstEndTime: endTime,
+        frequency: 'WEEKLY',
+        numberOfSessions: numberOfSessions != null ? Number(numberOfSessions) : undefined,
+        endDate: endDate ?? null,
+      },
+      req.user!.id
+    );
+    successResponse(res, 201, 'Recurring series created', {
+      appointments: result.appointments,
+      conflicts: result.conflicts,
+    });
+  }
+);
+
 export const getMy = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.bypassClinicScope

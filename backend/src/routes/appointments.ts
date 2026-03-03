@@ -47,6 +47,13 @@ router.post(
   appointmentController.create
 );
 
+router.post(
+  '/recurring',
+  authorize(Role.PATIENT, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  appointmentCreateScope,
+  appointmentController.createRecurring
+);
+
 router.get(
   '/my',
   authorize(Role.PATIENT),

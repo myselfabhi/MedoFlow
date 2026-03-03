@@ -17,8 +17,10 @@ import {
   checkPatientExists,
   createAppointment,
 } from '@/lib/appointmentApi';
+import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringApi';
 import { LoginModal } from '@/components/LoginModal';
 import { WaitlistModal } from '@/components/WaitlistModal';
+import { RecurringConflictModal } from '@/components/RecurringConflictModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
 const patientSchema = z.object({
@@ -51,6 +53,14 @@ export default function BookingPage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringSessions, setRecurringSessions] = useState<number>(4);
+  const [recurringEndDate, setRecurringEndDate] = useState<string>('');
+  const [recurringUseEndDate, setRecurringUseEndDate] = useState(false);
+  const [recurringConflictModal, setRecurringConflictModal] = useState<{
+    conflicts: RecurringConflict[];
+    createdCount: number;
+  } | null>(null);
 
   const { data: clinic } = useQuery({
     queryKey: ['clinic', clinicId],
@@ -145,14 +155,63 @@ export default function BookingPage() {
     [clinicId, locations, providerId, providersForService, router, selectedSlot, serviceId]
   );
 
+  const doCreateRecurringSeries = useCallback(
+    async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
+      const payload = {
+        clinicId,
+        locationId: locations?.[0]?.id!,
+        providerId: providerId || providersForService?.[0]?.id!,
+        serviceId,
+        patientId,
+        startTime: selectedSlot!.start,
+        endTime: selectedSlot!.end,
+        frequency: 'WEEKLY' as const,
+        ...(recurringUseEndDate && recurringEndDate
+          ? { endDate: recurringEndDate }
+          : { numberOfSessions: Math.max(2, recurringSessions) }),
+      };
+      const result = await createRecurringSeries(payload);
+      if (result.conflicts.length > 0) {
+        return result;
+      }
+      const first = result.appointments[0] as { status?: string; id?: string } | undefined;
+      if (first?.status === 'PENDING_PAYMENT' && first?.id) {
+        router.push(`/payment/${first.id}`);
+      } else {
+        router.push('/dashboard/appointments');
+      }
+      return result;
+    },
+    [
+      clinicId,
+      locations,
+      providerId,
+      providersForService,
+      recurringEndDate,
+      recurringSessions,
+      recurringUseEndDate,
+      router,
+      selectedSlot,
+      serviceId,
+    ]
+  );
+
   const appointmentMutation = useMutation({
     mutationFn: async (data: {
       patientId?: string;
       name?: string;
       email?: string;
       password?: string;
+      recurring?: boolean;
     }) => {
-      if (data.patientId) return doCreateAppointment(data.patientId);
+      const runWithPatient = async (pid: string) => {
+        if (data.recurring && isRecurring) {
+          return doCreateRecurringSeries(pid);
+        }
+        await doCreateAppointment(pid);
+        return { appointments: [], conflicts: [] };
+      };
+      if (data.patientId) return runWithPatient(data.patientId);
       if (!data.email || !data.password) throw new Error('Email and password required');
       await api.post('/auth/register', {
         name: data.name,
@@ -165,28 +224,49 @@ export default function BookingPage() {
         data: { accessToken: string; user: { id: string } };
       }>('/auth/login', { email: data.email, password: data.password });
       setAccessToken(loginRes.data.accessToken);
-      return doCreateAppointment(loginRes.data.user.id);
+      return runWithPatient(loginRes.data.user.id);
     },
   });
+
+  const handleBookingResult = useCallback(
+    (result: { appointments: unknown[]; conflicts: RecurringConflict[] } | void) => {
+      if (result?.conflicts?.length) {
+        setRecurringConflictModal({
+          conflicts: result.conflicts,
+          createdCount: result.appointments?.length ?? 0,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+    [queryClient]
+  );
 
   const onSubmit = async (data: PatientFormData) => {
     setBookingError(null);
     try {
+      let result: { appointments: unknown[]; conflicts: RecurringConflict[] } | void;
       if (isAuthenticated && user) {
-        await appointmentMutation.mutateAsync({ patientId: user.id });
+        result = await appointmentMutation.mutateAsync({
+          patientId: user.id,
+          recurring: isRecurring,
+        });
       } else if (patientExists) {
         const { data: meRes } = await api.get<{ success: boolean; data: { user: { id: string } } }>(
           '/auth/me'
         );
-        await appointmentMutation.mutateAsync({ patientId: meRes.data.user.id });
+        result = await appointmentMutation.mutateAsync({
+          patientId: meRes.data.user.id,
+          recurring: isRecurring,
+        });
       } else {
-        await appointmentMutation.mutateAsync({
+        result = await appointmentMutation.mutateAsync({
           name: data.name,
           email: data.email,
           password: data.password,
+          recurring: isRecurring,
         });
       }
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      handleBookingResult(result);
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
@@ -201,8 +281,11 @@ export default function BookingPage() {
     if (!user) return;
     setBookingError(null);
     try {
-      await appointmentMutation.mutateAsync({ patientId: user.id });
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      const result = await appointmentMutation.mutateAsync({
+        patientId: user.id,
+        recurring: isRecurring,
+      });
+      handleBookingResult(result);
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
@@ -506,12 +589,89 @@ export default function BookingPage() {
                   </p>
                 )}
               </div>
+
+              <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-900">
+                    Make this a recurring appointment
+                  </span>
+                </label>
+                {isRecurring && (
+                  <div className="ml-7 space-y-4 border-l-2 border-gray-100 pl-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Frequency
+                      </label>
+                      <select
+                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        value="WEEKLY"
+                        readOnly
+                        aria-readonly
+                      >
+                        <option value="WEEKLY">Weekly</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="recurringMode"
+                          checked={!recurringUseEndDate}
+                          onChange={() => setRecurringUseEndDate(false)}
+                          className="border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">Number of sessions</span>
+                      </label>
+                      {!recurringUseEndDate && (
+                        <input
+                          type="number"
+                          min={2}
+                          max={52}
+                          value={recurringSessions}
+                          onChange={(e) =>
+                            setRecurringSessions(Math.min(52, Math.max(2, parseInt(e.target.value, 10) || 2)))
+                          }
+                          className="block w-full max-w-[8rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="recurringMode"
+                          checked={recurringUseEndDate}
+                          onChange={() => setRecurringUseEndDate(true)}
+                          className="border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">End date</span>
+                      </label>
+                      {recurringUseEndDate && (
+                        <input
+                          type="date"
+                          value={recurringEndDate}
+                          onChange={(e) => setRecurringEndDate(e.target.value)}
+                          min={selectedDate || new Date().toISOString().split('T')[0]}
+                          className="block w-full max-w-[12rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {bookingError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                   {bookingError}
                 </div>
               )}
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button type="button" onClick={prevStep} className="rounded-lg border px-4 py-2">
                   Back
                 </button>
@@ -519,7 +679,12 @@ export default function BookingPage() {
                   <button
                     type="button"
                     onClick={handleConfirmAuthenticated}
-                    disabled={appointmentMutation.isPending}
+                    disabled={
+                      appointmentMutation.isPending ||
+                      (isRecurring &&
+                        recurringUseEndDate &&
+                        (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate)))
+                    }
                     className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                   >
                     {appointmentMutation.isPending ? (
@@ -528,14 +693,19 @@ export default function BookingPage() {
                         Booking...
                       </>
                     ) : (
-                      'Confirm Booking'
+                      isRecurring ? 'Confirm recurring booking' : 'Confirm Booking'
                     )}
                   </button>
                 ) : (
                   <form onSubmit={handleSubmit(onSubmit)} className="inline">
                     <button
                       type="submit"
-                      disabled={appointmentMutation.isPending}
+                      disabled={
+                        appointmentMutation.isPending ||
+                        (isRecurring &&
+                          recurringUseEndDate &&
+                          (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate)))
+                      }
                       className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                     >
                       {appointmentMutation.isPending ? (
@@ -544,7 +714,7 @@ export default function BookingPage() {
                           Booking...
                         </>
                       ) : (
-                        'Confirm Booking'
+                        isRecurring ? 'Confirm recurring booking' : 'Confirm Booking'
                       )}
                     </button>
                   </form>
@@ -575,6 +745,19 @@ export default function BookingPage() {
         defaultPreferredDate={selectedDate}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['waitlist'] })}
       />
+      {recurringConflictModal && (
+        <RecurringConflictModal
+          isOpen={!!recurringConflictModal}
+          onClose={() => setRecurringConflictModal(null)}
+          conflicts={recurringConflictModal.conflicts}
+          createdCount={recurringConflictModal.createdCount}
+          onProceedPartial={() => {
+            setRecurringConflictModal(null);
+            router.push('/dashboard/appointments');
+          }}
+          onCancel={() => setRecurringConflictModal(null)}
+        />
+      )}
     </div>
   );
 }

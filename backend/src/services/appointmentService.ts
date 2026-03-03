@@ -453,6 +453,76 @@ export const createAppointment = async (
   });
 };
 
+export interface CreateRecurringSeriesInput {
+  clinicId: string;
+  locationId: string;
+  providerId: string;
+  serviceId: string;
+  patientId: string;
+  firstStartTime: Date | string;
+  firstEndTime: Date | string;
+  frequency: 'WEEKLY';
+  numberOfSessions?: number;
+  endDate?: Date | string | null;
+}
+
+export interface RecurringConflict {
+  date: string;
+  reason: string;
+}
+
+export const createRecurringSeries = async (
+  input: CreateRecurringSeriesInput,
+  performedById: string
+): Promise<{
+  appointments: Awaited<ReturnType<typeof createAppointment>>[];
+  conflicts: RecurringConflict[];
+}> => {
+  const firstStart = new Date(input.firstStartTime);
+  const firstEnd = new Date(input.firstEndTime);
+  const durationMs = firstEnd.getTime() - firstStart.getTime();
+
+  const occurrences: { start: Date; end: Date }[] = [];
+  const endDate = input.endDate ? new Date(input.endDate) : null;
+  const maxSessions = input.numberOfSessions ?? 52;
+
+  for (let i = 0; i < maxSessions; i++) {
+    const start = new Date(firstStart);
+    start.setDate(start.getDate() + i * 7);
+    const end = new Date(start.getTime() + durationMs);
+    if (endDate && start > endDate) break;
+    occurrences.push({ start, end });
+  }
+
+  const appointments: Awaited<ReturnType<typeof createAppointment>>[] = [];
+  const conflicts: RecurringConflict[] = [];
+
+  for (const { start, end } of occurrences) {
+    try {
+      const apt = await createAppointment(
+        {
+          locationId: input.locationId,
+          providerId: input.providerId,
+          serviceId: input.serviceId,
+          patientId: input.patientId,
+          startTime: start,
+          endTime: end,
+        },
+        input.clinicId,
+        { performedById, excludeAppointmentId: null }
+      );
+      appointments.push(apt);
+    } catch (err) {
+      conflicts.push({
+        date: start.toISOString().split('T')[0],
+        reason: err instanceof Error ? err.message : 'Slot unavailable',
+      });
+    }
+  }
+
+  return { appointments, conflicts };
+};
+
 export interface CancelAppointmentResult {
   appointment: Awaited<ReturnType<typeof prisma.appointment.update>>;
   lateCancellation: boolean;
