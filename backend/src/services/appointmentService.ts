@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { ApiError } from '../types/errors';
 import { AppointmentStatus } from '@prisma/client';
 import * as auditService from './auditService';
+import * as waitlistService from './waitlistService';
 
 const CANCELLED_STATUS = 'CANCELLED';
 
@@ -401,6 +402,20 @@ export const cancelAppointment = async (
     },
     performedById,
   });
+
+  try {
+    await waitlistService.offerSlotToWaitlist({
+      clinicId: appointment.clinicId,
+      providerId: appointment.providerId,
+      serviceId: appointment.serviceId,
+      slotStartTime: appointment.startTime,
+      slotEndTime: appointment.endTime,
+      locationId: appointment.locationId,
+    });
+  } catch {
+    // Best-effort: do not fail cancellation if waitlist offer fails
+  }
+
   return {
     appointment: updated,
     lateCancellation: withinWindow,

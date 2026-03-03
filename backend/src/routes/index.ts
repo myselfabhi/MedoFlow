@@ -9,6 +9,7 @@ import appointmentRoutes from './appointments';
 import visitRoutes from './visits';
 import prescriptionRoutes from './prescriptions';
 import publicRoutes from './public';
+import waitlistRoutes from './waitlist';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/services', serviceRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/visits', visitRoutes);
 router.use('/prescriptions', prescriptionRoutes);
+router.use('/waitlist', waitlistRoutes);
 
 export default router;
