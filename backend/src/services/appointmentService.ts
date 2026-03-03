@@ -1,7 +1,7 @@
 import prisma from '../config/prisma';
 import { Request } from 'express';
 import { ApiError } from '../types/errors';
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 import * as auditService from './auditService';
 import * as waitlistService from './waitlistService';
 
@@ -228,130 +228,229 @@ export const createAppointment = async (
   const startDate = new Date(startTime);
   const endDate = new Date(endTime);
 
-  const service = await validateServiceBelongsToClinic(serviceId, clinicId);
-  const assignment = await validateProviderOffersService(
-    providerId,
-    serviceId,
-    clinicId
-  );
-  await validateLocationBelongsToClinic(locationId, clinicId);
-  await validatePatient(patientId);
-
-  try {
-    await checkSamePatientOverlap(patientId, startDate, endDate, excludeAppointmentId);
-  } catch (err) {
-    if (performedById) {
-      await logBookingRejectedPolicy(
-        clinicId,
-        serviceId,
-        'You already have another appointment during this time.',
-        performedById
-      );
+  return prisma.$transaction(async (tx) => {
+    const service = await tx.service.findFirst({
+      where: { id: serviceId, clinicId, isActive: true },
+    });
+    if (!service) {
+      const err = new Error(
+        'Service not found or does not belong to this clinic'
+      ) as ApiError;
+      err.statusCode = 404;
+      throw err;
     }
-    throw err;
-  }
 
-  const minNotice = service.minimumNoticeMinutes ?? 0;
-  const maxFuture = service.maxFutureBookingDays ?? 365;
-
-  try {
-    checkMinimumNotice(
-      startDate,
-      minNotice,
-      clinicId,
-      serviceId,
-      performedById
-    );
-  } catch (err) {
-    if (performedById) {
-      await logBookingRejectedPolicy(
-        clinicId,
-        serviceId,
-        (err as Error).message,
-        performedById
-      );
-    }
-    throw err;
-  }
-
-  try {
-    checkMaxFutureBooking(
-      startDate,
-      maxFuture,
-      clinicId,
-      serviceId,
-      performedById
-    );
-  } catch (err) {
-    if (performedById) {
-      await logBookingRejectedPolicy(
-        clinicId,
-        serviceId,
-        (err as Error).message,
-        performedById
-      );
-    }
-    throw err;
-  }
-
-  await checkDoubleBooking(providerId, startDate, endDate, excludeAppointmentId);
-
-  const priceAtBooking =
-    assignment.priceOverride ?? assignment.service.defaultPrice;
-
-  const requirePrepayment = Boolean(service.requirePrepayment);
-  const now = new Date();
-  const slotHoldMinutes = 10;
-  const slotHeldUntil = requirePrepayment
-    ? new Date(now.getTime() + slotHoldMinutes * 60 * 1000)
-    : null;
-
-  const appointmentData = {
-    clinicId,
-    locationId,
-    providerId,
-    serviceId,
-    patientId,
-    startTime: new Date(startTime),
-    endTime: new Date(endTime),
-    status: requirePrepayment ? ('PENDING_PAYMENT' as const) : ('CONFIRMED' as const),
-    priceAtBooking,
-    paymentStatus: requirePrepayment ? 'PENDING' : 'NONE',
-    paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
-    slotHeldUntil,
-  };
-
-  const appointment = await prisma.appointment.create({
-    data: appointmentData,
-    include: {
-      clinic: { select: { id: true, name: true } },
-      location: { select: { id: true, name: true } },
-      provider: {
-        include: {
-          discipline: { select: { id: true, name: true } },
-          user: { select: { id: true, name: true } },
+    const provider = await tx.provider.findFirst({
+      where: { id: providerId, clinicId, isActive: true },
+      include: {
+        providerServices: {
+          where: { serviceId },
+          include: { service: true },
         },
       },
-      service: { select: { id: true, name: true, duration: true } },
-      patient: { select: { id: true, name: true, email: true } },
-    },
-  });
-
-  if (requirePrepayment && performedById) {
-    await auditService.logAudit({
-      clinicId,
-      entityType: 'Appointment',
-      entityId: appointment.id,
-      action: 'PAYMENT_INITIATED',
-      newValue: {
-        slotHeldUntil: slotHeldUntil?.toISOString(),
-        amount: Number(priceAtBooking),
-      },
-      performedById,
     });
-  }
+    if (!provider) {
+      const err = new Error(
+        'Provider not found or does not belong to this clinic'
+      ) as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    const assignment = provider.providerServices[0];
+    if (!assignment) {
+      const err = new Error('Provider does not offer this service') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
 
-  return appointment;
+    const location = await tx.location.findFirst({
+      where: { id: locationId, clinicId, isActive: true },
+    });
+    if (!location) {
+      const err = new Error(
+        'Location not found or does not belong to this clinic'
+      ) as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const user = await tx.user.findUnique({
+      where: { id: patientId },
+    });
+    if (!user) {
+      const err = new Error('Patient not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    if (user.role !== 'PATIENT') {
+      const err = new Error('User is not a patient') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const samePatientConflict = await tx.appointment.findFirst({
+      where: {
+        patientId,
+        status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
+        startTime: { lt: endDate },
+        endTime: { gt: startDate },
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+      },
+    });
+    if (samePatientConflict) {
+      if (performedById) {
+        await tx.auditLog.create({
+          data: {
+            clinicId,
+            entityType: 'Booking',
+            entityId: serviceId,
+            action: 'BOOKING_REJECTED_POLICY',
+            fieldChanged: 'reason',
+            newValue: 'You already have another appointment during this time.' as Prisma.InputJsonValue,
+            oldValue: Prisma.JsonNull,
+            performedById,
+          },
+        });
+      }
+      const err = new Error(
+        'You already have another appointment during this time.'
+      ) as ApiError;
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const minNotice = service.minimumNoticeMinutes ?? 0;
+    const maxFuture = service.maxFutureBookingDays ?? 365;
+
+    try {
+      checkMinimumNotice(
+        startDate,
+        minNotice,
+        clinicId,
+        serviceId,
+        performedById
+      );
+    } catch (err) {
+      if (performedById) {
+        await tx.auditLog.create({
+          data: {
+            clinicId,
+            entityType: 'Booking',
+            entityId: serviceId,
+            action: 'BOOKING_REJECTED_POLICY',
+            fieldChanged: 'reason',
+            newValue: (err as Error).message as unknown as Prisma.InputJsonValue,
+            oldValue: Prisma.JsonNull,
+            performedById,
+          },
+        });
+      }
+      throw err;
+    }
+
+    try {
+      checkMaxFutureBooking(
+        startDate,
+        maxFuture,
+        clinicId,
+        serviceId,
+        performedById
+      );
+    } catch (err) {
+      if (performedById) {
+        await tx.auditLog.create({
+          data: {
+            clinicId,
+            entityType: 'Booking',
+            entityId: serviceId,
+            action: 'BOOKING_REJECTED_POLICY',
+            fieldChanged: 'reason',
+            newValue: (err as Error).message as unknown as Prisma.InputJsonValue,
+            oldValue: Prisma.JsonNull,
+            performedById,
+          },
+        });
+      }
+      throw err;
+    }
+
+    const doubleBookConflict = await tx.appointment.findFirst({
+      where: {
+        providerId,
+        status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
+        startTime: { lt: endDate },
+        endTime: { gt: startDate },
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+      },
+    });
+    if (doubleBookConflict) {
+      const err = new Error(
+        'Provider has a conflicting appointment in this time slot'
+      ) as ApiError;
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const priceAtBooking =
+      assignment.priceOverride ?? assignment.service.defaultPrice;
+    const requirePrepayment = Boolean(service.requirePrepayment);
+    const now = new Date();
+    const slotHoldMinutes = 10;
+    const slotHeldUntil = requirePrepayment
+      ? new Date(now.getTime() + slotHoldMinutes * 60 * 1000)
+      : null;
+
+    const appointmentData = {
+      clinicId,
+      locationId,
+      providerId,
+      serviceId,
+      patientId,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      status: (requirePrepayment ? 'PENDING_PAYMENT' : 'CONFIRMED') as const,
+      priceAtBooking,
+      paymentStatus: (requirePrepayment ? 'PENDING' : 'NONE') as const,
+      paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
+      slotHeldUntil,
+    };
+
+    const appointment = await tx.appointment.create({
+      data: appointmentData,
+      include: {
+        clinic: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+        provider: {
+          include: {
+            discipline: { select: { id: true, name: true } },
+            user: { select: { id: true, name: true } },
+          },
+        },
+        service: { select: { id: true, name: true, duration: true } },
+        patient: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (requirePrepayment && performedById) {
+      await tx.auditLog.create({
+        data: {
+          clinicId,
+          entityType: 'Appointment',
+          entityId: appointment.id,
+          action: 'PAYMENT_INITIATED',
+          fieldChanged: null,
+          oldValue: Prisma.JsonNull,
+          newValue: {
+            slotHeldUntil: slotHeldUntil?.toISOString(),
+            amount: Number(priceAtBooking),
+          } as Prisma.InputJsonValue,
+          performedById,
+        },
+      });
+    }
+
+    return appointment;
+  });
 };
 
 export interface CancelAppointmentResult {
