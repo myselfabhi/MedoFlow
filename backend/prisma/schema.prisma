@@ -57,6 +57,7 @@ model Clinic {
   waitlistEntries WaitlistEntry[]
   payments        Payment[]
   treatmentPlans  TreatmentPlan[]
+  patientFiles    PatientFile[]
 }
 
 model User {
@@ -81,6 +82,8 @@ model User {
   payments        Payment[]
   visitNoteVersions VisitNoteVersion[]
   treatmentPlans   TreatmentPlan[] @relation("PatientPlans")
+  patientFiles     PatientFile[] @relation("PatientFiles")
+  uploadedFiles    PatientFile[] @relation("UploadedFiles")
 }
 
 model Discipline {
@@ -286,7 +289,7 @@ model VisitRecord {
   assessment        String?
   plan              String?
   status            VisitRecordStatus @default(DRAFT)
-  currentVersionId  String?
+  currentVersionId  String?  @unique
   isFinalized       Boolean          @default(false)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -297,6 +300,7 @@ model VisitRecord {
   patient        User              @relation(fields: [patientId], references: [id], onDelete: Restrict)
   versions       VisitNoteVersion[]
   currentVersion VisitNoteVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  patientFiles   PatientFile[]
 }
 
 model VisitNoteVersion {
@@ -417,4 +421,28 @@ model TreatmentPlan {
   @@index([patientId])
   @@index([providerId])
   @@index([clinicId])
+}
+
+model PatientFile {
+  id             String    @id @default(cuid())
+  clinicId       String
+  patientId      String
+  visitRecordId  String?
+  uploadedById   String
+  originalName   String
+  storagePath    String
+  mimeType       String
+  size           Int
+  tags           Json?
+  isDeleted      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     User         @relation("PatientFiles", fields: [patientId], references: [id], onDelete: Restrict)
+  visitRecord VisitRecord? @relation(fields: [visitRecordId], references: [id], onDelete: SetNull)
+  uploadedBy  User         @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([patientId])
+  @@index([clinicId])
+  @@index([visitRecordId])
 }
