@@ -47,6 +47,29 @@ export const getProviderAvailability = asyncHandler(
   }
 );
 
+export const previewAvailabilityUpdate = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const providerId = req.params.id as string;
+    const { weekday, startTime, endTime } = req.body;
+    if (
+      weekday === undefined ||
+      startTime === undefined ||
+      endTime === undefined
+    ) {
+      const err = new Error('weekday, startTime and endTime are required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const result = await availabilityService.previewAvailabilityUpdate({
+      providerId,
+      weekday: Number(weekday),
+      newStartTime: String(startTime),
+      newEndTime: String(endTime),
+    });
+    successResponse(res, 200, 'Availability impact preview', result);
+  }
+);
+
 export const createAvailability = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const providerId = req.params.id as string;
@@ -78,13 +101,23 @@ export const updateAvailability = asyncHandler(
       err.statusCode = 400;
       throw err;
     }
-    const availability = await availabilityService.updateAvailability(
+    const { force, ...data } = req.body as { force?: boolean; weekday?: number; startTime?: string; endTime?: string };
+    const result = await availabilityService.updateAvailability(
       id,
-      req.body,
+      data,
       clinicId,
-      req.user!.id
+      req.user!.id,
+      { force: Boolean(force) }
     );
-    successResponse(res, 200, 'Availability updated', { availability });
+    if ('requiresConfirmation' in result && result.requiresConfirmation) {
+      successResponse(res, 200, 'Confirmation required', {
+        requiresConfirmation: true,
+        affectedCount: result.affectedCount,
+        affectedAppointmentIds: result.affectedAppointmentIds,
+      });
+      return;
+    }
+    successResponse(res, 200, 'Availability updated', { availability: result });
   }
 );
 

@@ -43,6 +43,11 @@ router.delete(
 );
 router.get('/:id', providerController.getById);
 router.post(
+  '/:id/availability/preview',
+  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  availabilityController.previewAvailabilityUpdate
+);
+router.post(
   '/:id/availability',
   authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
   availabilityController.createAvailability
