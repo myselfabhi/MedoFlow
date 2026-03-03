@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +34,7 @@ const STEPS = ['Provider', 'Date', 'Time', 'Patient', 'Confirm'];
 export default function BookingPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { login, isAuthenticated, user } = useAuth();
   const serviceId = params.serviceId as string;
@@ -124,7 +125,7 @@ export default function BookingPage() {
 
   const doCreateAppointment = useCallback(
     async (patientId: string) => {
-      await createAppointment({
+      const appointment = await createAppointment({
         clinicId,
         locationId: locations?.[0]?.id!,
         providerId: providerId || providersForService?.[0]?.id!,
@@ -133,8 +134,13 @@ export default function BookingPage() {
         startTime: selectedSlot!.start,
         endTime: selectedSlot!.end,
       });
+      if (appointment.status === 'PENDING_PAYMENT') {
+        router.push(`/payment/${appointment.id}`);
+      } else {
+        router.push('/dashboard/appointments');
+      }
     },
-    [clinicId, locations, providerId, providersForService, selectedSlot, serviceId]
+    [clinicId, locations, providerId, providersForService, router, selectedSlot, serviceId]
   );
 
   const appointmentMutation = useMutation({
@@ -179,7 +185,6 @@ export default function BookingPage() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      window.location.href = '/dashboard/appointments';
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
@@ -196,7 +201,6 @@ export default function BookingPage() {
     try {
       await appointmentMutation.mutateAsync({ patientId: user.id });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      window.location.href = '/dashboard/appointments';
     } catch (err: unknown) {
       const axErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (axErr.response?.status === 409) {
