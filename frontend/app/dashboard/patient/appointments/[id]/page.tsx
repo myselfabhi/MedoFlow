@@ -10,6 +10,7 @@ import {
   getMyPrescriptions,
   type VisitRecordStatus,
 } from '@/lib/patientApi';
+import { PatientFilesSection } from '@/components/PatientFilesSection';
 
 const visitStatusColors: Record<VisitRecordStatus, string> = {
   DRAFT: 'bg-amber-100 text-amber-800',
@@ -192,6 +193,12 @@ export default function PatientAppointmentDetailPage() {
             </p>
           )}
         </div>
+
+        <PatientFilesSection
+          patientId={appointment.patientId}
+          clinicId={appointment.clinicId}
+          canDelete={false}
+        />
 
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">

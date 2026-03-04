@@ -41,6 +41,19 @@ router.get(
   fileController.listByPatient
 );
 
+router.get(
+  '/:id/download',
+  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),
+  fileScope,
+  (req: Request, _res: Response, next: NextFunction) => {
+    if (req.user!.role === 'SUPER_ADMIN' && !req.clinicId) {
+      req.clinicId = req.query.clinicId as string;
+    }
+    next();
+  },
+  fileController.download
+);
+
 router.delete(
   '/:id',
   authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),

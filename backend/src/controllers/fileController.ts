@@ -4,6 +4,7 @@ import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertClinicAccess } from '../middleware/clinicScope';
 import { generateStoragePath } from '../config/multer';
+import { logAudit } from '../services/auditService';
 import { ApiError } from '../types/errors';
 import fs from 'fs';
 
@@ -99,5 +100,59 @@ export const remove = asyncHandler(
 
     await fileService.softDeleteFile(fileId, clinicId, req.user!.id);
     successResponse(res, 200, 'File deleted');
+  }
+);
+
+export const download = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const fileId = req.params.id as string;
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+
+    if (!clinicId) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const file = await fileService.getFileById(fileId, clinicId);
+    if (!file) {
+      const err = new Error('File not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const belongs = await fileService.validatePatientBelongsToClinic(
+      file.patientId,
+      clinicId
+    );
+    if (!belongs) {
+      const err = new Error('Access denied') as ApiError;
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const downloadInfo = await fileService.getFileForDownload(fileId, clinicId);
+    if (!downloadInfo) {
+      const err = new Error('File not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+
+    await logAudit({
+      clinicId,
+      entityType: 'PatientFile',
+      entityId: fileId,
+      action: 'FILE_DOWNLOADED',
+      newValue: { originalName: file.originalName },
+      performedById: req.user!.id,
+    });
+
+    res.download(downloadInfo.filePath, downloadInfo.originalName, {
+      headers: downloadInfo.mimeType
+        ? { 'Content-Type': downloadInfo.mimeType }
+        : undefined,
+    });
   }
 );

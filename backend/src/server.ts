@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import app from './app';
 import prisma from './config/prisma';
+import { startCronJobs } from './scheduler/cronJobs';
 import { Server } from 'http';
 
 const PORT = process.env.PORT || 3000;
@@ -60,6 +61,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const bootstrap = async (): Promise<void> => {
   await connectDatabase();
+  startCronJobs();
   startServer();
 };
 

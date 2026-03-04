@@ -189,6 +189,23 @@ export const updateProvider = async (
     }
   }
 
+  if (data.isActive === false && provider.isActive) {
+    const futureCount = await prisma.appointment.count({
+      where: {
+        providerId: id,
+        startTime: { gt: new Date() },
+        status: { notIn: ['CANCELLED'] },
+      },
+    });
+    if (futureCount > 0) {
+      const err = new Error(
+        'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
+      ) as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   return prisma.provider.update({
     where: { id },
     data: {
@@ -212,6 +229,21 @@ export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
   if (!provider) {
     const err = new Error('Provider not found') as ApiError;
     err.statusCode = 404;
+    throw err;
+  }
+
+  const futureCount = await prisma.appointment.count({
+    where: {
+      providerId: id,
+      startTime: { gt: new Date() },
+      status: { notIn: ['CANCELLED'] },
+    },
+  });
+  if (futureCount > 0) {
+    const err = new Error(
+      'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
+    ) as ApiError;
+    err.statusCode = 400;
     throw err;
   }
 

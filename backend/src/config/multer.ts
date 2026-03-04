@@ -2,6 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { ApiError } from '../types/errors';
+import { MIME_WHITELIST, FILE_SIZE_LIMIT_BYTES } from './fileConstants';
 
 export const UPLOAD_BASE = path.resolve(process.cwd(), 'uploads');
 
@@ -15,10 +16,14 @@ export const ensureUploadDir = (clinicId: string, patientId: string): string => 
 
 export const patientFileUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: FILE_SIZE_LIMIT_BYTES },
   fileFilter: (_req, file, cb) => {
-    const allowed = /^image\/|^application\/pdf|^text\//;
-    if (allowed.test(file.mimetype)) {
+    const allowed = MIME_WHITELIST.some(
+      (m) =>
+        file.mimetype.toLowerCase() === m ||
+        file.mimetype.toLowerCase().startsWith(m.split('/')[0] + '/')
+    );
+    if (allowed) {
       cb(null, true);
     } else {
       const err = new Error('File type not allowed') as ApiError;

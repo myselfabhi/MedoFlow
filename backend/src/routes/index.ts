@@ -14,6 +14,8 @@ import paymentRoutes from './payments';
 import treatmentPlanRoutes from './treatmentPlans';
 import fileRoutes from './files';
 import formRoutes from './forms';
+import invoiceRoutes from './invoices';
+import analyticsRoutes from './analytics';
 
 const router = Router();
 
@@ -32,5 +34,7 @@ router.use('/payments', paymentRoutes);
 router.use('/treatment-plans', treatmentPlanRoutes);
 router.use('/files', fileRoutes);
 router.use('/forms', formRoutes);
+router.use('/invoices', invoiceRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

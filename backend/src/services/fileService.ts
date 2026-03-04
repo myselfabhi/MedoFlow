@@ -127,11 +127,37 @@ export const getFileForDownload = async (
     where: { id: fileId, clinicId, isDeleted: false },
   });
   if (!file) return null;
-  const filePath = path.join(UPLOAD_BASE, file.storagePath);
-  if (!fs.existsSync(filePath)) return null;
+  const safePath = path.join(UPLOAD_BASE, file.storagePath);
+  const resolved = path.resolve(safePath);
+  if (!resolved.startsWith(path.resolve(UPLOAD_BASE))) {
+    return null;
+  }
+  if (!fs.existsSync(resolved)) return null;
   return {
-    filePath,
+    filePath: resolved,
     originalName: file.originalName,
     mimeType: file.mimeType,
   };
+};
+
+export const validatePatientBelongsToClinic = async (
+  patientId: string,
+  clinicId: string
+): Promise<boolean> => {
+  const apt = await prisma.appointment.findFirst({
+    where: { patientId, clinicId },
+  });
+  return !!apt;
+};
+
+export const getFileById = async (
+  fileId: string,
+  clinicId: string
+) => {
+  return prisma.patientFile.findFirst({
+    where: { id: fileId, clinicId, isDeleted: false },
+    include: {
+      uploadedBy: { select: { id: true, name: true } },
+    },
+  });
 };
