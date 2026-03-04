@@ -284,6 +284,46 @@ export const submitResponse = async (params: {
   return response;
 };
 
+export const getTemplatesForAppointment = async (
+  appointmentId: string,
+  patientId: string
+) => {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, patientId },
+    include: {
+      service: { select: { id: true, disciplineId: true } },
+    },
+  });
+  if (!appointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const clinicId = appointment.clinicId;
+  const serviceId = appointment.serviceId;
+  const disciplineId = appointment.service.disciplineId;
+
+  const templates = await prisma.formTemplate.findMany({
+    where: {
+      isActive: true,
+      clinicId,
+      OR: [
+        { scope: 'CLINIC', disciplineId: null, serviceId: null },
+        { scope: 'DISCIPLINE', disciplineId },
+        { scope: 'SERVICE', serviceId },
+      ],
+    },
+    include: {
+      discipline: { select: { id: true, name: true } },
+      service: { select: { id: true, name: true } },
+    },
+    orderBy: [{ scope: 'asc' }, { name: 'asc' }],
+  });
+
+  return templates;
+};
+
 export const getResponsesByPatient = async (
   clinicId: string,
   patientId: string

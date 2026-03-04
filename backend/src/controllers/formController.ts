@@ -104,6 +104,22 @@ export const submitResponse = asyncHandler(
   }
 );
 
+export const getTemplatesForAppointment = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const appointmentId = req.params.appointmentId as string;
+    if (req.user!.role !== 'PATIENT') {
+      const err = new Error('Only patients can fetch templates for appointment') as ApiError;
+      err.statusCode = 403;
+      throw err;
+    }
+    const templates = await formService.getTemplatesForAppointment(
+      appointmentId,
+      req.user!.id
+    );
+    successResponse(res, 200, 'Templates retrieved', { templates });
+  }
+);
+
 export const getResponsesByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;

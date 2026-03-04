@@ -76,6 +76,12 @@ router.delete(
   formController.disableTemplate
 );
 
+router.get(
+  '/templates/for-appointment/:appointmentId',
+  authorize(Role.PATIENT),
+  formController.getTemplatesForAppointment
+);
+
 router.post(
   '/respond',
   authorize(Role.PATIENT),

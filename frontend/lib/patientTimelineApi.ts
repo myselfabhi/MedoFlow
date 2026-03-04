@@ -10,7 +10,8 @@ export type TimelineEventType =
     | 'PRESCRIPTION'
     | 'PLAN_CREATED'
     | 'PLAN_COMPLETED'
-    | 'PLAN_DISCONTINUED';
+    | 'PLAN_DISCONTINUED'
+    | 'FORM_SUBMITTED';
 
 export type TimelineEvent = {
     id: string;
@@ -42,6 +43,18 @@ export const getVisitsByPatient = async (
         data: { visitRecords: VisitRecord[] };
     }>(`/visits/patient/${patientId}${params}`);
     return data.data.visitRecords;
+};
+
+export const getFormResponsesByPatient = async (
+    patientId: string,
+    clinicId?: string
+): Promise<{ id: string; templateId: string; template: { id: string; name: string }; createdAt: string }[]> => {
+    const params = clinicId ? `?clinicId=${clinicId}` : '';
+    const { data } = await api.get<{
+        success: boolean;
+        data: { responses: { id: string; templateId: string; template: { id: string; name: string }; createdAt: string }[] };
+    }>(`/forms/patient/${patientId}${params}`);
+    return data.data.responses;
 };
 
 export const getPrescriptionsByPatient = async (

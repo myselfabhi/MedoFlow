@@ -9,6 +9,7 @@ import {
     getVisitsByPatient,
     getPrescriptionsByPatient,
     getPlansByPatient,
+    getFormResponsesByPatient,
     type TimelineEvent,
     type TimelineEventType,
 } from '@/lib/patientTimelineApi';
@@ -32,7 +33,8 @@ function buildTimelineEvents(
     appointments: PatientAppointment[],
     visits: VisitRecord[],
     prescriptions: Prescription[],
-    plans: TreatmentPlan[]
+    plans: TreatmentPlan[],
+    formResponses: { id: string; template: { name: string }; createdAt: string }[]
 ): TimelineEvent[] {
     const events: TimelineEvent[] = [];
 
@@ -68,6 +70,16 @@ function buildTimelineEvents(
             title: 'Prescription',
             description: p.notes.slice(0, 100) + (p.notes.length > 100 ? '…' : ''),
             date: p.createdAt,
+        });
+    });
+
+    formResponses.forEach((fr) => {
+        events.push({
+            id: `form-${fr.id}`,
+            type: 'FORM_SUBMITTED',
+            title: 'Intake Form Submitted',
+            description: fr.template.name,
+            date: fr.createdAt,
         });
     });
 
@@ -112,6 +124,7 @@ const TYPE_COLORS: Record<TimelineEventType, string> = {
     PLAN_CREATED: 'bg-cyan-500',
     PLAN_COMPLETED: 'bg-emerald-500',
     PLAN_DISCONTINUED: 'bg-gray-400',
+    FORM_SUBMITTED: 'bg-cyan-500',
 };
 
 // ───────────────────── Skeleton ─────────────────────
@@ -164,7 +177,7 @@ export default function ProviderPatientTimelinePage() {
     const { user } = useAuth();
     const clinicId = user?.clinicId ?? undefined;
 
-    const [appointmentsQuery, visitsQuery, prescriptionsQuery, plansQuery] =
+    const [appointmentsQuery, visitsQuery, prescriptionsQuery, plansQuery, formResponsesQuery] =
         useQueries({
             queries: [
                 {
@@ -187,6 +200,11 @@ export default function ProviderPatientTimelinePage() {
                     queryFn: () => getPlansByPatient(patientId),
                     enabled: !!patientId,
                 },
+                {
+                    queryKey: ['formResponses', 'patient', patientId],
+                    queryFn: () => getFormResponsesByPatient(patientId, clinicId),
+                    enabled: !!patientId && !!clinicId,
+                },
             ],
         });
 
@@ -194,19 +212,22 @@ export default function ProviderPatientTimelinePage() {
         appointmentsQuery.isLoading ||
         visitsQuery.isLoading ||
         prescriptionsQuery.isLoading ||
-        plansQuery.isLoading;
+        plansQuery.isLoading ||
+        formResponsesQuery.isLoading;
 
     const isError =
         appointmentsQuery.isError ||
         visitsQuery.isError ||
         prescriptionsQuery.isError ||
-        plansQuery.isError;
+        plansQuery.isError ||
+        formResponsesQuery.isError;
 
     const error =
         appointmentsQuery.error ??
         visitsQuery.error ??
         prescriptionsQuery.error ??
-        plansQuery.error;
+        plansQuery.error ??
+        formResponsesQuery.error;
 
     const events = React.useMemo(() => {
         if (isLoading || isError) return [];
@@ -214,7 +235,8 @@ export default function ProviderPatientTimelinePage() {
             appointmentsQuery.data ?? [],
             visitsQuery.data ?? [],
             prescriptionsQuery.data ?? [],
-            plansQuery.data ?? []
+            plansQuery.data ?? [],
+            formResponsesQuery.data ?? []
         );
     }, [
         isLoading,
@@ -223,6 +245,7 @@ export default function ProviderPatientTimelinePage() {
         visitsQuery.data,
         prescriptionsQuery.data,
         plansQuery.data,
+        formResponsesQuery.data,
     ]);
 
     const refetch = () => {
@@ -230,6 +253,7 @@ export default function ProviderPatientTimelinePage() {
         visitsQuery.refetch();
         prescriptionsQuery.refetch();
         plansQuery.refetch();
+        formResponsesQuery.refetch();
     };
 
     return (

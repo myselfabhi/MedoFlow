@@ -76,7 +76,7 @@ export default function PaymentPage() {
   const confirmMutation = useMutation({
     mutationFn: () => confirmPayment(appointmentId),
     onSuccess: () => {
-      router.push('/dashboard/appointments');
+      router.push(`/intake/${appointmentId}`);
     },
   });
 
