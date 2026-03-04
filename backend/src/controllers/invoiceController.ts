@@ -58,6 +58,44 @@ export const addItem = asyncHandler(
   }
 );
 
+export const updateItem = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const invoiceId = req.params.id as string;
+    const itemId = req.params.itemId as string;
+    const { unitPrice, quantity } = req.body;
+    const invoice = await invoiceService.getInvoiceById(invoiceId);
+    if (!invoice) {
+      const err = new Error('Invoice not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    assertClinicAccess(req, invoice.clinicId);
+    const item = await invoiceService.updateInvoiceItem(
+      invoiceId,
+      itemId,
+      { unitPrice, quantity },
+      req.user!.id
+    );
+    successResponse(res, 200, 'Invoice item updated', { item });
+  }
+);
+
+export const deleteItem = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const invoiceId = req.params.id as string;
+    const itemId = req.params.itemId as string;
+    const invoice = await invoiceService.getInvoiceById(invoiceId);
+    if (!invoice) {
+      const err = new Error('Invoice not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    assertClinicAccess(req, invoice.clinicId);
+    await invoiceService.deleteInvoiceItem(invoiceId, itemId, req.user!.id);
+    successResponse(res, 200, 'Invoice item deleted');
+  }
+);
+
 export const finalize = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const invoiceId = req.params.id as string;
@@ -112,6 +150,22 @@ export const getById = asyncHandler(
     }
     assertClinicAccess(req, invoice.clinicId);
     successResponse(res, 200, 'Invoice retrieved', { invoice });
+  }
+);
+
+export const listByClinic = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+    const status = req.query.status as string | undefined;
+    if (!clinicId) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const invoices = await invoiceService.getInvoicesByClinic(clinicId, status);
+    successResponse(res, 200, 'Invoices retrieved', { invoices });
   }
 );
 

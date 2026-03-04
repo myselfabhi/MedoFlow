@@ -46,6 +46,20 @@ router.post(
 );
 
 router.put(
+  '/:id/items/:itemId',
+  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),
+  invoiceScope,
+  invoiceController.updateItem
+);
+
+router.delete(
+  '/:id/items/:itemId',
+  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),
+  invoiceScope,
+  invoiceController.deleteItem
+);
+
+router.put(
   '/:id/finalize',
   authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),
   invoiceScope,
@@ -60,8 +74,8 @@ router.put(
 );
 
 router.get(
-  '/:id',
-  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.STAFF, Role.SUPER_ADMIN),
+  '/',
+  authorize(Role.CLINIC_ADMIN, Role.STAFF, Role.SUPER_ADMIN),
   invoiceScope,
   (req: Request, _res: Response, next: NextFunction) => {
     if (req.user!.role === 'SUPER_ADMIN' && !req.clinicId) {
@@ -69,7 +83,7 @@ router.get(
     }
     next();
   },
-  invoiceController.getById
+  invoiceController.listByClinic
 );
 
 router.get(
@@ -83,6 +97,19 @@ router.get(
     next();
   },
   invoiceController.getByAppointment
+);
+
+router.get(
+  '/:id',
+  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.STAFF, Role.SUPER_ADMIN),
+  invoiceScope,
+  (req: Request, _res: Response, next: NextFunction) => {
+    if (req.user!.role === 'SUPER_ADMIN' && !req.clinicId) {
+      req.clinicId = req.query.clinicId as string;
+    }
+    next();
+  },
+  invoiceController.getById
 );
 
 export default router;

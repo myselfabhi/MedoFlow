@@ -15,6 +15,10 @@ const navItems = [
   { href: '/dashboard/analytics', label: 'Analytics' },
 ];
 
+const frontDeskNavItems = [
+  { href: '/dashboard/front-desk/invoices', label: 'Invoices' },
+];
+
 const patientNavItem = {
   href: '/dashboard/patient/appointments',
   label: 'Patient Portal',
@@ -24,10 +28,13 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isPatient = user?.role === 'PATIENT';
+  const showFrontDesk = user?.role === 'STAFF' || user?.role === 'CLINIC_ADMIN' || user?.role === 'SUPER_ADMIN';
 
   const items = isPatient
     ? [patientNavItem, ...navItems]
-    : navItems;
+    : showFrontDesk
+      ? [...navItems, ...frontDeskNavItems]
+      : navItems;
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-gray-200 bg-white">

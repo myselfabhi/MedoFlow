@@ -174,6 +174,144 @@ export const addInvoiceItem = async (
   return item;
 };
 
+export interface UpdateInvoiceItemInput {
+  unitPrice?: number | string | Prisma.Decimal;
+  quantity?: number;
+}
+
+export const updateInvoiceItem = async (
+  invoiceId: string,
+  itemId: string,
+  input: UpdateInvoiceItemInput,
+  performedById: string
+) => {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId },
+    include: {
+      items: { where: { id: itemId }, include: { service: true } },
+      provider: {
+        include: {
+          providerServices: {
+            include: { service: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!invoice) {
+    const err = new Error('Invoice not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (invoice.status !== 'DRAFT') {
+    const err = new Error(
+      'Cannot edit items on a finalized or paid invoice'
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const item = invoice.items[0];
+  if (!item) {
+    const err = new Error('Invoice item not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const providerService = invoice.provider.providerServices.find(
+    (ps) => ps.serviceId === item.serviceId
+  );
+  const expectedPrice =
+    providerService?.priceOverride ?? item.service.defaultPrice;
+
+  let unitPrice = item.unitPrice;
+  let quantity = item.quantity;
+
+  if (input.unitPrice !== undefined) {
+    unitPrice =
+      typeof input.unitPrice === 'object' && 'toNumber' in input.unitPrice
+        ? input.unitPrice
+        : new Prisma.Decimal(input.unitPrice);
+    const priceDiffers =
+      unitPrice.toDecimalPlaces(2).toString() !==
+      new Prisma.Decimal(expectedPrice).toDecimalPlaces(2).toString();
+    if (priceDiffers) {
+      await auditService.logAudit({
+        clinicId: invoice.clinicId,
+        entityType: 'InvoiceItem',
+        entityId: itemId,
+        action: 'INVOICE_PRICE_OVERRIDE',
+        fieldChanged: 'unitPrice',
+        oldValue: Number(expectedPrice),
+        newValue: Number(unitPrice),
+        performedById,
+      });
+    }
+  }
+
+  if (input.quantity !== undefined) {
+    quantity = Math.max(1, Math.floor(input.quantity));
+  }
+
+  const totalPrice =
+    typeof unitPrice === 'object' && 'times' in unitPrice
+      ? unitPrice.times(quantity)
+      : new Prisma.Decimal(unitPrice).times(quantity);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.invoiceItem.update({
+      where: { id: itemId },
+      data: { unitPrice, quantity, totalPrice },
+      include: { service: true },
+    });
+    await recalculateInvoiceTotalsTx(tx, invoiceId);
+    return result;
+  });
+
+  return updated;
+};
+
+export const deleteInvoiceItem = async (
+  invoiceId: string,
+  itemId: string,
+  performedById: string
+) => {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId },
+    include: { items: { where: { id: itemId } } },
+  });
+
+  if (!invoice) {
+    const err = new Error('Invoice not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (invoice.status !== 'DRAFT') {
+    const err = new Error(
+      'Cannot delete items from a finalized or paid invoice'
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const item = invoice.items[0];
+  if (!item) {
+    const err = new Error('Invoice item not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.invoiceItem.delete({ where: { id: itemId } });
+    await recalculateInvoiceTotalsTx(tx, invoiceId);
+  });
+
+  return null;
+};
+
 async function recalculateInvoiceTotalsTx(
   tx: Omit<
     typeof prisma,
@@ -329,6 +467,25 @@ export const getInvoiceById = async (
       patient: true,
       provider: true,
     },
+  });
+};
+
+export const getInvoicesByClinic = async (
+  clinicId: string,
+  status?: string
+) => {
+  const where: Prisma.InvoiceWhereInput = { clinicId };
+  if (status && status !== 'ALL') where.status = status as 'DRAFT' | 'FINALIZED' | 'PAID' | 'CANCELLED';
+
+  return prisma.invoice.findMany({
+    where,
+    include: {
+      items: true,
+      patient: { select: { id: true, name: true, email: true } },
+      provider: { select: { id: true, firstName: true, lastName: true } },
+      appointment: { select: { id: true, startTime: true } },
+    },
+    orderBy: { createdAt: 'desc' },
   });
 };
 

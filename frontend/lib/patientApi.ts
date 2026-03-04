@@ -80,6 +80,36 @@ export const getMyAppointments = async (
   return data.data.appointments;
 };
 
+export interface ProviderAppointment {
+  id: string;
+  clinicId: string;
+  locationId: string;
+  providerId: string;
+  serviceId: string;
+  patientId: string;
+  startTime: string;
+  endTime: string;
+  status: AppointmentStatus;
+  priceAtBooking?: string;
+  createdAt: string;
+  updatedAt: string;
+  location: { id: string; name: string };
+  service: { id: string; name: string };
+  patient: { id: string; name: string; email: string };
+  provider?: { id: string; firstName: string; lastName: string };
+}
+
+export const getProviderAppointments = async (
+  clinicId?: string
+): Promise<ProviderAppointment[]> => {
+  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  const { data } = await api.get<{
+    success: boolean;
+    data: { appointments: ProviderAppointment[] };
+  }>(`/appointments/provider${params}`);
+  return data.data.appointments;
+};
+
 export const getAppointmentById = async (
   id: string
 ): Promise<PatientAppointmentDetail> => {
