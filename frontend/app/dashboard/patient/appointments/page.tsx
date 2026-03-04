@@ -2,22 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getMyAppointments,
-  type PatientAppointment,
-  type AppointmentStatus,
-} from '@/lib/patientApi';
-
-const statusColors: Record<AppointmentStatus, string> = {
-  CONFIRMED: 'bg-blue-100 text-blue-800',
-  COMPLETED: 'bg-green-100 text-green-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-  DRAFT: 'bg-gray-100 text-gray-800',
-  PENDING_PAYMENT: 'bg-amber-100 text-amber-800',
-  NO_SHOW: 'bg-orange-100 text-orange-800',
-  RESCHEDULED: 'bg-purple-100 text-purple-800',
-};
+import { getMyAppointments, type PatientAppointment } from '@/lib/patientApi';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { EmptyState } from '@/components/common/EmptyState';
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -28,6 +17,7 @@ function formatDateTime(iso: string) {
 }
 
 export default function PatientAppointmentsPage() {
+  const router = useRouter();
   const { data: appointments, isLoading, error } = useQuery({
     queryKey: ['patient', 'appointments'],
     queryFn: () => getMyAppointments(),
@@ -51,14 +41,17 @@ export default function PatientAppointmentsPage() {
 
   if (!appointments?.length) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-        <p className="text-gray-600">No appointments yet.</p>
-        <Link
-          href="/"
-          className="mt-4 inline-block text-primary-600 hover:text-primary-700"
-        >
-          Book an appointment
-        </Link>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">My Appointments</h1>
+          <p className="mt-1 text-sm text-gray-500">View and manage your appointments</p>
+        </div>
+        <EmptyState
+          title="No appointments yet"
+          description="Book your first appointment to get started."
+          actionLabel="Book an appointment"
+          onAction={() => router.push('/')}
+        />
       </div>
     );
   }
@@ -107,13 +100,7 @@ export default function PatientAppointmentsPage() {
                     {formatDateTime(apt.startTime)}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        statusColors[apt.status] ?? 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {apt.status.replace(/_/g, ' ')}
-                    </span>
+                    <StatusBadge status={apt.status} variant="appointment" />
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                     <Link

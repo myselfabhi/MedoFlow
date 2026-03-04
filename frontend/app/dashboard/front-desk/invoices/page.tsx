@@ -2,8 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import {
   getInvoices,
   payInvoice,
@@ -11,7 +13,8 @@ import {
 } from '@/lib/invoiceApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { EmptyState } from '@/components/common/EmptyState';
 import {
   Table,
   TableBody,
@@ -27,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { useAppToast } from '@/hooks/useAppToast';
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'All' },
@@ -35,13 +38,6 @@ const STATUS_OPTIONS = [
   { value: 'FINALIZED', label: 'Finalized' },
   { value: 'PAID', label: 'Paid' },
 ];
-
-const STATUS_BADGE: Record<string, { className: string }> = {
-  DRAFT: { className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  FINALIZED: { className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  PAID: { className: 'bg-green-100 text-green-800 border-green-200' },
-  CANCELLED: { className: 'bg-gray-100 text-gray-600 border-gray-200' },
-};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -72,6 +68,9 @@ function formatAppointmentDate(inv: Invoice) {
 
 export default function FrontDeskInvoicesPage() {
   const { user } = useAuth();
+  const clinicId = useSelectedClinicId();
+  const router = useRouter();
+  const toast = useAppToast();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
 
@@ -80,14 +79,16 @@ export default function FrontDeskInvoicesPage() {
     user?.role === 'CLINIC_ADMIN' ||
     user?.role === 'SUPER_ADMIN';
 
+  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
+
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', 'clinic', user?.clinicId, statusFilter],
-    queryFn: () => getInvoices(user?.clinicId ?? undefined, statusFilter === 'ALL' ? undefined : statusFilter),
-    enabled: !!user?.clinicId || user?.role === 'SUPER_ADMIN',
+    queryKey: ['invoices', 'clinic', effectiveClinicId, statusFilter],
+    queryFn: () => getInvoices(effectiveClinicId, statusFilter === 'ALL' ? undefined : statusFilter),
+    enabled: !!effectiveClinicId || user?.role === 'SUPER_ADMIN',
   });
 
   const payMutation = useMutation({
-    mutationFn: (invoiceId: string) => payInvoice(invoiceId, user?.clinicId ?? undefined),
+    mutationFn: (invoiceId: string) => payInvoice(invoiceId, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice marked as paid');
@@ -140,6 +141,7 @@ export default function FrontDeskInvoicesPage() {
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           ) : (
+            <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -154,22 +156,23 @@ export default function FrontDeskInvoicesPage() {
               <TableBody>
                 {invoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-12">
-                      No invoices found.
+                    <TableCell colSpan={6} className="h-48 p-0 align-top">
+                      <EmptyState
+                        title="No invoices found"
+                        description="Create an invoice from an appointment to get started."
+                        actionLabel="View appointments"
+                        onAction={() => router.push('/dashboard/appointments')}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
-                  invoices.map((inv: Invoice) => {
-                    const config = STATUS_BADGE[inv.status] ?? { className: 'bg-gray-100 text-gray-600' };
-                    return (
+                  invoices.map((inv: Invoice) => (
                       <TableRow key={inv.id}>
                         <TableCell className="font-medium">{formatPatient(inv)}</TableCell>
                         <TableCell>{formatProvider(inv)}</TableCell>
                         <TableCell>{formatAppointmentDate(inv)}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={config.className}>
-                            {inv.status}
-                          </Badge>
+                          <StatusBadge status={inv.status} variant="invoice" />
                         </TableCell>
                         <TableCell className="text-right">{inv.totalAmount ?? '0.00'}</TableCell>
                         <TableCell className="text-right">
@@ -194,17 +197,15 @@ export default function FrontDeskInvoicesPage() {
                             </Button>
                           )}
                           {inv.status === 'PAID' && (
-                            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                              Paid
-                            </Badge>
+                            <StatusBadge status="PAID" variant="invoice" />
                           )}
                         </TableCell>
                       </TableRow>
-                    );
-                  })
+                    ))
                 )}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import {
   getAnalyticsOverview,
   getRevenueByService,
@@ -27,7 +28,8 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
-  const clinicId = user?.clinicId ?? undefined;
+  const selectedClinicId = useSelectedClinicId();
+  const clinicId = selectedClinicId ?? user?.clinicId ?? undefined;
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['analytics', 'overview', clinicId],

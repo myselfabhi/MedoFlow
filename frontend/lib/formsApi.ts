@@ -34,11 +34,24 @@ export const submitFormResponse = async (payload: FormResponsePayload) => {
   return data.data;
 };
 
-export const getPatientForms = async (patientId: string, clinicId?: string) => {
+export interface FormResponseItem {
+  id: string;
+  templateId: string;
+  appointmentId: string | null;
+  responses: Record<string, unknown>;
+  createdAt: string;
+  template: { id: string; name: string; scope: string };
+  appointment?: { id: string; startTime: string };
+}
+
+export const getPatientForms = async (
+  patientId: string,
+  clinicId?: string
+): Promise<FormResponseItem[]> => {
   const params = clinicId ? `?clinicId=${clinicId}` : '';
   const { data } = await api.get<{
     success: boolean;
-    data: { responses: unknown[] };
+    data: { responses: FormResponseItem[] };
   }>(`/forms/patient/${patientId}${params}`);
   return data.data.responses;
 };

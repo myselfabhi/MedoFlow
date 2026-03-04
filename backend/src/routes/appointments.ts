@@ -93,7 +93,7 @@ router.get(
 
 router.get(
   '/clinic',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.STAFF),
   enforceClinicScope,
   appointmentController.getClinic
 );

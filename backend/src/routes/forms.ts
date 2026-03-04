@@ -90,10 +90,13 @@ router.post(
 
 router.get(
   '/patient/:patientId',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
+  authorize(Role.PROVIDER, Role.PATIENT, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
   responseScope,
   (req: Request, _res: Response, next: NextFunction) => {
     if (req.user!.role === 'SUPER_ADMIN' && !req.clinicId) {
+      req.clinicId = req.query.clinicId as string;
+    }
+    if (req.user!.role === 'PATIENT') {
       req.clinicId = req.query.clinicId as string;
     }
     next();

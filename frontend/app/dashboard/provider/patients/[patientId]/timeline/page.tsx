@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQueries } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +35,7 @@ function buildTimelineEvents(
     visits: VisitRecord[],
     prescriptions: Prescription[],
     plans: TreatmentPlan[],
-    formResponses: { id: string; template: { name: string }; createdAt: string }[]
+    formResponses: { id: string; template: { name: string }; appointmentId?: string | null; createdAt: string }[]
 ): TimelineEvent[] {
     const events: TimelineEvent[] = [];
 
@@ -47,6 +48,7 @@ function buildTimelineEvents(
                 title: `${a.service.name} — ${a.location.name}`,
                 description: `${a.provider.firstName} ${a.provider.lastName}`,
                 date: a.startTime,
+                appointmentId: a.id,
             });
         });
 
@@ -60,6 +62,8 @@ function buildTimelineEvents(
                 title: 'Visit note finalized',
                 description: assessment.slice(0, 100) + (assessment.length > 100 ? '…' : ''),
                 date: v.updatedAt,
+                appointmentId: v.appointmentId,
+                visitId: v.id,
             });
         });
 
@@ -70,6 +74,7 @@ function buildTimelineEvents(
             title: 'Prescription',
             description: p.notes.slice(0, 100) + (p.notes.length > 100 ? '…' : ''),
             date: p.createdAt,
+            appointmentId: p.appointment?.id,
         });
     });
 
@@ -80,6 +85,7 @@ function buildTimelineEvents(
             title: 'Intake Form Submitted',
             description: fr.template.name,
             date: fr.createdAt,
+            appointmentId: fr.appointmentId ?? undefined,
         });
     });
 
@@ -154,7 +160,12 @@ function TimelineSkeleton() {
 // ───────────────────── Timeline Card ─────────────────────
 
 function TimelineEventCard({ event }: { event: TimelineEvent }) {
-    return (
+    const href =
+        event.appointmentId
+            ? `/dashboard/provider/appointments/${event.appointmentId}`
+            : null;
+
+    const content = (
         <Card className="transition-shadow hover:shadow-md">
             <CardContent className="py-4">
                 <h3 className="font-semibold text-gray-900">{event.title}</h3>
@@ -167,6 +178,19 @@ function TimelineEventCard({ event }: { event: TimelineEvent }) {
             </CardContent>
         </Card>
     );
+
+    if (href) {
+        return (
+            <Link
+                href={href}
+                className="block transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg"
+            >
+                {content}
+            </Link>
+        );
+    }
+
+    return content;
 }
 
 // ───────────────────── Page ─────────────────────

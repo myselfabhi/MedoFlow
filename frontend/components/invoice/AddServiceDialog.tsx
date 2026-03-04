@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { addInvoiceItem, type InvoiceItem } from '@/lib/invoiceApi';
 import { getDashboardServices } from '@/lib/serviceApi';
-import { toast } from 'sonner';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface AddServiceDialogProps {
   open: boolean;
@@ -38,6 +38,7 @@ export function AddServiceDialog({
   clinicId,
   onSuccess,
 }: AddServiceDialogProps) {
+  const toast = useAppToast();
   const [serviceId, setServiceId] = useState<string>('');
   const [description, setDescription] = useState('');
   const [unitPrice, setUnitPrice] = useState('');

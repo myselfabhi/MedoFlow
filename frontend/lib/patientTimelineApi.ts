@@ -19,6 +19,8 @@ export type TimelineEvent = {
     title: string;
     description?: string;
     date: string;
+    appointmentId?: string;
+    visitId?: string;
 };
 
 export const getAppointmentsByPatient = async (
@@ -48,11 +50,11 @@ export const getVisitsByPatient = async (
 export const getFormResponsesByPatient = async (
     patientId: string,
     clinicId?: string
-): Promise<{ id: string; templateId: string; template: { id: string; name: string }; createdAt: string }[]> => {
+): Promise<{ id: string; templateId: string; template: { id: string; name: string }; appointmentId?: string | null; createdAt: string }[]> => {
     const params = clinicId ? `?clinicId=${clinicId}` : '';
     const { data } = await api.get<{
         success: boolean;
-        data: { responses: { id: string; templateId: string; template: { id: string; name: string }; createdAt: string }[] };
+        data: { responses: { id: string; templateId: string; template: { id: string; name: string }; appointmentId?: string | null; createdAt: string }[] };
     }>(`/forms/patient/${patientId}${params}`);
     return data.data.responses;
 };

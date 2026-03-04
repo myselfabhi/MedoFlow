@@ -21,7 +21,7 @@ import {
 } from '@/lib/invoiceApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -32,29 +32,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AddServiceDialog } from '@/components/invoice/AddServiceDialog';
-import { toast } from 'sonner';
+import { IntakeFormsSection } from '@/components/intake/IntakeFormsSection';
+import { PatientRecordSheet } from '@/components/patient/PatientRecordSheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getPatientForms } from '@/lib/formsApi';
+import { useAppToast } from '@/hooks/useAppToast';
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
-}
-
-const STATUS_BADGE: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
-  DRAFT: { className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  FINALIZED: { className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  PAID: { className: 'bg-green-100 text-green-800 border-green-200' },
-  CANCELLED: { className: 'bg-gray-100 text-gray-600 border-gray-200' },
-};
-
-function InvoiceStatusBadge({ status }: { status: string }) {
-  const config = STATUS_BADGE[status] ?? { className: 'bg-gray-100 text-gray-600' };
-  return (
-    <Badge variant="outline" className={config.className}>
-      {status}
-    </Badge>
-  );
 }
 
 function InvoiceItemRow({
@@ -154,8 +142,10 @@ function InvoiceItemRow({
 export default function ProviderAppointmentDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const toast = useAppToast();
   const queryClient = useQueryClient();
   const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [recordSheetOpen, setRecordSheetOpen] = useState(false);
 
   const { data: appointment, isLoading: appointmentLoading, error: appointmentError } = useQuery({
     queryKey: ['appointment', id],
@@ -173,6 +163,12 @@ export default function ProviderAppointmentDetailPage() {
     queryKey: ['invoices', 'appointment', id],
     queryFn: () => getInvoicesByAppointment(id, appointment?.clinicId),
     enabled: !!appointment?.id,
+  });
+
+  const { data: formResponses = [], isLoading: formsLoading } = useQuery({
+    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
+    queryFn: () => getPatientForms(appointment!.patientId, appointment?.clinicId),
+    enabled: !!appointment?.patientId && !!appointment?.clinicId,
   });
 
   const createMutation = useMutation({
@@ -259,8 +255,10 @@ export default function ProviderAppointmentDetailPage() {
       );
     }
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      <div className="space-y-6">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -298,9 +296,7 @@ export default function ProviderAppointmentDetailPage() {
               <div>
                 <dt className="text-sm font-medium text-gray-500">Status</dt>
                 <dd className="mt-1">
-                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                    {appointment.status.replace(/_/g, ' ')}
-                  </span>
+                  <StatusBadge status={appointment.status} variant="appointment" />
                 </dd>
               </div>
             </dl>
@@ -313,9 +309,7 @@ export default function ProviderAppointmentDetailPage() {
               <CardTitle>Visit Record</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <Badge variant={visitRecord.status === 'FINAL' ? 'default' : 'secondary'}>
-                {visitRecord.status === 'DRAFT' ? 'Draft' : 'Finalized'}
-              </Badge>
+              <StatusBadge status={visitRecord.status} variant="visitRecord" />
               <div className="mt-4 space-y-4">
                 {visitRecord.subjective && (
                   <div>
@@ -372,7 +366,7 @@ export default function ProviderAppointmentDetailPage() {
             ) : (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <InvoiceStatusBadge status={invoice.status} />
+                  <StatusBadge status={invoice.status} variant="invoice" />
                   {canEdit && (
                     <Button
                       size="sm"
@@ -464,6 +458,26 @@ export default function ProviderAppointmentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        <IntakeFormsSection
+          responses={formResponses}
+          appointmentId={id}
+          isLoading={formsLoading}
+        />
+
+        {appointment?.patientId && (
+          <>
+            <Button variant="outline" onClick={() => setRecordSheetOpen(true)}>
+              View Full Record
+            </Button>
+            <PatientRecordSheet
+              patientId={appointment.patientId}
+              clinicId={appointment.clinicId}
+              open={recordSheetOpen}
+              onOpenChange={setRecordSheetOpen}
+            />
+          </>
+        )}
       </div>
 
       {invoice && (

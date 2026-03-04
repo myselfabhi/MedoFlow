@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { rescheduleAppointment, type ProviderAppointment } from '@/lib/patientApi';
-import { toast } from 'sonner';
+import { useAppToast } from '@/hooks/useAppToast';
 import { format, addMinutes } from 'date-fns';
 
 interface RescheduleDialogProps {
@@ -27,6 +27,7 @@ export function RescheduleDialog({
   onOpenChange,
   onSuccess,
 }: RescheduleDialogProps) {
+  const toast = useAppToast();
   const start = new Date(appointment.startTime);
   const end = new Date(appointment.endTime);
   const duration = (end.getTime() - start.getTime()) / 60000;

@@ -23,6 +23,19 @@ router.post(
 );
 
 router.get(
+  '/',
+  authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN, Role.STAFF),
+  (req: Request, _res: Response, next: NextFunction) => {
+    if (req.user!.role === 'SUPER_ADMIN') {
+      req.bypassClinicScope = true;
+      req.clinicId = (req.query?.clinicId as string) || null;
+    }
+    next();
+  },
+  treatmentPlanController.getList
+);
+
+router.get(
   '/patient/:patientId',
   authorize(Role.PROVIDER, Role.CLINIC_ADMIN, Role.SUPER_ADMIN),
   (req: Request, _res: Response, next: NextFunction) => {

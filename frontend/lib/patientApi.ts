@@ -116,6 +116,16 @@ export const getProviderAppointments = async (
   return data.data.appointments;
 };
 
+export const getClinicAppointments = async (
+  clinicId: string
+): Promise<ProviderAppointment[]> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { appointments: ProviderAppointment[] };
+  }>(`/appointments/clinic?clinicId=${clinicId}`);
+  return data.data.appointments;
+};
+
 export const cancelAppointment = async (
   appointmentId: string,
   reason?: string

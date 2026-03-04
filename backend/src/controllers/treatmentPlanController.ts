@@ -37,6 +37,31 @@ export const create = asyncHandler(
   }
 );
 
+export const getList = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.bypassClinicScope
+      ? (req.query.clinicId as string)
+      : req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    let providerId: string | undefined;
+    if (req.user!.role === 'PROVIDER') {
+      const provider = await treatmentPlanService.getProviderByUserId(req.user!.id);
+      if (provider) providerId = provider.id;
+    }
+    const status = req.query.status as 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED' | undefined;
+    const plans = await treatmentPlanService.getTreatmentPlans({
+      clinicId,
+      providerId,
+      status,
+    });
+    successResponse(res, 200, 'Treatment plans retrieved', { treatmentPlans: plans });
+  }
+);
+
 export const getByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;

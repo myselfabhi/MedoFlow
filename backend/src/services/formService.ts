@@ -341,7 +341,7 @@ export const getResponsesByPatient = async (
   return prisma.formResponse.findMany({
     where: { clinicId, patientId },
     include: {
-      template: { select: { id: true, name: true, scope: true } },
+      template: { select: { id: true, name: true, scope: true, fields: true } },
       appointment: { select: { id: true, startTime: true } },
     },
     orderBy: { createdAt: 'desc' },

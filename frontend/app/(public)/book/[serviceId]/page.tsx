@@ -611,8 +611,7 @@ export default function BookingPage() {
                       <select
                         className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                         value="WEEKLY"
-                        readOnly
-                        aria-readonly
+                        disabled
                       >
                         <option value="WEEKLY">Weekly</option>
                       </select>
@@ -681,9 +680,11 @@ export default function BookingPage() {
                     onClick={handleConfirmAuthenticated}
                     disabled={
                       appointmentMutation.isPending ||
-                      (isRecurring &&
-                        recurringUseEndDate &&
-                        (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate)))
+                      Boolean(
+                        isRecurring &&
+                          recurringUseEndDate &&
+                          (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate))
+                      )
                     }
                     className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                   >
@@ -702,9 +703,11 @@ export default function BookingPage() {
                       type="submit"
                       disabled={
                         appointmentMutation.isPending ||
-                        (isRecurring &&
-                          recurringUseEndDate &&
-                          (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate)))
+                        Boolean(
+                          isRecurring &&
+                            recurringUseEndDate &&
+                            (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate))
+                        )
                       }
                       className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
                     >

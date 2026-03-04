@@ -9,7 +9,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,18 +22,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cancelAppointment, type ProviderAppointment } from '@/lib/patientApi';
 import { RescheduleDialog } from './RescheduleDialog';
-import { toast } from 'sonner';
+import { useAppToast } from '@/hooks/useAppToast';
 import { format } from 'date-fns';
-
-const STATUS_BADGE: Record<string, string> = {
-  CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
-  COMPLETED: 'bg-green-100 text-green-800 border-green-200',
-  CANCELLED: 'bg-gray-100 text-gray-600 border-gray-200',
-  PENDING_PAYMENT: 'bg-amber-100 text-amber-800 border-amber-200',
-  DRAFT: 'bg-gray-100 text-gray-600 border-gray-200',
-  NO_SHOW: 'bg-gray-100 text-gray-600 border-gray-200',
-  RESCHEDULED: 'bg-gray-100 text-gray-600 border-gray-200',
-};
 
 interface AppointmentSheetProps {
   appointment: ProviderAppointment | null;
@@ -48,6 +38,7 @@ export function AppointmentSheet({
   onOpenChange,
   onSuccess,
 }: AppointmentSheetProps) {
+  const toast = useAppToast();
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -87,8 +78,6 @@ export function AppointmentSheet({
 
   if (!appointment) return null;
 
-  const statusClass = STATUS_BADGE[appointment.status] ?? 'bg-gray-100 text-gray-600';
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -116,9 +105,7 @@ export function AppointmentSheet({
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <Badge variant="outline" className={`mt-1 ${statusClass}`}>
-                {appointment.status.replace(/_/g, ' ')}
-              </Badge>
+              <StatusBadge status={appointment.status} variant="appointment" className="mt-1" />
             </div>
           </div>
           <SheetFooter className="mt-8 gap-2">

@@ -10,7 +10,11 @@ import {
   getMyPrescriptions,
   type VisitRecordStatus,
 } from '@/lib/patientApi';
+import { getPatientForms } from '@/lib/formsApi';
 import { PatientFilesSection } from '@/components/PatientFilesSection';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { IntakeFormsSection } from '@/components/intake/IntakeFormsSection';
 
 const visitStatusColors: Record<VisitRecordStatus, string> = {
   DRAFT: 'bg-amber-100 text-amber-800',
@@ -56,6 +60,12 @@ export default function PatientAppointmentDetailPage() {
     (p) => p.appointmentId === id
   ) ?? [];
 
+  const { data: formResponses = [], isLoading: formsLoading } = useQuery({
+    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
+    queryFn: () => getPatientForms(appointment!.patientId, appointment?.clinicId),
+    enabled: !!appointment?.patientId && !!appointment?.clinicId,
+  });
+
   if (appointmentLoading || !appointment) {
     if (appointmentError) {
       return (
@@ -73,8 +83,10 @@ export default function PatientAppointmentDetailPage() {
       );
     }
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      <div className="space-y-6">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -89,11 +101,12 @@ export default function PatientAppointmentDetailPage() {
       </Link>
 
       <div className="space-y-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Appointment Summary
-          </h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Appointment Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+          <dl className="grid gap-4 sm:grid-cols-2">
             <div>
               <dt className="text-sm font-medium text-gray-500">Service</dt>
               <dd className="mt-1 text-sm text-gray-900">
@@ -121,10 +134,14 @@ export default function PatientAppointmentDetailPage() {
               </dd>
             </div>
           </dl>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Visit Record</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Visit Record</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
           {visitRecord ? (
             <div className="mt-4 space-y-6">
               <div>
@@ -192,7 +209,14 @@ export default function PatientAppointmentDetailPage() {
               No visit record for this appointment yet.
             </p>
           )}
-        </div>
+          </CardContent>
+        </Card>
+
+        <IntakeFormsSection
+          responses={formResponses}
+          appointmentId={id}
+          isLoading={formsLoading}
+        />
 
         <PatientFilesSection
           patientId={appointment.patientId}
@@ -200,10 +224,11 @@ export default function PatientAppointmentDetailPage() {
           canDelete={false}
         />
 
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Prescriptions
-          </h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Prescriptions</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
           {prescriptions.length > 0 ? (
             <div className="mt-4 space-y-4">
               {prescriptions.map((rx) => (
@@ -228,7 +253,8 @@ export default function PatientAppointmentDetailPage() {
               No prescriptions for this appointment.
             </p>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -9,10 +9,10 @@ import {
     completeTreatmentPlan,
     discontinueTreatmentPlan,
     type TreatmentPlan,
-    type TreatmentPlanStatus,
 } from '@/lib/treatmentPlanApi';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { Card, CardContent } from '@/components/ui/Card';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { CreatePlanModal } from '@/components/CreatePlanModal';
 
 // ───────────────────── helpers ─────────────────────
@@ -25,12 +25,6 @@ function formatDate(iso: string | null | undefined): string {
         year: 'numeric',
     });
 }
-
-const STATUS_STYLES: Record<TreatmentPlanStatus, string> = {
-    ACTIVE: 'bg-blue-100 text-blue-700',
-    COMPLETED: 'bg-green-100 text-green-700',
-    DISCONTINUED: 'bg-gray-200 text-gray-600',
-};
 
 // ────────────── Progress bar component ──────────────
 
@@ -116,11 +110,7 @@ function PlanCard({
                         </h3>
                         <p className="text-sm text-gray-500">{plan.discipline.name}</p>
                     </div>
-                    <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[plan.status]}`}
-                    >
-                        {plan.status}
-                    </span>
+                    <StatusBadge status={plan.status} variant="treatmentPlan" className="shrink-0" />
                 </div>
 
                 {/* Progress */}

@@ -36,7 +36,7 @@ export function CardTitle({ children, className, ...props }: CardProps) {
 
 export function CardContent({ children, className, ...props }: CardProps) {
   return (
-    <div className={cn('px-6 py-4', className)} {...props}>
+    <div className={cn('p-6', className)} {...props}>
       {children}
     </div>
   );

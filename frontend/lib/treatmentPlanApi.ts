@@ -66,6 +66,19 @@ export const createTreatmentPlan = async (
     return data.data.treatmentPlan;
 };
 
+export const getTreatmentPlans = async (
+  clinicId: string,
+  status?: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED'
+): Promise<TreatmentPlan[]> => {
+  const params = new URLSearchParams({ clinicId });
+  if (status) params.set('status', status);
+  const { data } = await api.get<{
+    success: boolean;
+    data: { treatmentPlans: TreatmentPlan[] };
+  }>(`/treatment-plans?${params.toString()}`);
+  return data.data.treatmentPlans;
+};
+
 export const getPlansByPatient = async (
     patientId: string
 ): Promise<TreatmentPlan[]> => {

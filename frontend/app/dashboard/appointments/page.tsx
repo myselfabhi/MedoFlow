@@ -10,6 +10,7 @@ import {
   type ProviderAppointment,
 } from '@/lib/patientApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/button';
 
 function formatDateTime(iso: string) {
@@ -26,12 +27,11 @@ export default function AppointmentsPage() {
 
   const { data: appointments = [], isLoading, error } = useQuery({
     queryKey: ['appointments', user?.role, user?.clinicId],
-    queryFn: () =>
-      isPatient
-        ? getMyAppointments(user?.clinicId ?? undefined)
-        : isProvider
-          ? getProviderAppointments(user?.clinicId ?? undefined)
-          : Promise.resolve([]),
+    queryFn: async () => {
+      if (isPatient) return getMyAppointments(user?.clinicId ?? undefined);
+      if (isProvider) return getProviderAppointments(user?.clinicId ?? undefined);
+      return [] as (PatientAppointment | ProviderAppointment)[];
+    },
     enabled: isPatient || isProvider,
   });
 
@@ -74,7 +74,12 @@ export default function AppointmentsPage() {
           ) : error ? (
             <p className="text-sm text-red-600">Failed to load appointments.</p>
           ) : !appointments.length ? (
-            <p className="text-gray-500">No appointments yet.</p>
+            <EmptyState
+              title="No appointments yet"
+              description={isPatient ? 'Book your first appointment to get started.' : 'No scheduled appointments.'}
+              actionLabel={isPatient ? 'Book appointment' : undefined}
+              onAction={isPatient ? () => window.location.assign('/') : undefined}
+            />
           ) : (
             <div className="space-y-4">
               {appointments.map((apt: PatientAppointment | ProviderAppointment) => (

@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { AppointmentSheet } from '@/components/calendar/AppointmentSheet';
 import { format } from 'date-fns';
 
@@ -243,6 +243,7 @@ export default function ProviderCalendarPage() {
                 ))}
               </div>
             </div>
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </CardContent>
       </Card>

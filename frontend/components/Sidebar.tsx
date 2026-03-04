@@ -16,6 +16,7 @@ const navItems = [
 ];
 
 const frontDeskNavItems = [
+  { href: '/dashboard/front-desk', label: 'Front Desk' },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices' },
 ];
 

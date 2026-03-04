@@ -105,6 +105,23 @@ export const getTreatmentPlansByPatient = async (
   });
 };
 
+export const getTreatmentPlans = async (opts: {
+  clinicId: string;
+  providerId?: string;
+  status?: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
+}) => {
+  const where: { clinicId: string; providerId?: string; status?: string } = {
+    clinicId: opts.clinicId,
+  };
+  if (opts.providerId) where.providerId = opts.providerId;
+  if (opts.status) where.status = opts.status;
+  return prisma.treatmentPlan.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: includeRelations,
+  });
+};
+
 export const getTreatmentPlanById = async (
   id: string,
   where: { clinicId?: string; providerId?: string } = {}

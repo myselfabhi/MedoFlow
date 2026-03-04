@@ -84,5 +84,6 @@ export const updateAvailability = async (
   if ('requiresConfirmation' in result && result.requiresConfirmation) {
     return result;
   }
-  return { availability: result.availability! };
+  const withAvailability = result as { availability?: ProviderAvailabilitySlot };
+  return { availability: withAvailability.availability! };
 };

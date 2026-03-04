@@ -1,20 +1,24 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import type { User } from '@/lib/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { ProviderDashboard } from '@/components/dashboard/ProviderDashboard';
+import { PatientDashboard } from '@/components/dashboard/PatientDashboard';
 
 export default function DashboardPage() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['me'],
-    queryFn: async () => {
-      const { data } = await api.get<{ success: boolean; data: { user: User } }>('/auth/me');
-      return data.data.user;
-    },
-  });
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (user.role === 'STAFF' || user.role === 'CLINIC_ADMIN' || user.role === 'SUPER_ADMIN') {
+      router.replace('/dashboard/front-desk');
+      return;
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -22,45 +26,21 @@ export default function DashboardPage() {
     );
   }
 
-  if (error || !data) {
+  if (user.role === 'PROVIDER') {
+    return <ProviderDashboard />;
+  }
+
+  if (user.role === 'PATIENT') {
+    return <PatientDashboard />;
+  }
+
+  if (user.role === 'STAFF' || user.role === 'CLINIC_ADMIN' || user.role === 'SUPER_ADMIN') {
     return (
-      <Card>
-        <CardContent className="py-6">
-          <p className="text-red-600">Failed to load user data</p>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Welcome to Medoflow</p>
-      </div>
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Your Profile</h2>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <span className="text-sm font-medium text-gray-500">Name</span>
-            <p className="text-gray-900">{data.name}</p>
-          </div>
-          <div>
-            <span className="text-sm font-medium text-gray-500">Email</span>
-            <p className="text-gray-900">{data.email}</p>
-          </div>
-          <div>
-            <span className="text-sm font-medium text-gray-500">Role</span>
-            <p className="text-gray-900">{data.role.replace('_', ' ')}</p>
-          </div>
-          <div>
-            <span className="text-sm font-medium text-gray-500">Clinic ID</span>
-            <p className="text-gray-900">{data.clinicId || '—'}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <PatientDashboard />;
 }

@@ -123,6 +123,11 @@ export const getTemplatesForAppointment = asyncHandler(
 export const getResponsesByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
+    if (req.user!.role === 'PATIENT' && patientId !== req.user!.id) {
+      const err = new Error('Patients can only access their own form responses') as ApiError;
+      err.statusCode = 403;
+      throw err;
+    }
     const clinicId = req.bypassClinicScope
       ? (req.query.clinicId as string)
       : req.clinicId;
