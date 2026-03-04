@@ -159,9 +159,16 @@ export const getProvider = asyncHandler(
     const clinicId = req.bypassClinicScope
       ? (req.query.clinicId as string)
       : req.clinicId;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const options =
+      startDate && endDate
+        ? { startDate: new Date(startDate), endDate: new Date(endDate) }
+        : undefined;
     const appointments = await appointmentService.getAppointmentsByProvider(
       provider.id,
-      clinicId
+      clinicId,
+      options
     );
     successResponse(res, 200, 'Appointments retrieved', { appointments });
   }

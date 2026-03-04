@@ -100,14 +100,43 @@ export interface ProviderAppointment {
 }
 
 export const getProviderAppointments = async (
-  clinicId?: string
+  clinicId?: string,
+  startDate?: Date,
+  endDate?: Date
 ): Promise<ProviderAppointment[]> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  const search = new URLSearchParams();
+  if (clinicId) search.set('clinicId', clinicId);
+  if (startDate) search.set('startDate', startDate.toISOString());
+  if (endDate) search.set('endDate', endDate.toISOString());
+  const qs = search.toString();
   const { data } = await api.get<{
     success: boolean;
     data: { appointments: ProviderAppointment[] };
-  }>(`/appointments/provider${params}`);
+  }>(`/appointments/provider${qs ? `?${qs}` : ''}`);
   return data.data.appointments;
+};
+
+export const cancelAppointment = async (
+  appointmentId: string,
+  reason?: string
+): Promise<{ appointment: PatientAppointment; cancellationFee?: { type: string; value: string; amount?: string } }> => {
+  const { data } = await api.post<{
+    success: boolean;
+    data: { appointment: PatientAppointment; cancellationFee?: { type: string; value: string; amount?: string } };
+  }>(`/appointments/${appointmentId}/cancel`, { reason: reason ?? '' });
+  return data.data;
+};
+
+export const rescheduleAppointment = async (
+  appointmentId: string,
+  newStartTime: string,
+  newEndTime: string
+): Promise<{ oldAppointment: PatientAppointment; newAppointment: PatientAppointment }> => {
+  const { data } = await api.post<{
+    success: boolean;
+    data: { oldAppointment: PatientAppointment; newAppointment: PatientAppointment };
+  }>(`/appointments/${appointmentId}/reschedule`, { newStartTime, newEndTime });
+  return data.data;
 };
 
 export const getAppointmentById = async (

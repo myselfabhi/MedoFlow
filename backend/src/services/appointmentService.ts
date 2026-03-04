@@ -742,13 +742,19 @@ export const getAppointmentsByPatient = async (
 
 export const getAppointmentsByProvider = async (
   providerId: string,
-  clinicId?: string | null
+  clinicId?: string | null,
+  options?: { startDate?: Date; endDate?: Date }
 ) => {
-  const where: { providerId: string; clinicId?: string } = { providerId };
+  const where: Record<string, unknown> = { providerId };
   if (clinicId) where.clinicId = clinicId;
+  if (options?.startDate || options?.endDate) {
+    where.startTime = {};
+    if (options.startDate) (where.startTime as { gte?: Date }).gte = options.startDate;
+    if (options.endDate) (where.startTime as { lte?: Date }).lte = options.endDate;
+  }
   return prisma.appointment.findMany({
     where,
-    orderBy: { startTime: 'desc' },
+    orderBy: { startTime: 'asc' },
     include: {
       location: { select: { id: true, name: true } },
       service: { select: { id: true, name: true } },
