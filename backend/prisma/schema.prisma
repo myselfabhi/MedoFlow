@@ -36,6 +36,12 @@ enum TreatmentPlanStatus {
   DISCONTINUED
 }
 
+enum FormScope {
+  CLINIC
+  DISCIPLINE
+  SERVICE
+}
+
 model Clinic {
   id               String   @id @default(cuid())
   name             String
@@ -58,6 +64,8 @@ model Clinic {
   payments        Payment[]
   treatmentPlans  TreatmentPlan[]
   patientFiles    PatientFile[]
+  formTemplates   FormTemplate[]
+  formResponses   FormResponse[]
 }
 
 model User {
@@ -84,6 +92,7 @@ model User {
   treatmentPlans   TreatmentPlan[] @relation("PatientPlans")
   patientFiles     PatientFile[] @relation("PatientFiles")
   uploadedFiles    PatientFile[] @relation("UploadedFiles")
+  formResponses    FormResponse[]
 }
 
 model Discipline {
@@ -99,6 +108,7 @@ model Discipline {
   providers      Provider[]
   services       Service[]
   treatmentPlans TreatmentPlan[]
+  formTemplates  FormTemplate[]
 
   @@unique([clinicId, name])
 }
@@ -198,6 +208,7 @@ model Service {
   providerServices  ProviderService[]
   appointments      Appointment[]
   waitlistEntries   WaitlistEntry[]
+  formTemplates     FormTemplate[]
 
   @@unique([clinicId, name])
   @@index([clinicId])
@@ -251,6 +262,7 @@ model Appointment {
   visitRecords   VisitRecord[]
   prescriptions  Prescription[]
   payments       Payment[]
+  formResponses  FormResponse[]
 
   @@index([providerId])
   @@index([patientId])
@@ -445,4 +457,44 @@ model PatientFile {
   @@index([patientId])
   @@index([clinicId])
   @@index([visitRecordId])
+}
+
+model FormTemplate {
+  id           String    @id @default(cuid())
+  clinicId     String
+  name         String
+  description  String?
+  scope        FormScope
+  disciplineId String?
+  serviceId    String?
+  fields       Json
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  discipline  Discipline?  @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  service     Service?     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  responses   FormResponse[]
+
+  @@index([clinicId])
+}
+
+model FormResponse {
+  id             String    @id @default(cuid())
+  clinicId       String
+  templateId     String
+  patientId      String
+  appointmentId  String?
+  responses      Json
+  createdAt      DateTime  @default(now())
+
+  clinic      Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  template    FormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  patient     User          @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([clinicId])
+  @@index([templateId])
 }

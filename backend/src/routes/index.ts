@@ -13,6 +13,7 @@ import waitlistRoutes from './waitlist';
 import paymentRoutes from './payments';
 import treatmentPlanRoutes from './treatmentPlans';
 import fileRoutes from './files';
+import formRoutes from './forms';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/waitlist', waitlistRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/treatment-plans', treatmentPlanRoutes);
 router.use('/files', fileRoutes);
+router.use('/forms', formRoutes);
 
 export default router;
