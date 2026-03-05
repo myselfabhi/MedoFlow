@@ -38,3 +38,56 @@ export const getDashboardServices = async (
   }>(`/services${params}`);
   return data.data.services;
 };
+
+export interface ServiceWithCount extends DashboardService {
+  _count?: { providerServices: number };
+}
+
+export interface CreateServicePayload {
+  disciplineId: string;
+  name: string;
+  duration: number;
+  defaultPrice: number | string;
+  taxApplicable?: boolean;
+}
+
+export interface UpdateServicePayload {
+  name?: string;
+  duration?: number;
+  defaultPrice?: number | string;
+  disciplineId?: string;
+  taxApplicable?: boolean;
+}
+
+export const createService = async (
+  payload: CreateServicePayload,
+  clinicId?: string
+): Promise<ServiceWithCount> => {
+  const body = clinicId ? { ...payload, clinicId } : payload;
+  const { data } = await api.post<{ success: boolean; data: { service: ServiceWithCount } }>(
+    '/services',
+    body
+  );
+  return data.data.service;
+};
+
+export const updateService = async (
+  id: string,
+  payload: UpdateServicePayload,
+  clinicId?: string
+): Promise<ServiceWithCount> => {
+  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  const { data } = await api.put<{ success: boolean; data: { service: ServiceWithCount } }>(
+    `/services/${id}${params}`,
+    payload
+  );
+  return data.data.service;
+};
+
+export const archiveService = async (
+  id: string,
+  clinicId?: string
+): Promise<void> => {
+  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  await api.delete(`/services/${id}${params}`);
+};

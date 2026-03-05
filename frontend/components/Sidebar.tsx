@@ -5,44 +5,49 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
-const navItems = [
+const patientItems = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/patient/appointments', label: 'My Appointments' },
+];
+
+const providerItems = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/provider/calendar', label: 'Calendar' },
+  { href: '/dashboard/appointments', label: 'Appointments' },
   { href: '/dashboard/providers', label: 'Providers' },
   { href: '/dashboard/disciplines', label: 'Disciplines' },
   { href: '/dashboard/services', label: 'Services' },
-  { href: '/dashboard/appointments', label: 'Appointments' },
-  { href: '/dashboard/billing', label: 'Billing' },
   { href: '/dashboard/analytics', label: 'Analytics' },
 ];
 
-const frontDeskNavItems = [
+const staffAdminItems = [
+  { href: '/dashboard', label: 'Dashboard' },
   { href: '/dashboard/front-desk', label: 'Front Desk' },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices' },
+  { href: '/dashboard/appointments', label: 'Appointments' },
+  { href: '/dashboard/providers', label: 'Providers' },
+  { href: '/dashboard/disciplines', label: 'Disciplines' },
+  { href: '/dashboard/services', label: 'Services' },
+  { href: '/dashboard/analytics', label: 'Analytics' },
 ];
-
-const providerNavItems = [
-  { href: '/dashboard/provider/calendar', label: 'Calendar' },
-];
-
-const patientNavItem = {
-  href: '/dashboard/patient/appointments',
-  label: 'Patient Portal',
-};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isPatient = user?.role === 'PATIENT';
   const isProvider = user?.role === 'PROVIDER';
-  const showFrontDesk = user?.role === 'STAFF' || user?.role === 'CLINIC_ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isStaffOrAdmin =
+    user?.role === 'STAFF' ||
+    user?.role === 'CLINIC_ADMIN' ||
+    user?.role === 'SUPER_ADMIN';
 
   const items = isPatient
-    ? [patientNavItem, ...navItems]
+    ? patientItems
     : isProvider
-      ? [...navItems, ...providerNavItems]
-      : showFrontDesk
-        ? [...navItems, ...frontDeskNavItems]
-        : navItems;
+      ? providerItems
+      : isStaffOrAdmin
+        ? staffAdminItems
+        : [{ href: '/dashboard', label: 'Dashboard' }];
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-gray-200 bg-white">
