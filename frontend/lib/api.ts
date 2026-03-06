@@ -62,7 +62,9 @@ api.interceptors.response.use(
     }
 
     const isAuthEndpoint =
-      originalRequest.url?.includes('/auth/me') || originalRequest.url?.includes('/auth/refresh-token');
+      originalRequest.url?.includes('/auth/me') ||
+      originalRequest.url?.includes('/auth/refresh-token') ||
+      originalRequest.url?.includes('/auth/login');
 
     originalRequest._retry = true;
 

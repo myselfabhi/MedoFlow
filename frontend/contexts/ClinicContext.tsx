@@ -47,12 +47,23 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
     refetchClinics();
   }, [user?.role, refetchClinics]);
 
+  // Restore selected clinic from localStorage immediately so pages like Providers
+  // have clinicId before clinics finish loading
   useEffect(() => {
     if (user?.role !== 'SUPER_ADMIN') return;
     const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (stored && clinics.some((c) => c.id === stored)) {
+    if (stored) {
       setSelectedClinicIdState(stored);
-    } else if (clinics.length > 0 && !stored) {
+    }
+  }, [user?.role]);
+
+  // Sync with clinics when they load: validate stored, or pick first if none stored
+  useEffect(() => {
+    if (user?.role !== 'SUPER_ADMIN' || clinics.length === 0) return;
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (stored && !clinics.some((c) => c.id === stored)) {
+      setSelectedClinicIdState(clinics[0].id);
+    } else if (!stored) {
       setSelectedClinicIdState(clinics[0].id);
     }
   }, [user?.role, clinics]);

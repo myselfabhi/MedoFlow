@@ -43,8 +43,8 @@ function LoginForm() {
     setIsSubmitting(true);
     try {
       await login(data.email, data.password);
-      router.push(returnUrl);
-      router.refresh();
+      // Let useEffect handle redirect when isAuthenticated updates - avoids race where
+      // dashboard mounts before auth state propagates and redirects back to login
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
@@ -62,7 +62,13 @@ function LoginForm() {
         <p className="mt-1 text-sm text-gray-500">Enter your credentials</p>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(onSubmit)(e);
+          }}
+          className="space-y-4"
+        >
           {error && (
             <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
           )}

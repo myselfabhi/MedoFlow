@@ -49,10 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       '/auth/login',
       { email, password }
     );
-    if (data.success && data.data.accessToken) {
-      setAccessToken(data.data.accessToken);
-      setUser(data.data.user);
+    const payload = data?.data;
+    if (!payload?.accessToken || !payload?.user) {
+      throw new Error((data as { message?: string })?.message || 'Invalid response from server');
     }
+    setAccessToken(payload.accessToken);
+    setUser(payload.user);
   }, []);
 
   const logout = useCallback(async () => {

@@ -3,14 +3,34 @@
 import React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import { listProviders } from '@/lib/availabilityApi';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
 export default function ProvidersPage() {
+  const { user } = useAuth();
+  const clinicId = useSelectedClinicId();
+  const effectiveClinicId = (clinicId ?? user?.clinicId)?.trim() || undefined;
+
   const { data: providers, isLoading, error } = useQuery({
-    queryKey: ['providers'],
-    queryFn: () => listProviders(),
+    queryKey: ['providers', effectiveClinicId],
+    queryFn: () => listProviders(effectiveClinicId),
+    enabled: !!effectiveClinicId,
   });
+
+  if (!effectiveClinicId) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Providers</h1>
+        <p className="text-gray-500">
+          {user?.role === 'SUPER_ADMIN'
+            ? 'Select a clinic from the dropdown above to view providers.'
+            : 'You are not assigned to a clinic.'}
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
