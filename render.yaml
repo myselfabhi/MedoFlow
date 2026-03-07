@@ -12,11 +12,8 @@ services:
     # Build commands (--include=dev ensures @types/* are installed for tsc)
     buildCommand: npm install --include=dev && npx prisma generate && npm run build
 
-    # Run migrations before starting (runs after build, before new instance goes live)
-    releaseCommand: npx prisma migrate deploy
-
-    # Start command
-    startCommand: npm start
+    # Start command (migrations run before start; Pre-Deploy is paid-only on Render)
+    startCommand: npx prisma migrate deploy && npm start
 
     # Required env vars (set in Render Dashboard > Environment):
     #   DATABASE_URL - from Render PostgreSQL addon

@@ -30,8 +30,7 @@ Deploy MedoFlow with **Vercel** (frontend) and **Render** (backend).
    - **Root Directory**: `backend`
    - **Runtime**: Node
    - **Build Command**: `npm install --include=dev && npx prisma generate && npm run build`
-   - **Start Command**: `npm start`
-   - **Release Command**: `npx prisma migrate deploy`
+   - **Start Command**: `npx prisma migrate deploy && npm start` *(runs migrations before each start; Pre-Deploy is paid-only)*
 
 ### 1.3 Environment Variables (Render Dashboard → Environment)
 
@@ -86,7 +85,25 @@ Click **Deploy**. Vercel will build and deploy. Note your frontend URL (e.g. `ht
 
 ---
 
-## 4. Post-Deploy Checklist
+## 4. Troubleshooting
+
+### "The table `public.Clinic` does not exist" (500 error)
+
+Database migrations haven't run. Fix:
+
+**Option A – Start Command (free tier):**  
+Set **Start Command** to: `npx prisma migrate deploy && npm start`
+
+**Option B – Run locally once:**  
+```bash
+cd backend
+DATABASE_URL="postgresql://..." npx prisma migrate deploy
+```
+*(Use the Internal Database URL from Render → your PostgreSQL instance)*
+
+---
+
+## 5. Post-Deploy Checklist
 
 - [ ] Backend health: `https://your-backend.onrender.com/api/v1/health` (if you have a health route)
 - [ ] Frontend loads and can reach the API
@@ -95,7 +112,7 @@ Click **Deploy**. Vercel will build and deploy. Note your frontend URL (e.g. `ht
 
 ---
 
-## 5. Important Notes
+## 6. Important Notes
 
 ### File Uploads (Patient Files)
 
@@ -118,7 +135,7 @@ The backend stores files on local disk (`uploads/`). On Render, the filesystem i
 
 ---
 
-## 6. Using Blueprint (Optional)
+## 7. Using Blueprint (Optional)
 
 A `render.yaml` is included for [Render Blueprint](https://render.com/docs/blueprint-spec) deployment:
 
