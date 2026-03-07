@@ -408,9 +408,9 @@ export const createAppointment = async (
       patientId,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
-      status: (requirePrepayment ? 'PENDING_PAYMENT' : 'CONFIRMED') as const,
+      status: requirePrepayment ? AppointmentStatus.PENDING_PAYMENT : AppointmentStatus.CONFIRMED,
       priceAtBooking,
-      paymentStatus: (requirePrepayment ? 'PENDING' : 'NONE') as const,
+      paymentStatus: requirePrepayment ? 'PENDING' : 'NONE',
       paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
       slotHeldUntil,
     };
@@ -509,7 +509,7 @@ export const createRecurringSeries = async (
           endTime: end,
         },
         input.clinicId,
-        { performedById, excludeAppointmentId: null }
+        { performedById }
       );
       appointments.push(apt);
     } catch (err) {

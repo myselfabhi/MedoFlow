@@ -1,7 +1,7 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
-import { Prisma } from '@prisma/client';
+import { Prisma, TreatmentPlanStatus } from '@prisma/client';
 
 export interface CreateTreatmentPlanData {
   patientId: string;
@@ -110,11 +110,11 @@ export const getTreatmentPlans = async (opts: {
   providerId?: string;
   status?: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
 }) => {
-  const where: { clinicId: string; providerId?: string; status?: string } = {
+  const where: Prisma.TreatmentPlanWhereInput = {
     clinicId: opts.clinicId,
   };
   if (opts.providerId) where.providerId = opts.providerId;
-  if (opts.status) where.status = opts.status;
+  if (opts.status) where.status = opts.status as TreatmentPlanStatus;
   return prisma.treatmentPlan.findMany({
     where,
     orderBy: { createdAt: 'desc' },
