@@ -14,7 +14,19 @@ app.use(helmet());
 const corsOrigin = process.env.CORS_ORIGIN;
 app.use(
   cors({
-    origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
+    origin: (origin, cb) => {
+      const allowed = corsOrigin
+        ? corsOrigin.split(',').map((o) => o.trim())
+        : [];
+      const allowAll = allowed.length === 0;
+      const isVercelPreview = origin?.endsWith('.vercel.app');
+      const isAllowed =
+        allowAll ||
+        !origin ||
+        allowed.includes(origin) ||
+        (isVercelPreview && allowed.some((o) => o.includes('vercel.app')));
+      cb(null, isAllowed);
+    },
     credentials: true,
   })
 );
