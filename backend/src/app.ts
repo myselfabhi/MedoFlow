@@ -11,7 +11,13 @@ import { ApiError } from './types/errors';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(
+  cors({
+    origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
+    credentials: true,
+  })
+);
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(cookieParser());

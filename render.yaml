@@ -1,0 +1,24 @@
+# Render Blueprint for MedoFlow Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: medoflow-backend
+    runtime: node
+
+    # Build from backend directory
+    rootDir: backend
+
+    # Build commands
+    buildCommand: npm install && npx prisma generate && npm run build
+
+    # Run migrations before starting (runs after build, before new instance goes live)
+    releaseCommand: npx prisma migrate deploy
+
+    # Start command
+    startCommand: npm start
+
+    # Required env vars (set in Render Dashboard > Environment):
+    #   DATABASE_URL - from Render PostgreSQL addon
+    #   JWT_SECRET   - strong random string (e.g. openssl rand -base64 32)
+    # Optional: STRIPE_SECRET, FILE_SIZE_LIMIT_MB, CORS_ORIGIN

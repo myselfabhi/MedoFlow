@@ -16,20 +16,22 @@ const REFRESH_TOKEN_COOKIE = 'refreshToken';
 
 const setRefreshTokenCookie = (res: Response, token: string): void => {
   const isProduction = process.env.NODE_ENV === 'production';
+  const crossOrigin = Boolean(process.env.CORS_ORIGIN);
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'strict',
+    sameSite: crossOrigin ? 'none' : 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/api/v1/auth',
   });
 };
 
 const clearRefreshTokenCookie = (res: Response): void => {
+  const crossOrigin = Boolean(process.env.CORS_ORIGIN);
   res.clearCookie(REFRESH_TOKEN_COOKIE, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: crossOrigin ? 'none' : 'strict',
     path: '/api/v1/auth',
   });
 };
