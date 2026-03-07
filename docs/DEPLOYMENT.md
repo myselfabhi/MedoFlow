@@ -29,7 +29,7 @@ Deploy MedoFlow with **Vercel** (frontend) and **Render** (backend).
    - **Region**: Same as database
    - **Root Directory**: `backend`
    - **Runtime**: Node
-   - **Build Command**: `npm install && npx prisma generate && npm run build`
+   - **Build Command**: `npm install --include=dev && npx prisma generate && npm run build`
    - **Start Command**: `npm start`
    - **Release Command**: `npx prisma migrate deploy`
 

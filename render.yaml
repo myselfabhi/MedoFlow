@@ -9,8 +9,8 @@ services:
     # Build from backend directory
     rootDir: backend
 
-    # Build commands
-    buildCommand: npm install && npx prisma generate && npm run build
+    # Build commands (--include=dev ensures @types/* are installed for tsc)
+    buildCommand: npm install --include=dev && npx prisma generate && npm run build
 
     # Run migrations before starting (runs after build, before new instance goes live)
     releaseCommand: npx prisma migrate deploy
