@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as visitService from '../services/visitService';
+import * as aiScribeService from '../services/aiScribeService';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../types/errors';
@@ -60,7 +61,17 @@ export const getById = asyncHandler(
         err.statusCode = 403;
         throw err;
     }
-    successResponse(res, 200, 'Visit record retrieved', { visitRecord });
+    let payload: { visitRecord: typeof visitRecord; patientSummary?: object } = { visitRecord };
+    if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
+      const patientSummary = await aiScribeService.getApprovedPatientSummary(
+        visitRecord.id,
+        visitRecord.patientId
+      );
+      if (patientSummary) {
+        payload = { ...payload, patientSummary };
+      }
+    }
+    successResponse(res, 200, 'Visit record retrieved', payload);
   }
 );
 
@@ -113,7 +124,17 @@ export const getByAppointment = asyncHandler(
       err.statusCode = 403;
       throw err;
     }
-    successResponse(res, 200, 'Visit record retrieved', { visitRecord });
+    let payload: { visitRecord: typeof visitRecord; patientSummary?: object } = { visitRecord };
+    if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
+      const patientSummary = await aiScribeService.getApprovedPatientSummary(
+        visitRecord.id,
+        visitRecord.patientId
+      );
+      if (patientSummary) {
+        payload = { ...payload, patientSummary };
+      }
+    }
+    successResponse(res, 200, 'Visit record retrieved', payload);
   }
 );
 

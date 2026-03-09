@@ -43,12 +43,14 @@ export default function PatientAppointmentDetailPage() {
     enabled: !!id,
   });
 
-  const { data: visitRecord } = useQuery({
+  const { data: visitData } = useQuery({
     queryKey: ['patient', 'visit', id],
     queryFn: () =>
       appointment ? getVisitByAppointment(id, appointment.clinicId) : null,
     enabled: !!appointment?.id,
   });
+  const visitRecord = visitData?.visitRecord ?? null;
+  const patientSummary = visitData?.patientSummary;
 
   const { data: allPrescriptions } = useQuery({
     queryKey: ['patient', 'prescriptions', appointment?.clinicId],
@@ -136,6 +138,36 @@ export default function PatientAppointmentDetailPage() {
           </dl>
           </CardContent>
         </Card>
+
+        {patientSummary && (patientSummary.diagnosis || patientSummary.treatmentPlan || patientSummary.nextSteps) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Visit Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {patientSummary.diagnosis && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700">Diagnosis</h3>
+                    <p className="mt-1 text-sm text-gray-900">{patientSummary.diagnosis}</p>
+                  </div>
+                )}
+                {patientSummary.treatmentPlan && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700">Treatment Plan</h3>
+                    <p className="mt-1 text-sm text-gray-900">{patientSummary.treatmentPlan}</p>
+                  </div>
+                )}
+                {patientSummary.nextSteps && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700">Next Steps</h3>
+                    <p className="mt-1 text-sm text-gray-900">{patientSummary.nextSteps}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

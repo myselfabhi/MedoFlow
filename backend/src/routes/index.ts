@@ -16,6 +16,7 @@ import fileRoutes from './files';
 import formRoutes from './forms';
 import invoiceRoutes from './invoices';
 import analyticsRoutes from './analytics';
+import aiScribeRoutes from './aiScribe';
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use('/files', fileRoutes);
 router.use('/forms', formRoutes);
 router.use('/invoices', invoiceRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/ai-scribe', aiScribeRoutes);
 
 export default router;

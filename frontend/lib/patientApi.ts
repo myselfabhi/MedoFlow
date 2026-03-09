@@ -40,6 +40,12 @@ export interface PatientAppointmentDetail extends PatientAppointment {
   service: { id: string; name: string; duration: number };
 }
 
+export interface PatientSummary {
+  diagnosis?: string;
+  treatmentPlan?: string;
+  nextSteps?: string;
+}
+
 export interface VisitRecord {
   id: string;
   clinicId: string;
@@ -51,6 +57,7 @@ export interface VisitRecord {
   assessment: string | null;
   plan: string | null;
   status: VisitRecordStatus;
+  isFinalized?: boolean;
   createdAt: string;
   updatedAt: string;
   provider: { id: string; firstName: string; lastName: string };
@@ -159,17 +166,30 @@ export const getAppointmentById = async (
   return data.data.appointment;
 };
 
+export const createVisitRecord = async (
+  appointmentId: string,
+  clinicId?: string,
+  payload?: { patientId?: string; subjective?: string; objective?: string; assessment?: string; plan?: string }
+): Promise<VisitRecord> => {
+  const body = clinicId ? { ...payload, appointmentId, clinicId } : { ...payload, appointmentId };
+  const { data } = await api.post<{
+    success: boolean;
+    data: { visitRecord: VisitRecord };
+  }>('/visits', body);
+  return data.data.visitRecord;
+};
+
 export const getVisitByAppointment = async (
   appointmentId: string,
   clinicId?: string
-): Promise<VisitRecord | null> => {
+): Promise<{ visitRecord: VisitRecord; patientSummary?: PatientSummary } | null> => {
   try {
     const params = clinicId ? `?clinicId=${clinicId}` : '';
     const { data } = await api.get<{
       success: boolean;
-      data: { visitRecord: VisitRecord };
+      data: { visitRecord: VisitRecord; patientSummary?: PatientSummary };
     }>(`/visits/appointment/${appointmentId}${params}`);
-    return data.data.visitRecord;
+    return data.data;
   } catch {
     return null;
   }

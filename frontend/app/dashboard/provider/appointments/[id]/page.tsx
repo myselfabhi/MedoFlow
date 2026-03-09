@@ -8,6 +8,7 @@ import { Trash2 } from 'lucide-react';
 import {
   getAppointmentById,
   getVisitByAppointment,
+  createVisitRecord,
 } from '@/lib/patientApi';
 import {
   getInvoicesByAppointment,
@@ -146,6 +147,7 @@ export default function ProviderAppointmentDetailPage() {
   const queryClient = useQueryClient();
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
+  const [creatingVisit, setCreatingVisit] = useState(false);
 
   const { data: appointment, isLoading: appointmentLoading, error: appointmentError } = useQuery({
     queryKey: ['appointment', id],
@@ -153,11 +155,12 @@ export default function ProviderAppointmentDetailPage() {
     enabled: !!id,
   });
 
-  const { data: visitRecord } = useQuery({
+  const { data: visitData } = useQuery({
     queryKey: ['visit', id],
     queryFn: () => (appointment ? getVisitByAppointment(id, appointment.clinicId) : null),
     enabled: !!appointment?.id,
   });
+  const visitRecord = visitData?.visitRecord ?? null;
 
   const { data: invoices = [], refetch: refetchInvoices } = useQuery({
     queryKey: ['invoices', 'appointment', id],
@@ -306,7 +309,20 @@ export default function ProviderAppointmentDetailPage() {
         {visitRecord && (
           <Card>
             <CardHeader>
-              <CardTitle>Visit Record</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <CardTitle>Visit Record</CardTitle>
+                {visitRecord && !visitRecord.isFinalized && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <Link href={`/dashboard/provider/visits/${visitRecord.id}/scribe?appointmentId=${id}`}>
+                      AI Scribe
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-6">
               <StatusBadge status={visitRecord.status} variant="visitRecord" />
@@ -344,6 +360,38 @@ export default function ProviderAppointmentDetailPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!visitRecord && !creatingVisit && appointment && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Visit Record</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <p className="mb-4 text-sm text-gray-500">
+                Start a visit to document the consultation. Use AI Scribe to record or upload audio and generate clinical notes.
+              </p>
+              <Button
+                onClick={async () => {
+                  setCreatingVisit(true);
+                  try {
+                    const vr = await createVisitRecord(id, appointment.clinicId, {
+                      patientId: appointment.patientId,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['visit', id] });
+                    window.location.href = `/dashboard/provider/visits/${vr.id}/scribe?appointmentId=${id}`;
+                  } catch {
+                    toast.error('Failed to create visit');
+                  } finally {
+                    setCreatingVisit(false);
+                  }
+                }}
+                disabled={creatingVisit}
+              >
+                {creatingVisit ? 'Creating...' : 'Start Visit with AI Scribe'}
+              </Button>
             </CardContent>
           </Card>
         )}

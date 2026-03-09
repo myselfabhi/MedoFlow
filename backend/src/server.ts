@@ -2,6 +2,7 @@ import 'dotenv/config';
 import app from './app';
 import prisma from './config/prisma';
 import { startCronJobs } from './scheduler/cronJobs';
+import { createAiScribeWorker } from './queues/aiScribeQueue';
 import { Server } from 'http';
 
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,10 @@ const startServer = (): void => {
 
 const gracefulShutdown = async (signal: string): Promise<void> => {
   console.log(`${signal} received. Starting graceful shutdown...`);
+  if (aiScribeWorker) {
+    await aiScribeWorker.close();
+    console.log('AI Scribe worker closed.');
+  }
   if (server) {
     server.close(async () => {
       console.log('HTTP server closed.');
@@ -59,9 +64,19 @@ process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) =>
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
+let aiScribeWorker: ReturnType<typeof createAiScribeWorker> | null = null;
+
 const bootstrap = async (): Promise<void> => {
   await connectDatabase();
   startCronJobs();
+  if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+    try {
+      aiScribeWorker = createAiScribeWorker();
+      console.log('AI Scribe worker started');
+    } catch (err) {
+      console.warn('AI Scribe worker failed to start:', err);
+    }
+  }
   startServer();
 };
 

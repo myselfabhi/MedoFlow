@@ -49,6 +49,15 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum AIScribeStatus {
+  RECORDING
+  TRANSCRIBING
+  DRAFT_GENERATED
+  EDITED
+  APPROVED
+  FAILED
+}
+
 model Clinic {
   id               String   @id @default(cuid())
   name             String
@@ -74,6 +83,7 @@ model Clinic {
   formTemplates   FormTemplate[]
   formResponses   FormResponse[]
   invoices        Invoice[]
+  aiScribeSessions AIScribeSession[]
 }
 
 model User {
@@ -159,8 +169,9 @@ model Provider {
   providerAvailability   ProviderAvailability[]
   providerUnavailability ProviderUnavailability[]
   waitlistEntries        WaitlistEntry[]
-  treatmentPlans         TreatmentPlan[]
+  treatmentPlans          TreatmentPlan[]
   invoices               Invoice[]
+  aiScribeSessions       AIScribeSession[]
 }
 
 model ProviderAvailability {
@@ -380,6 +391,37 @@ model VisitRecord {
   versions       VisitNoteVersion[]
   currentVersion VisitNoteVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   patientFiles   PatientFile[]
+  aiSessions     AIScribeSession[]
+}
+
+model AIScribeSession {
+  id             String        @id @default(cuid())
+  visitRecordId  String
+  providerId     String
+  clinicId       String
+
+  audioUrl       String?
+  transcript     String?
+  aiDraft        Json?
+  patientSummary Json?
+
+  status         AIScribeStatus @default(RECORDING)
+
+  aiModel                String?
+  errorMessage           String?
+  processingStartedAt   DateTime?
+  processingCompletedAt DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  visitRecord VisitRecord @relation(fields: [visitRecordId], references: [id], onDelete: Cascade)
+  provider    Provider   @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  clinic      Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([visitRecordId])
+  @@index([providerId])
+  @@index([clinicId])
 }
 
 model VisitNoteVersion {

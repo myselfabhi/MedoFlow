@@ -1,14 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
+import * as multer from 'multer';
 import { ApiError } from '../types/errors';
 import { logError } from '../utils/errorLogger';
 
 export const errorHandler = (
-  err: ApiError,
+  err: ApiError | multer.MulterError,
   req: Request,
   res: Response,
   _next: NextFunction
 ): Response => {
-  const statusCode = err.statusCode || 500;
+  const multerErr = err as multer.MulterError;
+  if (multerErr.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      message: 'Audio file too large. Maximum size is 50MB.',
+    });
+  }
+  const statusCode = (err as ApiError).statusCode || 500;
   const message = err.message || 'Internal Server Error';
   const stack =
     process.env.NODE_ENV === 'development' ? err.stack : undefined;
