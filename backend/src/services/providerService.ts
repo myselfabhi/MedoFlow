@@ -10,7 +10,7 @@ export interface CreateProviderServiceInput {
 export interface CreateProviderData {
   firstName: string;
   lastName: string;
-  email?: string;
+  email: string;
   phone?: string;
   disciplineIds: string[];
   userId?: string | null;
@@ -87,6 +87,19 @@ export const createProvider = async (
   data: CreateProviderData,
   clinicId: string
 ) => {
+  const email = (data.email ?? '').trim();
+  if (!email) {
+    const err = new Error('Valid email is required.') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    const err = new Error('Valid email is required.') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
   if (!data.disciplineIds?.length) {
     const err = new Error('At least one discipline is required') as ApiError;
     err.statusCode = 400;
@@ -113,7 +126,7 @@ export const createProvider = async (
       userId: data.userId || null,
       firstName: data.firstName,
       lastName: data.lastName,
-      email: data.email,
+      email,
       phone: data.phone,
       disciplines: {
         create: data.disciplineIds.map((disciplineId) => ({ disciplineId })),

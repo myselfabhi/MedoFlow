@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 const addProviderSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  email: z.string().min(1, 'Valid email is required.').email('Valid email is required.'),
   disciplineIds: z.array(z.string()).min(1, 'Select at least one discipline'),
   serviceIds: z.array(z.string()).min(1, 'Select at least one service'),
   priceOverrides: z.record(z.string(), z.union([z.number(), z.undefined()])).optional(),
@@ -148,7 +148,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
     addProviderMutation.mutate({
       firstName: data.firstName,
       lastName: data.lastName,
-      email: data.email || undefined,
+      email: data.email,
       disciplineIds: data.disciplineIds,
       services,
     });
@@ -197,7 +197,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Email (optional)
+                Email (required)
               </label>
               <Input
                 {...register('email')}
@@ -205,6 +205,9 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
                 placeholder="john@example.com"
                 className={cn(errors.email && 'border-red-500')}
               />
+              <p className="text-xs text-gray-500">
+                This email will be used for provider login.
+              </p>
               {errors.email && (
                 <p className="text-xs text-red-600">{errors.email.message}</p>
               )}

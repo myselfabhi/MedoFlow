@@ -73,7 +73,7 @@ export const getProvider = async (
 export interface AddProviderPayload {
   firstName: string;
   lastName: string;
-  email?: string;
+  email: string;
   disciplineIds: string[];
   services: { serviceId: string; priceOverride?: number }[];
 }
@@ -85,7 +85,7 @@ export const addProvider = async (
   const body = {
     firstName: payload.firstName,
     lastName: payload.lastName,
-    email: payload.email || undefined,
+    email: payload.email,
     disciplineIds: payload.disciplineIds,
     services: payload.services,
     clinicId,
