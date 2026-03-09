@@ -5,7 +5,8 @@ export interface ProviderListItem {
   clinicId: string;
   firstName: string;
   lastName: string;
-  discipline: { id: string; name: string };
+  discipline?: { id: string; name: string };
+  disciplines?: { discipline: { id: string; name: string } }[];
   providerServices?: {
     service: { id: string; name: string; defaultPrice: string };
   }[];
@@ -37,7 +38,8 @@ export interface ProviderWithAvailability {
   clinicId: string;
   firstName: string;
   lastName: string;
-  discipline: { id: string; name: string };
+  discipline?: { id: string; name: string };
+  disciplines?: { discipline: { id: string; name: string } }[];
   providerAvailability: ProviderAvailabilitySlot[];
 }
 
@@ -72,7 +74,7 @@ export interface AddProviderPayload {
   firstName: string;
   lastName: string;
   email?: string;
-  disciplineId: string;
+  disciplineIds: string[];
   services: { serviceId: string; priceOverride?: number }[];
 }
 
@@ -84,7 +86,7 @@ export const addProvider = async (
     firstName: payload.firstName,
     lastName: payload.lastName,
     email: payload.email || undefined,
-    disciplineId: payload.disciplineId,
+    disciplineIds: payload.disciplineIds,
     services: payload.services,
     clinicId,
   };

@@ -112,7 +112,7 @@ export const addToWaitlist = async (
       clinic: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -187,7 +187,7 @@ export const offerSlotToWaitlist = async (
       clinic: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -257,7 +257,7 @@ export const getMyWaitlistEntries = async (
       clinic: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -345,7 +345,7 @@ export const claimWaitlistOffer = async (
       clinic: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },

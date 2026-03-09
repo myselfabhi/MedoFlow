@@ -18,7 +18,8 @@ export interface Provider {
   firstName: string;
   lastName: string;
   email: string | null;
-  discipline: { id: string; name: string };
+  discipline?: { id: string; name: string };
+  disciplines?: { discipline: { id: string; name: string } }[];
   providerServices: { serviceId: string }[];
 }
 

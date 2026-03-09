@@ -422,7 +422,7 @@ export const createAppointment = async (
         location: { select: { id: true, name: true } },
         provider: {
           include: {
-            discipline: { select: { id: true, name: true } },
+            disciplines: { include: { discipline: { select: { id: true, name: true } } } },
             user: { select: { id: true, name: true } },
           },
         },
@@ -577,7 +577,7 @@ export const cancelAppointment = async (
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -680,7 +680,7 @@ export const rescheduleAppointment = async (
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -692,7 +692,7 @@ export const rescheduleAppointment = async (
           location: { select: { id: true, name: true } },
           provider: {
             include: {
-              discipline: { select: { id: true, name: true } },
+              disciplines: { include: { discipline: { select: { id: true, name: true } } } },
               user: { select: { id: true, name: true } },
             },
           },
@@ -731,7 +731,7 @@ export const getAppointmentsByPatient = async (
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -771,7 +771,7 @@ export const getAppointmentsByClinic = async (clinicId: string) => {
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -792,7 +792,7 @@ export const getAppointmentById = async (
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },
@@ -933,7 +933,7 @@ export const updateAppointmentStatus = async (
       location: { select: { id: true, name: true } },
       provider: {
         include: {
-          discipline: { select: { id: true, name: true } },
+          disciplines: { include: { discipline: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },
       },

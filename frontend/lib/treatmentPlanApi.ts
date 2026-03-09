@@ -26,7 +26,8 @@ export interface TreatmentPlan {
         id: string;
         firstName: string;
         lastName: string;
-        discipline: { id: string; name: string };
+        discipline?: { id: string; name: string };
+        disciplines?: { discipline: { id: string; name: string } }[];
         user: { id: string; name: string };
     };
     discipline: { id: string; name: string };

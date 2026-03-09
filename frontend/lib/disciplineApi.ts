@@ -7,7 +7,7 @@ export interface Discipline {
   description: string | null;
   createdAt: string;
   updatedAt: string;
-  _count?: { providers: number };
+  _count?: { providers?: number; providerDisciplines?: number };
 }
 
 export interface DisciplineCreatePayload {

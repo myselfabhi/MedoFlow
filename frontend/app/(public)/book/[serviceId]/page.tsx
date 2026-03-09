@@ -384,7 +384,11 @@ export default function BookingPage() {
                     <span className="font-medium">
                       {p.firstName} {p.lastName}
                     </span>
-                    <span className="text-sm text-gray-500">{p.discipline.name}</span>
+                    <span className="text-sm text-gray-500">
+                      {p.disciplines?.length
+                        ? p.disciplines.map((pd) => pd.discipline.name).join(' · ')
+                        : p.discipline?.name ?? ''}
+                    </span>
                   </button>
                 ))}
               </div>

@@ -30,7 +30,7 @@ const includeRelations = {
   patient: { select: { id: true, name: true, email: true } },
   provider: {
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true } },
     },
   },

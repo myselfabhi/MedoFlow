@@ -115,7 +115,16 @@ export default function ProvidersPage() {
                         {p.firstName} {p.lastName}
                       </p>
                       <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary">{p.discipline.name}</Badge>
+                        {(p.disciplines?.length
+                          ? p.disciplines.map((pd) => pd.discipline.name)
+                          : p.discipline
+                            ? [p.discipline.name]
+                            : []
+                        ).map((name) => (
+                          <Badge key={name} variant="secondary">
+                            {name}
+                          </Badge>
+                        ))}
                       </div>
                       {p.providerServices && p.providerServices.length > 0 && (
                         <div className="space-y-1">

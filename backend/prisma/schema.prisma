@@ -113,13 +113,26 @@ model Discipline {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  clinic         Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  providers      Provider[]
-  services       Service[]
-  treatmentPlans TreatmentPlan[]
-  formTemplates  FormTemplate[]
+  clinic              Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  providerDisciplines ProviderDiscipline[]
+  services            Service[]
+  treatmentPlans      TreatmentPlan[]
+  formTemplates       FormTemplate[]
 
   @@unique([clinicId, name])
+}
+
+model ProviderDiscipline {
+  id           String @id @default(cuid())
+  providerId   String
+  disciplineId String
+
+  provider   Provider   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  discipline Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, disciplineId])
+  @@index([providerId])
+  @@index([disciplineId])
 }
 
 model Provider {
@@ -130,23 +143,22 @@ model Provider {
   lastName      String
   email         String?
   phone         String?
-  disciplineId  String
   bufferMinutes Int      @default(0)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  clinic               Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  discipline           Discipline             @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
-  user                 User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  providerServices     ProviderService[]
-  appointments         Appointment[]
-  visitRecords        VisitRecord[]
-  prescriptions       Prescription[]
-  providerAvailability    ProviderAvailability[]
-  providerUnavailability  ProviderUnavailability[]
-  waitlistEntries         WaitlistEntry[]
-  treatmentPlans          TreatmentPlan[]
+  clinic                 Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  disciplines            ProviderDiscipline[]
+  user                   User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  providerServices       ProviderService[]
+  appointments           Appointment[]
+  visitRecords           VisitRecord[]
+  prescriptions          Prescription[]
+  providerAvailability   ProviderAvailability[]
+  providerUnavailability ProviderUnavailability[]
+  waitlistEntries        WaitlistEntry[]
+  treatmentPlans         TreatmentPlan[]
   invoices               Invoice[]
 }
 

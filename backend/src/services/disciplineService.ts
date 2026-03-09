@@ -37,7 +37,7 @@ export const getDisciplines = async (where: ClinicWhere) => {
   return prisma.discipline.findMany({
     where: whereClause as { isActive: boolean; clinicId?: string },
     orderBy: { name: 'asc' },
-    include: { _count: { select: { providers: true } } },
+    include: { _count: { select: { providerDisciplines: true } } },
   });
 };
 

@@ -121,10 +121,15 @@ export default function PatientWaitlistPage() {
                       </h2>
                       <p className="mt-0.5 text-sm text-gray-600">
                         {entry.provider.firstName} {entry.provider.lastName}
-                        {entry.provider.discipline?.name && (
+                        {(entry.provider.disciplines?.length
+                            ? entry.provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
+                            : entry.provider.discipline?.name) && (
                           <span className="text-gray-500">
                             {' '}
-                            · {entry.provider.discipline.name}
+                            ·{' '}
+                            {entry.provider.disciplines?.length
+                              ? entry.provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
+                              : entry.provider.discipline?.name}
                           </span>
                         )}
                       </p>

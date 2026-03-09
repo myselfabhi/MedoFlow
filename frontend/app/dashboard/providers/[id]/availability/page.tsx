@@ -123,7 +123,11 @@ export default function ProviderAvailabilityPage() {
           <h1 className="mt-1 text-2xl font-semibold text-gray-900">
             Availability — {provider.firstName} {provider.lastName}
           </h1>
-          <p className="mt-0.5 text-sm text-gray-500">{provider.discipline.name}</p>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {provider.disciplines?.length
+              ? provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
+              : provider.discipline?.name ?? ''}
+          </p>
         </div>
       </div>
 

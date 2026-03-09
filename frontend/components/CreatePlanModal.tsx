@@ -309,7 +309,11 @@ export function CreatePlanModal({
                                     <option value="">Select provider</option>
                                     {providers.map((p) => (
                                         <option key={p.id} value={p.id}>
-                                            {p.firstName} {p.lastName} ({p.discipline.name})
+                                            {p.firstName} {p.lastName} (
+                                        {p.disciplines?.length
+                                          ? p.disciplines.map((pd) => pd.discipline.name).join(' · ')
+                                          : p.discipline?.name ?? ''}
+                                      )
                                         </option>
                                     ))}
                                 </select>

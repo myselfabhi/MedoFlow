@@ -12,7 +12,7 @@ export interface CreateProviderData {
   lastName: string;
   email?: string;
   phone?: string;
-  disciplineId: string;
+  disciplineIds: string[];
   userId?: string | null;
   serviceIds?: string[];
   /** Services with optional price override (takes precedence over serviceIds) */
@@ -87,7 +87,14 @@ export const createProvider = async (
   data: CreateProviderData,
   clinicId: string
 ) => {
-  await validateDisciplineBelongsToClinic(data.disciplineId, clinicId);
+  if (!data.disciplineIds?.length) {
+    const err = new Error('At least one discipline is required') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  for (const disciplineId of data.disciplineIds) {
+    await validateDisciplineBelongsToClinic(disciplineId, clinicId);
+  }
 
   if (data.userId) {
     await validateUserBelongsToClinic(data.userId, clinicId);
@@ -108,10 +115,12 @@ export const createProvider = async (
       lastName: data.lastName,
       email: data.email,
       phone: data.phone,
-      disciplineId: data.disciplineId,
+      disciplines: {
+        create: data.disciplineIds.map((disciplineId) => ({ disciplineId })),
+      },
     },
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
     },
   });
@@ -131,7 +140,7 @@ export const createProvider = async (
     return prisma.provider.findUnique({
       where: { id: provider.id },
       include: {
-        discipline: { select: { id: true, name: true } },
+        disciplines: { include: { discipline: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true, email: true } },
         providerServices: {
           include: {
@@ -151,7 +160,7 @@ export const getProviders = async (where: ClinicWhere) => {
     where: whereClause as { isActive: boolean; clinicId?: string },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
       providerServices: {
         include: {
@@ -170,7 +179,7 @@ export const getProviderById = async (
   return prisma.provider.findFirst({
     where: whereClause as { id: string; clinicId?: string },
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
       providerAvailability: true,
     },
@@ -191,8 +200,10 @@ export const updateProvider = async (
 
   const clinicId = 'clinicId' in where ? where.clinicId : undefined;
 
-  if (data.disciplineId && clinicId) {
-    await validateDisciplineBelongsToClinic(data.disciplineId, clinicId);
+  if (data.disciplineIds && data.disciplineIds.length > 0 && clinicId) {
+    for (const disciplineId of data.disciplineIds) {
+      await validateDisciplineBelongsToClinic(disciplineId, clinicId);
+    }
   }
 
   if (data.userId !== undefined) {
@@ -221,19 +232,27 @@ export const updateProvider = async (
     }
   }
 
+  const baseData: Record<string, unknown> = {
+    ...(data.firstName && { firstName: data.firstName }),
+    ...(data.lastName && { lastName: data.lastName }),
+    ...(data.email !== undefined && { email: data.email }),
+    ...(data.phone !== undefined && { phone: data.phone }),
+    ...(data.userId !== undefined && { userId: data.userId || null }),
+    ...(data.isActive !== undefined && { isActive: data.isActive }),
+  };
+
+  if (data.disciplineIds && data.disciplineIds.length > 0) {
+    await prisma.providerDiscipline.deleteMany({ where: { providerId: id } });
+    (baseData as { disciplines?: { create: { disciplineId: string }[] } }).disciplines = {
+      create: data.disciplineIds.map((disciplineId) => ({ disciplineId })),
+    };
+  }
+
   return prisma.provider.update({
     where: { id },
-    data: {
-      ...(data.firstName && { firstName: data.firstName }),
-      ...(data.lastName && { lastName: data.lastName }),
-      ...(data.email !== undefined && { email: data.email }),
-      ...(data.phone !== undefined && { phone: data.phone }),
-      ...(data.disciplineId && { disciplineId: data.disciplineId }),
-      ...(data.userId !== undefined && { userId: data.userId || null }),
-      ...(data.isActive !== undefined && { isActive: data.isActive }),
-    },
+    data: baseData as Parameters<typeof prisma.provider.update>[0]['data'],
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
     },
   });
@@ -266,7 +285,7 @@ export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
     where: { id },
     data: { isActive: false },
     include: {
-      discipline: { select: { id: true, name: true } },
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
     },
   });

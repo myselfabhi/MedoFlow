@@ -66,8 +66,7 @@ export const getClinicProviders = asyncHandler(
         firstName: true,
         lastName: true,
         email: true,
-        disciplineId: true,
-        discipline: { select: { id: true, name: true } },
+        disciplines: { include: { discipline: { select: { id: true, name: true } } } },
         providerServices: {
           select: { serviceId: true },
         },

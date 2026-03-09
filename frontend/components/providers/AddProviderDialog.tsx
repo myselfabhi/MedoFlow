@@ -14,13 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices, type DashboardService } from '@/lib/serviceApi';
 import { addProvider, type AddProviderPayload } from '@/lib/availabilityApi';
@@ -29,13 +23,12 @@ import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
 
 const addProviderSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
-  disciplineId: z.string().min(1, 'Select at least one discipline'),
+  disciplineIds: z.array(z.string()).min(1, 'Select at least one discipline'),
   serviceIds: z.array(z.string()).min(1, 'Select at least one service'),
   priceOverrides: z.record(z.string(), z.union([z.number(), z.undefined()])).optional(),
 });
@@ -79,28 +72,35 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
       firstName: '',
       lastName: '',
       email: '',
-      disciplineId: '',
+      disciplineIds: [],
       serviceIds: [],
       priceOverrides: {},
     },
   });
 
-  const selectedDisciplineId = watch('disciplineId');
+  const selectedDisciplineIds = watch('disciplineIds') ?? [];
   const selectedServiceIds = watch('serviceIds') ?? [];
   const priceOverrides = watch('priceOverrides') ?? {};
 
   const filteredServices = useMemo(() => {
-    if (!selectedDisciplineId) return [];
-    return allServices.filter(
-      (s) => s.discipline.id === selectedDisciplineId
-    );
-  }, [allServices, selectedDisciplineId]);
+    if (selectedDisciplineIds.length === 0) return [];
+    const idSet = new Set(selectedDisciplineIds);
+    return allServices.filter((s) => idSet.has(s.discipline.id));
+  }, [allServices, selectedDisciplineIds]);
 
   useEffect(() => {
     if (!open) return;
     setValue('serviceIds', []);
     setValue('priceOverrides', {});
-  }, [selectedDisciplineId, open, setValue]);
+  }, [selectedDisciplineIds, open, setValue]);
+
+  const toggleDiscipline = (disciplineId: string) => {
+    const current = selectedDisciplineIds;
+    const next = current.includes(disciplineId)
+      ? current.filter((id) => id !== disciplineId)
+      : [...current, disciplineId];
+    setValue('disciplineIds', next, { shouldValidate: true });
+  };
 
   const toggleService = (serviceId: string) => {
     const current = selectedServiceIds;
@@ -149,7 +149,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email || undefined,
-      disciplineId: data.disciplineId,
+      disciplineIds: data.disciplineIds,
       services,
     });
   };
@@ -212,45 +212,53 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-900">
-              Discipline Assignment
-            </h4>
-            <div className="space-y-2">
-              <Select
-                value={selectedDisciplineId}
-                onValueChange={(v) => setValue('disciplineId', v, { shouldValidate: true })}
-                disabled={disciplinesLoading}
-              >
-                <SelectTrigger className={cn(errors.disciplineId && 'border-red-500')}>
-                  <SelectValue placeholder="Select discipline" />
-                </SelectTrigger>
-                <SelectContent>
+            <h4 className="text-sm font-medium text-gray-900">Disciplines</h4>
+            {disciplinesLoading ? (
+              <p className="text-sm text-gray-500">Loading disciplines...</p>
+            ) : disciplines.length === 0 ? (
+              <p className="text-sm text-gray-500">No disciplines found.</p>
+            ) : (
+              <ScrollArea className="h-[120px] rounded-md border border-gray-200 p-3">
+                <div className="space-y-2">
                   {disciplines.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
+                    <div
+                      key={d.id}
+                      className="flex items-center space-x-2 rounded-md p-2 hover:bg-gray-50"
+                    >
+                      <Checkbox
+                        id={`discipline-${d.id}`}
+                        checked={selectedDisciplineIds.includes(d.id)}
+                        onCheckedChange={() => toggleDiscipline(d.id)}
+                      />
+                      <label
+                        htmlFor={`discipline-${d.id}`}
+                        className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {d.name}
+                      </label>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-              {errors.disciplineId && (
-                <p className="text-xs text-red-600">{errors.disciplineId.message}</p>
-              )}
-            </div>
+                </div>
+              </ScrollArea>
+            )}
+            {errors.disciplineIds && (
+              <p className="text-xs text-red-600">{errors.disciplineIds.message}</p>
+            )}
           </div>
 
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-gray-900">
               Services Offered
             </h4>
-            {!selectedDisciplineId ? (
+            {selectedDisciplineIds.length === 0 ? (
               <p className="text-sm text-gray-500">
-                Select a discipline first to see available services.
+                Select at least one discipline to see available services.
               </p>
             ) : servicesLoading ? (
               <p className="text-sm text-gray-500">Loading services...</p>
             ) : filteredServices.length === 0 ? (
               <p className="text-sm text-gray-500">
-                No services found for this discipline.
+                No services found for selected disciplines.
               </p>
             ) : (
               <ScrollArea className="h-[180px] rounded-md border border-gray-200 p-3">
@@ -307,20 +315,18 @@ function ServiceRow({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-gray-100 bg-gray-50/50 p-2">
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={selected}
-        onClick={onToggle}
-        className={cn(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 transition-colors',
-          selected ? 'bg-primary border-primary' : 'bg-white'
-        )}
-      >
-        {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-      </button>
+      <Checkbox
+        id={`service-${service.id}`}
+        checked={selected}
+        onCheckedChange={onToggle}
+      />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900">{service.name}</p>
+        <label
+          htmlFor={`service-${service.id}`}
+          className="cursor-pointer text-sm font-medium text-gray-900"
+        >
+          {service.name}
+        </label>
         <p className="text-xs text-gray-500">
           {service.duration} min · ${service.defaultPrice} default
         </p>
