@@ -3,8 +3,8 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const SUPER_ADMIN_EMAIL = 'admin@medoflow.com';
-const SUPER_ADMIN_PASSWORD = 'Admin123!';
+const SUPER_ADMIN_EMAIL = 'superadmin@gmail.com';
+const SUPER_ADMIN_PASSWORD = 'superadmin';
 
 async function main() {
   const hashedPassword = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 12);

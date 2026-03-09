@@ -137,9 +137,15 @@ export default function BookingPage() {
 
   const doCreateAppointment = useCallback(
     async (patientId: string) => {
+      const locationId = locations?.[0]?.id;
+      if (!locationId) {
+        throw new Error(
+          'This clinic has no locations configured. Please contact the clinic to set up a location.'
+        );
+      }
       const appointment = await createAppointment({
         clinicId,
-        locationId: locations?.[0]?.id!,
+        locationId,
         providerId: providerId || providersForService?.[0]?.id!,
         serviceId,
         patientId,
@@ -157,9 +163,15 @@ export default function BookingPage() {
 
   const doCreateRecurringSeries = useCallback(
     async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
+      const locationId = locations?.[0]?.id;
+      if (!locationId) {
+        throw new Error(
+          'This clinic has no locations configured. Please contact the clinic to set up a location.'
+        );
+      }
       const payload = {
         clinicId,
-        locationId: locations?.[0]?.id!,
+        locationId,
         providerId: providerId || providersForService?.[0]?.id!,
         serviceId,
         patientId,
@@ -213,12 +225,42 @@ export default function BookingPage() {
       };
       if (data.patientId) return runWithPatient(data.patientId);
       if (!data.email || !data.password) throw new Error('Email and password required');
-      await api.post('/auth/register', {
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        role: 'PATIENT',
-      });
+
+      const tryLoginFirst = async (): Promise<string | null> => {
+        try {
+          const { data: loginRes } = await api.post<{
+            success: boolean;
+            data: { accessToken: string; user: { id: string } };
+          }>('/auth/login', { email: data.email, password: data.password });
+          setAccessToken(loginRes.data.accessToken);
+          return loginRes.data.user.id;
+        } catch {
+          return null;
+        }
+      };
+
+      const existingUserId = await tryLoginFirst();
+      if (existingUserId) {
+        return runWithPatient(existingUserId);
+      }
+
+      try {
+        await api.post('/auth/register', {
+          name: data.name,
+          email: data.email,
+          password: data.password,
+          role: 'PATIENT',
+        });
+      } catch (err: unknown) {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        if (axErr.response?.data?.message === 'Email already registered') {
+          throw new Error(
+            'This email is already registered. Please log in with your existing account to continue.'
+          );
+        }
+        throw err;
+      }
+
       const { data: loginRes } = await api.post<{
         success: boolean;
         data: { accessToken: string; user: { id: string } };
@@ -268,11 +310,15 @@ export default function BookingPage() {
       }
       handleBookingResult(result);
     } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string } } };
+      const axErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
       if (axErr.response?.status === 409) {
         setBookingError('This slot was just booked. Please select another.');
+      } else if (msg.includes('already registered') || msg.includes('log in with your existing')) {
+        setBookingError(msg);
+        setShowLoginModal(true);
       } else {
-        setBookingError(axErr.response?.data?.message || 'Booking failed. Please try again.');
+        setBookingError(msg);
       }
     }
   };
@@ -287,11 +333,12 @@ export default function BookingPage() {
       });
       handleBookingResult(result);
     } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string } } };
+      const axErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
       if (axErr.response?.status === 409) {
         setBookingError('This slot was just booked. Please select another.');
       } else {
-        setBookingError(axErr.response?.data?.message || 'Booking failed. Please try again.');
+        setBookingError(msg);
       }
     }
   };
@@ -313,6 +360,22 @@ export default function BookingPage() {
       <div className="mx-auto max-w-2xl px-4 py-12">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           Invalid booking. Please select a service from a clinic.
+        </div>
+        <Link href="/" className="mt-6 inline-block text-primary-600 hover:underline">
+          ← Back to clinics
+        </Link>
+      </div>
+    );
+  }
+
+  if (locations && locations.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-12">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-medium">Booking unavailable</p>
+          <p className="mt-1 text-sm">
+            This clinic has no locations configured yet. Please contact the clinic to set up a location before booking.
+          </p>
         </div>
         <Link href="/" className="mt-6 inline-block text-primary-600 hover:underline">
           ← Back to clinics

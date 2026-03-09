@@ -223,6 +223,14 @@ export const createAppointment = async (
     endTime,
   } = data;
 
+  if (!locationId) {
+    const err = new Error(
+      'Location ID is required. Ensure the clinic has at least one location configured.'
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
   const performedById = context?.performedById;
   const excludeAppointmentId = context?.excludeAppointmentId ?? null;
   const startDate = new Date(startTime);

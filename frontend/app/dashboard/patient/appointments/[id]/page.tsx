@@ -254,6 +254,7 @@ export default function PatientAppointmentDetailPage() {
           patientId={appointment.patientId}
           clinicId={appointment.clinicId}
           canDelete={false}
+          canUpload={false}
         />
 
         <Card>

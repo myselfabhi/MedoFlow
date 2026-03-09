@@ -4,10 +4,12 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getPatientFiles,
+  uploadPatientFile,
   deletePatientFile,
   downloadPatientFile,
   type PatientFile,
 } from '@/lib/fileApi';
+import { useAppToast } from '@/hooks/useAppToast';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -109,13 +111,17 @@ export function PatientFilesSection({
   patientId,
   clinicId,
   canDelete = false,
+  canUpload = true,
 }: {
   patientId: string;
   clinicId?: string;
   canDelete?: boolean;
+  canUpload?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const toast = useAppToast();
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: files = [], isLoading } = useQuery({
     queryKey: ['files', 'patient', patientId, clinicId],
@@ -129,6 +135,22 @@ export function PatientFilesSection({
       queryClient.invalidateQueries({ queryKey: ['files', 'patient', patientId] });
     },
   });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !clinicId) return;
+    setUploading(true);
+    try {
+      await uploadPatientFile(file, { patientId, clinicId });
+      queryClient.invalidateQueries({ queryKey: ['files', 'patient', patientId] });
+      toast.success('File uploaded');
+    } catch {
+      toast.error('Failed to upload file');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   const allTags = Array.from(
     new Set(
@@ -153,7 +175,22 @@ export function PatientFilesSection({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-gray-900">Files</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Files</h2>
+        {canUpload && clinicId && (
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              className="sr-only"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+            <span className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {uploading ? 'Uploading...' : 'Upload'}
+            </span>
+          </label>
+        )}
+      </div>
       {allTags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button

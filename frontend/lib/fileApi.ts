@@ -11,6 +11,32 @@ export interface PatientFile {
   visitRecord?: { id: string };
 }
 
+export interface UploadPatientFilePayload {
+  patientId: string;
+  clinicId?: string;
+  visitRecordId?: string;
+  tags?: string[] | Record<string, unknown>;
+}
+
+export const uploadPatientFile = async (
+  file: File,
+  payload: UploadPatientFilePayload
+): Promise<{ id: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('patientId', payload.patientId);
+  if (payload.clinicId) formData.append('clinicId', payload.clinicId);
+  if (payload.visitRecordId) formData.append('visitRecordId', payload.visitRecordId);
+  if (payload.tags)
+    formData.append('tags', typeof payload.tags === 'string' ? payload.tags : JSON.stringify(payload.tags));
+
+  const { data } = await api.post<{ success: boolean; data: { id: string } }>(
+    '/files/upload',
+    formData
+  );
+  return data.data;
+};
+
 export const getPatientFiles = async (
   patientId: string,
   clinicId?: string

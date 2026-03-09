@@ -6,22 +6,34 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getProvider,
+  createAvailability,
   updateAvailability,
+  createUnavailability,
+  deactivateProvider,
   type ProviderWithAvailability,
   type ProviderAvailabilitySlot,
   type UpdateAvailabilityPayload,
 } from '@/lib/availabilityApi';
+import { useRouter } from 'next/navigation';
 import { ImpactModal } from '@/components/ImpactModal';
+import { ProviderServicesCard } from '@/components/providers/ProviderServicesCard';
+import { EditProviderDialog } from '@/components/providers/EditProviderDialog';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function ProviderAvailabilityPage() {
   const params = useParams();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const providerId = params.id as string;
 
   const [toast, setToast] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deactivateConfirm, setDeactivateConfirm] = useState(false);
+  const [showUnavailabilityForm, setShowUnavailabilityForm] = useState(false);
   const [impactModal, setImpactModal] = useState<{
     affectedCount: number;
     availabilityId: string;
@@ -32,6 +44,20 @@ export default function ProviderAvailabilityPage() {
     queryKey: ['provider', providerId],
     queryFn: () => getProvider(providerId),
     enabled: !!providerId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) =>
+      createAvailability(providerId, payload),
+  });
+
+  const unavailabilityMutation = useMutation({
+    mutationFn: (payload: { date: string; startTime?: string; endTime?: string; reason?: string; clinicId: string }) =>
+      createUnavailability(providerId, payload),
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: (clinicId: string) => deactivateProvider(providerId, clinicId),
   });
 
   const updateMutation = useMutation({
@@ -77,6 +103,17 @@ export default function ProviderAvailabilityPage() {
     }
   };
 
+  const handleAddSlot = async (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) => {
+    try {
+      await createMutation.mutateAsync(payload);
+      queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
+      setShowAddForm(false);
+      setToast('Availability slot added.');
+    } catch {
+      // Error handled by mutation
+    }
+  };
+
   const handleForceUpdate = async () => {
     if (!impactModal) return;
     try {
@@ -113,6 +150,20 @@ export default function ProviderAvailabilityPage() {
     );
   }
 
+  const handleDeactivate = async () => {
+    if (!deactivateConfirm) {
+      setDeactivateConfirm(true);
+      return;
+    }
+    try {
+      await deactivateMutation.mutateAsync(provider.clinicId);
+      queryClient.invalidateQueries({ queryKey: ['providers'] });
+      router.push('/dashboard/providers');
+    } catch {
+      setDeactivateConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -129,7 +180,27 @@ export default function ProviderAvailabilityPage() {
               : provider.discipline?.name ?? ''}
           </p>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
+            Edit Provider
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className={deactivateConfirm ? 'border-red-500 text-red-600' : ''}
+            onClick={handleDeactivate}
+            disabled={deactivateMutation.isPending}
+          >
+            {deactivateConfirm ? 'Click again to deactivate' : 'Deactivate'}
+          </Button>
+        </div>
       </div>
+
+      <EditProviderDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        provider={provider}
+      />
 
       {toast && (
         <div
@@ -140,6 +211,8 @@ export default function ProviderAvailabilityPage() {
         </div>
       )}
 
+      <ProviderServicesCard providerId={providerId} clinicId={provider.clinicId} />
+
       <Card>
         <CardHeader>
           <h2 className="text-lg font-medium text-gray-900">Schedule</h2>
@@ -148,11 +221,9 @@ export default function ProviderAvailabilityPage() {
           </p>
         </CardHeader>
         <CardContent>
-          {!provider.providerAvailability?.length ? (
-            <p className="text-sm text-gray-500">No availability slots. Add slots from the provider profile.</p>
-          ) : (
-            <div className="space-y-4">
-              {provider.providerAvailability.map((slot) => (
+          <div className="space-y-4">
+            {provider.providerAvailability?.length ? (
+              provider.providerAvailability.map((slot) => (
                 <AvailabilityRow
                   key={slot.id}
                   slot={slot}
@@ -160,8 +231,60 @@ export default function ProviderAvailabilityPage() {
                   onUpdate={(payload) => handleUpdate(slot.id, payload)}
                   isSubmitting={updateMutation.isPending}
                 />
-              ))}
-            </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No availability slots yet. Add your first slot below.</p>
+            )}
+            {(showAddForm || !provider.providerAvailability?.length) && (
+              <AddSlotForm
+                clinicId={provider.clinicId}
+                onSubmit={handleAddSlot}
+                onCancel={() => setShowAddForm(false)}
+                showCancel={!!provider.providerAvailability?.length}
+                isSubmitting={createMutation.isPending}
+              />
+            )}
+            {provider.providerAvailability?.length && !showAddForm && (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-primary-400 hover:text-primary-600"
+              >
+                + Add slot
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-medium text-gray-900">Time off</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Block specific dates when the provider is unavailable.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {showUnavailabilityForm ? (
+            <AddUnavailabilityForm
+              clinicId={provider.clinicId}
+              onSubmit={async (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) => {
+                await unavailabilityMutation.mutateAsync({ ...payload, clinicId: provider.clinicId });
+                queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
+                setShowUnavailabilityForm(false);
+                setToast('Time off added.');
+              }}
+              onCancel={() => setShowUnavailabilityForm(false)}
+              isSubmitting={unavailabilityMutation.isPending}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowUnavailabilityForm(true)}
+              className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-primary-400 hover:text-primary-600"
+            >
+              + Add time off
+            </button>
           )}
         </CardContent>
       </Card>
@@ -177,6 +300,171 @@ export default function ProviderAvailabilityPage() {
         />
       )}
     </div>
+  );
+}
+
+function AddUnavailabilityForm({
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: {
+  clinicId: string;
+  onSubmit: (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [reason, setReason] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      date,
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
+      reason: reason.trim() || undefined,
+    });
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-wrap items-end gap-4 rounded-lg border border-primary-200 bg-primary-50/30 p-4 sm:flex-nowrap"
+    >
+      <div className="w-full min-w-0 sm:w-36">
+        <label className="block text-xs font-medium text-gray-500">Date</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="w-full min-w-0 sm:w-28">
+        <label className="block text-xs font-medium text-gray-500">Start (optional)</label>
+        <input
+          type="time"
+          value={startTime}
+          onChange={(e) => setStartTime(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="w-full min-w-0 sm:w-28">
+        <label className="block text-xs font-medium text-gray-500">End (optional)</label>
+        <input
+          type="time"
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="min-w-0 flex-1 sm:w-40">
+        <label className="block text-xs font-medium text-gray-500">Reason (optional)</label>
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Vacation"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+      >
+        {isSubmitting ? 'Adding...' : 'Add'}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Cancel
+      </button>
+    </form>
+  );
+}
+
+function AddSlotForm({
+  clinicId,
+  onSubmit,
+  onCancel,
+  showCancel,
+  isSubmitting,
+}: {
+  clinicId: string;
+  onSubmit: (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) => void;
+  onCancel: () => void;
+  showCancel: boolean;
+  isSubmitting: boolean;
+}) {
+  const [weekday, setWeekday] = useState(1); // Monday default
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('17:00');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ weekday, startTime, endTime, clinicId });
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-wrap items-end gap-4 rounded-lg border border-primary-200 bg-primary-50/30 p-4 sm:flex-nowrap"
+    >
+      <div className="w-full min-w-0 sm:w-40">
+        <label className="block text-xs font-medium text-gray-500">Day</label>
+        <select
+          value={weekday}
+          onChange={(e) => setWeekday(Number(e.target.value))}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          {WEEKDAY_NAMES.map((name, i) => (
+            <option key={i} value={i}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="w-full min-w-0 sm:w-28">
+        <label className="block text-xs font-medium text-gray-500">Start</label>
+        <input
+          type="time"
+          value={startTime}
+          onChange={(e) => setStartTime(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="w-full min-w-0 sm:w-28">
+        <label className="block text-xs font-medium text-gray-500">End</label>
+        <input
+          type="time"
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+      >
+        {isSubmitting ? 'Adding...' : 'Add slot'}
+      </button>
+      {showCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      )}
+    </form>
   );
 }
 
