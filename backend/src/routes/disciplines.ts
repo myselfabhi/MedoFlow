@@ -15,6 +15,7 @@ router.post(
   disciplineController.create
 );
 router.get('/', disciplineController.list);
+router.get('/:id', disciplineController.getById);
 router.put(
   '/:id',
   authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
