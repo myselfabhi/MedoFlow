@@ -6,6 +6,9 @@ export interface ProviderListItem {
   firstName: string;
   lastName: string;
   discipline: { id: string; name: string };
+  providerServices?: {
+    service: { id: string; name: string; defaultPrice: string };
+  }[];
 }
 
 export const listProviders = async (
@@ -62,6 +65,33 @@ export const getProvider = async (
     success: boolean;
     data: { provider: ProviderWithAvailability };
   }>(`/providers/${providerId}${params}`);
+  return data.data.provider;
+};
+
+export interface AddProviderPayload {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  disciplineId: string;
+  services: { serviceId: string; priceOverride?: number }[];
+}
+
+export const addProvider = async (
+  payload: AddProviderPayload,
+  clinicId: string
+): Promise<ProviderListItem> => {
+  const body = {
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    email: payload.email || undefined,
+    disciplineId: payload.disciplineId,
+    services: payload.services,
+    clinicId,
+  };
+  const { data } = await api.post<{
+    success: boolean;
+    data: { provider: ProviderListItem };
+  }>('/providers', body);
   return data.data.provider;
 };
 

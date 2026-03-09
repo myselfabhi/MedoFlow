@@ -2,6 +2,11 @@ import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
 
+export interface CreateProviderServiceInput {
+  serviceId: string;
+  priceOverride?: number;
+}
+
 export interface CreateProviderData {
   firstName: string;
   lastName: string;
@@ -10,6 +15,8 @@ export interface CreateProviderData {
   disciplineId: string;
   userId?: string | null;
   serviceIds?: string[];
+  /** Services with optional price override (takes precedence over serviceIds) */
+  services?: CreateProviderServiceInput[];
 }
 
 type ClinicWhere = { clinicId?: string } | Record<string, never>;
@@ -87,8 +94,11 @@ export const createProvider = async (
     await checkDuplicateProviderUserLink(data.userId);
   }
 
-  const hasServices =
-    data.serviceIds && Array.isArray(data.serviceIds) && data.serviceIds.length > 0;
+  const servicesInput: CreateProviderServiceInput[] =
+    data.services && data.services.length > 0
+      ? data.services
+      : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? []);
+  const hasServices = servicesInput.length > 0;
 
   const provider = await prisma.provider.create({
     data: {
@@ -106,11 +116,16 @@ export const createProvider = async (
     },
   });
 
-  if (hasServices && data.serviceIds) {
-    for (const serviceId of data.serviceIds) {
+  if (hasServices) {
+    for (const item of servicesInput) {
+      const { serviceId, priceOverride } = item;
       await validateServiceBelongsToClinic(serviceId, clinicId);
       await prisma.providerService.create({
-        data: { providerId: provider.id, serviceId },
+        data: {
+          providerId: provider.id,
+          serviceId,
+          priceOverride: priceOverride ?? null,
+        },
       });
     }
     return prisma.provider.findUnique({
