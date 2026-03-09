@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
@@ -100,6 +102,15 @@ export const createProvider = async (
     throw err;
   }
 
+  const existingUser = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
+  if (existingUser) {
+    const err = new Error('A provider with this email already exists.') as ApiError;
+    err.statusCode = 409;
+    throw err;
+  }
+
   if (!data.disciplineIds?.length) {
     const err = new Error('At least one discipline is required') as ApiError;
     err.statusCode = 400;
@@ -109,21 +120,31 @@ export const createProvider = async (
     await validateDisciplineBelongsToClinic(disciplineId, clinicId);
   }
 
-  if (data.userId) {
-    await validateUserBelongsToClinic(data.userId, clinicId);
-    await checkDuplicateProviderUserLink(data.userId);
-  }
-
   const servicesInput: CreateProviderServiceInput[] =
     data.services && data.services.length > 0
       ? data.services
       : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? []);
   const hasServices = servicesInput.length > 0;
 
+  const tempPassword = crypto.randomBytes(32).toString('hex');
+  const hashedPassword = await bcrypt.hash(tempPassword, 12);
+  const providerName = `${data.firstName} ${data.lastName}`.trim();
+
+  const user = await prisma.user.create({
+    data: {
+      email: email.toLowerCase(),
+      name: providerName,
+      password: hashedPassword,
+      role: 'PROVIDER',
+      clinicId,
+    },
+    select: { id: true },
+  });
+
   const provider = await prisma.provider.create({
     data: {
       clinicId,
-      userId: data.userId || null,
+      userId: user.id,
       firstName: data.firstName,
       lastName: data.lastName,
       email,
