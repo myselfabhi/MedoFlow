@@ -7,6 +7,7 @@ const router = Router();
 
 router.post('/register', optionalProtect, authController.register);
 router.post('/login', authController.login);
+router.post('/set-password', authController.setPassword);
 router.post('/refresh-token', authController.refreshToken);
 router.post('/logout', authController.logout);
 router.get('/me', protect, enforceClinicScope, authController.me);

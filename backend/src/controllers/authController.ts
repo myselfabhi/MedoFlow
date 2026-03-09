@@ -4,6 +4,7 @@ import prisma from '../config/prisma';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import * as authService from '../services/authService';
+import * as passwordSetupService from '../services/passwordSetupService';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -193,5 +194,27 @@ export const logout = asyncHandler(
 export const me = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     successResponse(res, 200, 'User retrieved', { user: req.user });
+  }
+);
+
+export const setPassword = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const { token, password, confirmPassword } = req.body;
+
+    if (!password || password !== confirmPassword) {
+      const err = new Error('Passwords do not match') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const { userId, email } = await passwordSetupService.redeemPasswordSetupToken(
+      token,
+      password
+    );
+
+    successResponse(res, 200, 'Password set successfully. You can now log in.', {
+      userId,
+      email,
+    });
   }
 );

@@ -1,8 +1,9 @@
-import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
+import * as passwordSetupService from './passwordSetupService';
+import * as emailService from './emailService';
 
 export interface CreateProviderServiceInput {
   serviceId: string;
@@ -126,9 +127,9 @@ export const createProvider = async (
       : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? []);
   const hasServices = servicesInput.length > 0;
 
-  const tempPassword = crypto.randomBytes(32).toString('hex');
-  const hashedPassword = await bcrypt.hash(tempPassword, 12);
   const providerName = `${data.firstName} ${data.lastName}`.trim();
+  const tempPassword = 'pending-setup';
+  const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
   const user = await prisma.user.create({
     data: {
@@ -140,6 +141,11 @@ export const createProvider = async (
     },
     select: { id: true },
   });
+
+  const token = await passwordSetupService.createPasswordSetupToken(user.id);
+  const frontendUrl = (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const setupLink = `${frontendUrl}/set-password?token=${token}`;
+  await emailService.sendProviderInviteEmail(email, providerName, setupLink);
 
   const provider = await prisma.provider.create({
     data: {
