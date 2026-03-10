@@ -55,12 +55,12 @@ function buildTimelineEvents(
     visits
         .filter((v) => v.status === 'FINAL')
         .forEach((v) => {
-            const assessment = v.assessment ?? v.plan ?? 'Visit completed';
+            const desc = v.note ?? v.assessment ?? v.plan ?? 'Visit completed';
             events.push({
                 id: `visit-${v.id}`,
                 type: 'VISIT',
                 title: 'Visit note finalized',
-                description: assessment.slice(0, 100) + (assessment.length > 100 ? '…' : ''),
+                description: desc.slice(0, 100) + (desc.length > 100 ? '…' : ''),
                 date: v.updatedAt,
                 appointmentId: v.appointmentId,
                 visitId: v.id,

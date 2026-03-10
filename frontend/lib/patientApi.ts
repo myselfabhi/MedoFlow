@@ -56,6 +56,7 @@ export interface VisitRecord {
   objective: string | null;
   assessment: string | null;
   plan: string | null;
+  note: string | null;
   status: VisitRecordStatus;
   isFinalized?: boolean;
   createdAt: string;

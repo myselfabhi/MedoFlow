@@ -421,6 +421,7 @@ model VisitRecord {
   objective         String?
   assessment        String?
   plan              String?
+  note              String?           @db.Text
   status            VisitRecordStatus @default(DRAFT)
   currentVersionId  String?  @unique
   isFinalized       Boolean          @default(false)

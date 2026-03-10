@@ -69,6 +69,14 @@ export const uploadAudio = asyncHandler(
       throw err;
     }
 
+    const sizeLimit = 50 * 1024 * 1024; // 50MB
+    const fileSize = file.size ?? file.buffer?.length ?? 0;
+    if (!file.mimetype?.toLowerCase().startsWith('audio/') || fileSize > sizeLimit) {
+      const err = new Error('Invalid audio file.') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+
     const session = await aiScribeService.uploadAudio(
       sessionId,
       providerId,

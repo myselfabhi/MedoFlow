@@ -34,6 +34,78 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppToast } from '@/hooks/useAppToast';
 
+const SYMPTOM_PATTERN = /\b(pain|swelling|fever|headache|nausea|fatigue|dizziness|cough|soreness|stiffness)\b/gi;
+const BODY_PART_PATTERN = /\b(knee|back|shoulder|neck|arm|leg|wrist|ankle|hip|chest|abdomen|head)\b/gi;
+const DURATION_PATTERN = /\b(\d+\s*(?:days?|weeks?|months?|years?))\b/gi;
+
+function highlightTranscript(text: string): React.ReactNode {
+  if (!text) return null;
+  const parts: { type: 'symptom' | 'body' | 'duration' | 'plain'; text: string }[] = [];
+  let lastIndex = 0;
+
+  const allMatches: { index: number; length: number; type: 'symptom' | 'body' | 'duration' }[] = [];
+  let m;
+  const symptomRegex = new RegExp(SYMPTOM_PATTERN.source, 'gi');
+  while ((m = symptomRegex.exec(text)) !== null) {
+    allMatches.push({ index: m.index, length: m[0].length, type: 'symptom' });
+  }
+  const bodyRegex = new RegExp(BODY_PART_PATTERN.source, 'gi');
+  while ((m = bodyRegex.exec(text)) !== null) {
+    allMatches.push({ index: m.index, length: m[0].length, type: 'body' });
+  }
+  const durationRegex = new RegExp(DURATION_PATTERN.source, 'gi');
+  while ((m = durationRegex.exec(text)) !== null) {
+    allMatches.push({ index: m.index, length: m[0].length, type: 'duration' });
+  }
+
+  allMatches.sort((a, b) => a.index - b.index);
+  const nonOverlapping: typeof allMatches = [];
+  for (const m of allMatches) {
+    if (nonOverlapping.length && m.index < nonOverlapping[nonOverlapping.length - 1].index + nonOverlapping[nonOverlapping.length - 1].length) continue;
+    nonOverlapping.push(m);
+  }
+
+  for (const match of nonOverlapping) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'plain', text: text.slice(lastIndex, match.index) });
+    }
+    parts.push({
+      type: match.type,
+      text: text.slice(match.index, match.index + match.length),
+    });
+    lastIndex = match.index + match.length;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: 'plain', text: text.slice(lastIndex) });
+  }
+
+  if (parts.length === 0) return text;
+
+  const merged: { type: string; text: string }[] = [];
+  for (const p of parts) {
+    if (merged.length && merged[merged.length - 1].type === p.type) {
+      merged[merged.length - 1].text += p.text;
+    } else {
+      merged.push({ ...p });
+    }
+  }
+
+  return merged.map((p, i) => {
+    if (p.type === 'plain') return p.text;
+    const cls =
+      p.type === 'symptom'
+        ? 'bg-orange-100 text-orange-800 rounded px-0.5'
+        : p.type === 'body'
+          ? 'bg-blue-100 text-blue-800 rounded px-0.5'
+          : 'bg-purple-100 text-purple-800 rounded px-0.5';
+    return (
+      <span key={i} className={cls}>
+        {p.text}
+      </span>
+    );
+  });
+}
+
 const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
   RECORDING: { label: 'Recording', variant: 'destructive' },
   TRANSCRIBING: { label: 'Processing', variant: 'secondary', className: 'bg-amber-100 text-amber-800 border-amber-200' },
@@ -150,6 +222,7 @@ export default function ProviderAIScribePage() {
     queryKey: ['ai-scribe', 'session', visitRecordId],
     queryFn: () => getSessionByVisitRecord(visitRecordId),
     enabled: !!visitRecordId,
+    refetchOnMount: 'always',
     refetchInterval: (query) => {
       const s = query.state.data as AIScribeSession | undefined;
       if (s?.status === 'TRANSCRIBING') return 3000;
@@ -267,10 +340,10 @@ export default function ProviderAIScribePage() {
   const isFailed = session?.status === 'FAILED';
 
   React.useEffect(() => {
-    if (session?.aiDraft && !localDraft) {
+    if (session?.aiDraft) {
       setLocalDraft(session.aiDraft);
     }
-  }, [session?.aiDraft, localDraft]);
+  }, [session?.aiDraft]);
 
   if (sessionLoading && !session) {
     return (
@@ -409,7 +482,7 @@ export default function ProviderAIScribePage() {
                   <CardContent>
                     <ScrollArea className="h-[180px] w-full rounded-md border border-gray-200 p-4">
                       <p className="whitespace-pre-wrap text-sm text-gray-700">
-                        {session.transcript}
+                        {highlightTranscript(session.transcript)}
                       </p>
                     </ScrollArea>
                   </CardContent>
@@ -419,7 +492,20 @@ export default function ProviderAIScribePage() {
               {(session.status === 'DRAFT_GENERATED' ||
                 session.status === 'EDITED' ||
                 session.status === 'APPROVED') && (
-                <SoapEditor
+                <>
+                  {session.transcript && (
+                    <div className="mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        AI Confidence:{' '}
+                        {session.transcript.length > 1000
+                          ? 'High'
+                          : session.transcript.length >= 400
+                            ? 'Medium'
+                            : 'Low'}
+                      </Badge>
+                    </div>
+                  )}
+                  <SoapEditor
                   draft={draft}
                   onChange={setLocalDraft}
                   onSave={() =>
@@ -432,6 +518,7 @@ export default function ProviderAIScribePage() {
                   isApproving={approveMutation.isPending}
                   canEdit={canEdit && !session.visitRecord?.isFinalized}
                 />
+                </>
               )}
             </>
           )}

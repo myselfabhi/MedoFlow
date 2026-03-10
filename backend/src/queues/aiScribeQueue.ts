@@ -277,8 +277,12 @@ export function createAiScribeWorker(): Worker<AiScribeJobData> {
     AI_SCRIBE_QUEUE_NAME,
     async (job) => {
       const { sessionId } = job.data;
+      const JOB_TIMEOUT_MS = 60000;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI processing timeout')), JOB_TIMEOUT_MS);
+      });
       try {
-        await processAiScribeJob(job);
+        await Promise.race([processAiScribeJob(job), timeoutPromise]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         const session = await prisma.aIScribeSession.findUnique({

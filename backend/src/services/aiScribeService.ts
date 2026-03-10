@@ -298,6 +298,20 @@ export const approveDraft = async (
 
   const patientSummary = await openaiService.generatePatientSummary(draft);
 
+  const formattedNote = [
+    'Subjective:',
+    draft.subjective ?? '',
+    '',
+    'Objective:',
+    draft.objective ?? '',
+    '',
+    'Assessment:',
+    draft.assessment ?? '',
+    '',
+    'Plan:',
+    draft.plan ?? '',
+  ].join('\n');
+
   await prisma.$transaction(async (tx) => {
     const version = await tx.visitNoteVersion.create({
       data: {
@@ -318,6 +332,7 @@ export const approveDraft = async (
         objective: draft.objective,
         assessment: draft.assessment,
         plan: draft.plan,
+        note: formattedNote,
         status: 'FINAL',
         isFinalized: true,
       },
