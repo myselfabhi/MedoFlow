@@ -5,7 +5,7 @@ export type RecurringFrequency = 'WEEKLY';
 
 export interface CreateRecurringSeriesPayload {
   clinicId: string;
-  locationId: string;
+  locationId?: string;
   providerId: string;
   serviceId: string;
   patientId: string;

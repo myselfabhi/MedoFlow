@@ -8,7 +8,7 @@ import * as waitlistService from './waitlistService';
 const CANCELLED_STATUS = 'CANCELLED';
 
 export interface CreateAppointmentData {
-  locationId: string;
+  locationId?: string | null;
   providerId: string;
   serviceId: string;
   patientId: string;
@@ -225,14 +225,6 @@ export const createAppointment = async (
     endTime,
   } = data;
 
-  if (!locationId) {
-    const err = new Error(
-      'Location ID is required. Ensure the clinic has at least one location configured.'
-    ) as ApiError;
-    err.statusCode = 400;
-    throw err;
-  }
-
   const performedById = context?.performedById;
   const excludeAppointmentId = context?.excludeAppointmentId ?? null;
   const slotHoldId = context?.slotHoldId;
@@ -254,7 +246,7 @@ export const createAppointment = async (
       if (
         hold.providerId !== providerId ||
         hold.serviceId !== serviceId ||
-        hold.locationId !== locationId ||
+        (hold.locationId ?? null) !== (locationId ?? null) ||
         hold.startTime.getTime() !== startDate.getTime() ||
         hold.endTime.getTime() !== endDate.getTime()
       ) {
@@ -307,15 +299,17 @@ export const createAppointment = async (
       throw err;
     }
 
-    const location = await tx.location.findFirst({
-      where: { id: locationId, clinicId, isActive: true },
-    });
-    if (!location) {
-      const err = new Error(
-        'Location not found or does not belong to this clinic'
-      ) as ApiError;
-      err.statusCode = 404;
-      throw err;
+    if (locationId) {
+      const location = await tx.location.findFirst({
+        where: { id: locationId, clinicId, isActive: true },
+      });
+      if (!location) {
+        const err = new Error(
+          'Location not found or does not belong to this clinic'
+        ) as ApiError;
+        err.statusCode = 404;
+        throw err;
+      }
     }
 
     const user = await tx.user.findUnique({
@@ -446,7 +440,7 @@ export const createAppointment = async (
 
     const appointmentData = {
       clinicId,
-      locationId,
+      locationId: locationId ?? null,
       providerId,
       serviceId,
       disciplineId: service.disciplineId ?? null,
@@ -500,7 +494,7 @@ export const createAppointment = async (
 
 export interface CreateRecurringSeriesInput {
   clinicId: string;
-  locationId: string;
+  locationId?: string | null;
   providerId: string;
   serviceId: string;
   patientId: string;
@@ -546,7 +540,7 @@ export const createRecurringSeries = async (
     try {
       const apt = await createAppointment(
         {
-          locationId: input.locationId,
+          locationId: input.locationId ?? undefined,
           providerId: input.providerId,
           serviceId: input.serviceId,
           patientId: input.patientId,

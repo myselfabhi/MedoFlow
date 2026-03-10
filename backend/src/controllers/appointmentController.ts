@@ -43,9 +43,9 @@ export const createRecurring = asyncHandler(
       numberOfSessions,
       endDate,
     } = req.body;
-    if (!locationId || !providerId || !serviceId || !startTime || !endTime || frequency !== 'WEEKLY') {
+    if (!providerId || !serviceId || !startTime || !endTime || frequency !== 'WEEKLY') {
       const err = new Error(
-        'locationId, providerId, serviceId, startTime, endTime, and frequency (WEEKLY) are required'
+        'providerId, serviceId, startTime, endTime, and frequency (WEEKLY) are required'
       ) as ApiError;
       err.statusCode = 400;
       throw err;
@@ -53,7 +53,7 @@ export const createRecurring = asyncHandler(
     const result = await appointmentService.createRecurringSeries(
       {
         clinicId,
-        locationId,
+        locationId: locationId ?? undefined,
         providerId,
         serviceId,
         patientId: resolvedPatientId,

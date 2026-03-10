@@ -7,7 +7,7 @@ export interface CreateSlotHoldInput {
   clinicId: string;
   providerId: string;
   serviceId: string;
-  locationId: string;
+  locationId?: string | null;
   startTime: Date;
   endTime: Date;
   patientId?: string;
@@ -27,7 +27,7 @@ export const createSlotHold = async (input: CreateSlotHoldInput) => {
       clinicId: input.clinicId,
       providerId: input.providerId,
       serviceId: input.serviceId,
-      locationId: input.locationId,
+      locationId: input.locationId ?? null,
       startTime: input.startTime,
       endTime: input.endTime,
       patientId: input.patientId ?? null,
@@ -50,7 +50,7 @@ export const validateAndConsumeSlotHold = async (
   clinicId: string,
   providerId: string,
   serviceId: string,
-  locationId: string,
+  locationId: string | null | undefined,
   startTime: Date,
   endTime: Date
 ) => {
@@ -62,7 +62,7 @@ export const validateAndConsumeSlotHold = async (
   if (
     hold.providerId !== providerId ||
     hold.serviceId !== serviceId ||
-    hold.locationId !== locationId
+    (hold.locationId ?? null) !== (locationId ?? null)
   )
     return false;
   if (

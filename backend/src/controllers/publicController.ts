@@ -229,14 +229,14 @@ export const createSlotHold = asyncHandler(
       clinicId: string;
       providerId: string;
       serviceId: string;
-      locationId: string;
+      locationId?: string | null;
       startTime: string;
       endTime: string;
       patientId?: string;
     };
-    if (!clinicId || !providerId || !serviceId || !locationId || !startTime || !endTime) {
+    if (!clinicId || !providerId || !serviceId || !startTime || !endTime) {
       const err = new Error(
-        'clinicId, providerId, serviceId, locationId, startTime, endTime are required'
+        'clinicId, providerId, serviceId, startTime, endTime are required'
       ) as ApiError;
       err.statusCode = 400;
       throw err;
@@ -245,7 +245,7 @@ export const createSlotHold = asyncHandler(
       clinicId,
       providerId,
       serviceId,
-      locationId,
+      locationId: locationId ?? null,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
       patientId,

@@ -16,7 +16,7 @@ export interface CheckPatientExistsResponse {
 
 export interface CreateAppointmentPayload {
   clinicId: string;
-  locationId: string;
+  locationId?: string;
   providerId: string;
   serviceId: string;
   patientId: string;

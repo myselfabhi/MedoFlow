@@ -137,15 +137,9 @@ export default function BookingPage() {
 
   const doCreateAppointment = useCallback(
     async (patientId: string) => {
-      const locationId = locations?.[0]?.id;
-      if (!locationId) {
-        throw new Error(
-          'This clinic has no locations configured. Please contact the clinic to set up a location.'
-        );
-      }
       const appointment = await createAppointment({
         clinicId,
-        locationId,
+        ...(locations?.[0]?.id && { locationId: locations[0].id }),
         providerId: providerId || providersForService?.[0]?.id!,
         serviceId,
         patientId,
@@ -163,15 +157,9 @@ export default function BookingPage() {
 
   const doCreateRecurringSeries = useCallback(
     async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
-      const locationId = locations?.[0]?.id;
-      if (!locationId) {
-        throw new Error(
-          'This clinic has no locations configured. Please contact the clinic to set up a location.'
-        );
-      }
       const payload = {
         clinicId,
-        locationId,
+        ...(locations?.[0]?.id && { locationId: locations[0].id }),
         providerId: providerId || providersForService?.[0]?.id!,
         serviceId,
         patientId,
@@ -360,22 +348,6 @@ export default function BookingPage() {
       <div className="mx-auto max-w-2xl px-4 py-12">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           Invalid booking. Please select a service from a clinic.
-        </div>
-        <Link href="/" className="mt-6 inline-block text-primary-600 hover:underline">
-          ← Back to clinics
-        </Link>
-      </div>
-    );
-  }
-
-  if (locations && locations.length === 0) {
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
-          <p className="font-medium">Booking unavailable</p>
-          <p className="mt-1 text-sm">
-            This clinic has no locations configured yet. Please contact the clinic to set up a location before booking.
-          </p>
         </div>
         <Link href="/" className="mt-6 inline-block text-primary-600 hover:underline">
           ← Back to clinics

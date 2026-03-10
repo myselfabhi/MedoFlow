@@ -144,7 +144,7 @@ export interface OfferSlotToWaitlistInput {
   serviceId: string;
   slotStartTime: Date;
   slotEndTime: Date;
-  locationId: string;
+  locationId?: string | null;
 }
 
 export const offerSlotToWaitlist = async (
@@ -195,7 +195,7 @@ export const offerSlotToWaitlist = async (
       expiresAt,
       offeredStartTime: input.slotStartTime,
       offeredEndTime: input.slotEndTime,
-      offeredLocationId: input.locationId,
+      offeredLocationId: input.locationId ?? null,
     },
     include: {
       clinic: { select: { id: true, name: true } },
