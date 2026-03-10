@@ -2,19 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import * as invoiceService from '../services/invoiceService';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
-import { getClinicWhere, assertClinicAccess } from '../middleware/clinicScope';
+import { assertClinicAccess } from '../middleware/clinicScope';
 import { ApiError } from '../types/errors';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const { appointmentId, providerId } = req.body;
     if (!appointmentId || !providerId) {
       const err = new Error('appointmentId and providerId are required') as ApiError;
@@ -99,9 +92,7 @@ export const deleteItem = asyncHandler(
 export const finalize = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const invoiceId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string) || (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -119,9 +110,7 @@ export const finalize = asyncHandler(
 export const pay = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const invoiceId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string) || (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -139,9 +128,7 @@ export const pay = asyncHandler(
 export const getById = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     const invoice = await invoiceService.getInvoiceById(id, clinicId ?? undefined);
     if (!invoice) {
       const err = new Error('Invoice not found') as ApiError;
@@ -155,15 +142,8 @@ export const getById = asyncHandler(
 
 export const listByClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     const status = req.query.status as string | undefined;
-    if (!clinicId) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const invoices = await invoiceService.getInvoicesByClinic(clinicId, status);
     successResponse(res, 200, 'Invoices retrieved', { invoices });
   }
@@ -172,10 +152,7 @@ export const listByClinic = asyncHandler(
 export const getByAppointment = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const appointmentId = req.params.appointmentId as string;
-    const where = getClinicWhere(req);
-    const clinicId =
-      (where as { clinicId?: string }).clinicId ??
-      (req.bypassClinicScope ? (req.query.clinicId as string) : undefined);
+    const clinicId = req.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;

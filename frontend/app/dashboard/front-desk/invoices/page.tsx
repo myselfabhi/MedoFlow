@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClinic } from '@/contexts/ClinicContext';
-import { useClinicGuard } from '@/hooks/useClinicGuard';
 import {
   getInvoices,
   payInvoice,
@@ -69,28 +67,24 @@ function formatAppointmentDate(inv: Invoice) {
 
 export default function FrontDeskInvoicesPage() {
   const { user } = useAuth();
-  const { clinicId } = useClinicGuard();
   const router = useRouter();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
-  const { clinics } = useClinic();
-  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
+  const clinicId = user?.clinicId ?? undefined;
 
   const isAllowed =
-    user?.role === 'STAFF' ||
-    user?.role === 'CLINIC_ADMIN' ||
+    user?.role === 'FRONT_DESK' ||
     user?.role === 'SUPER_ADMIN';
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', 'clinic', effectiveClinicId, statusFilter],
-    queryFn: () => getInvoices(effectiveClinicId, statusFilter === 'ALL' ? undefined : statusFilter),
-    enabled: !!effectiveClinicId,
+    queryKey: ['invoices', statusFilter],
+    queryFn: () => getInvoices(statusFilter === 'ALL' ? undefined : statusFilter),
+    enabled: !!clinicId,
   });
 
   const payMutation = useMutation({
-    mutationFn: (invoiceId: string) => payInvoice(invoiceId, effectiveClinicId),
+    mutationFn: (invoiceId: string) => payInvoice(invoiceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice marked as paid');
@@ -98,27 +92,13 @@ export default function FrontDeskInvoicesPage() {
     onError: () => toast.error('Failed to mark invoice as paid'),
   });
 
-  if (!effectiveClinicId && isAllowed) {
+  if (!clinicId && isAllowed) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
         <EmptyState
-          title={
-            hasNoClinics
-              ? 'Oops! No Clinics Found'
-              : user?.role === 'SUPER_ADMIN'
-                ? 'No clinic selected'
-                : 'No clinic assigned'
-          }
-          description={
-            hasNoClinics
-              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
-              : user?.role === 'SUPER_ADMIN'
-                ? 'Select a clinic from the top-right to manage invoices.'
-                : 'You are not assigned to a clinic.'
-          }
-          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
-          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+          title="No clinic assigned"
+          description="You are not assigned to a clinic. Contact your administrator."
         />
       </div>
     );
@@ -129,7 +109,7 @@ export default function FrontDeskInvoicesPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">Access denied. This page is for front desk staff and clinic admins only.</p>
+          <p className="text-sm text-red-700">Access denied. This page is for front desk staff only.</p>
           <Link href="/dashboard" className="mt-3 inline-block text-sm text-primary-600 hover:text-primary-700">
             ← Back to dashboard
           </Link>

@@ -3,8 +3,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClinic } from '@/contexts/ClinicContext';
-import { useClinicGuard } from '@/hooks/useClinicGuard';
 import {
   getAnalyticsOverview,
   getRevenueByService,
@@ -30,33 +28,30 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
-  const { clinicId } = useClinicGuard();
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
-  const { clinics } = useClinic();
-  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
+  const clinicId = user?.clinicId ?? undefined;
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: ['analytics', 'overview', effectiveClinicId],
-    queryFn: () => getAnalyticsOverview(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['analytics', 'overview'],
+    queryFn: () => getAnalyticsOverview(),
+    enabled: !!clinicId,
   });
 
   const { data: revenueByService } = useQuery({
-    queryKey: ['analytics', 'revenue-by-service', effectiveClinicId],
-    queryFn: () => getRevenueByService(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['analytics', 'revenue-by-service'],
+    queryFn: () => getRevenueByService(),
+    enabled: !!clinicId,
   });
 
   const { data: revenueByProvider } = useQuery({
-    queryKey: ['analytics', 'revenue-by-provider', effectiveClinicId],
-    queryFn: () => getRevenueByProvider(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['analytics', 'revenue-by-provider'],
+    queryFn: () => getRevenueByProvider(),
+    enabled: !!clinicId,
   });
 
   const { data: appointmentsByDiscipline } = useQuery({
-    queryKey: ['analytics', 'appointments-by-discipline', effectiveClinicId],
-    queryFn: () => getAppointmentsByDiscipline(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['analytics', 'appointments-by-discipline'],
+    queryFn: () => getAppointmentsByDiscipline(),
+    enabled: !!clinicId,
   });
 
   const pieData =
@@ -66,31 +61,13 @@ export default function AnalyticsPage() {
       fill: CHART_COLORS[i % CHART_COLORS.length],
     })) ?? [];
 
-  if (!effectiveClinicId && user?.role === 'SUPER_ADMIN') {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-        <EmptyState
-          title={hasNoClinics ? 'Oops! No Clinics Found' : 'No clinic selected'}
-          description={
-            hasNoClinics
-              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
-              : 'Select a clinic from the top-right to view analytics.'
-          }
-          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
-          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
-        />
-      </div>
-    );
-  }
-
-  if (!effectiveClinicId) {
+  if (!clinicId) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
         <EmptyState
           title="No clinic assigned"
-          description="You are not assigned to a clinic."
+          description="You are not assigned to a clinic. Contact your administrator."
         />
       </div>
     );

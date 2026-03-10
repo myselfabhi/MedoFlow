@@ -32,35 +32,26 @@ interface DisciplineResponse {
   data: { discipline: Discipline };
 }
 
-export const getDisciplines = async (clinicId?: string): Promise<Discipline[]> => {
-  const { data } = await api.get<DisciplinesResponse>('/disciplines', {
-    params: clinicId ? { clinicId } : undefined,
-  });
+export const getDisciplines = async (): Promise<Discipline[]> => {
+  const { data } = await api.get<DisciplinesResponse>('/disciplines');
   return data.data.disciplines;
 };
 
 export const createDiscipline = async (
-  payload: DisciplineCreatePayload,
-  clinicId?: string
+  payload: DisciplineCreatePayload
 ): Promise<Discipline> => {
-  const body = clinicId ? { ...payload, clinicId } : payload;
-  const { data } = await api.post<DisciplineResponse>('/disciplines', body);
+  const { data } = await api.post<DisciplineResponse>('/disciplines', payload);
   return data.data.discipline;
 };
 
 export const updateDiscipline = async (
   id: string,
-  payload: DisciplineUpdatePayload,
-  clinicId?: string
+  payload: DisciplineUpdatePayload
 ): Promise<Discipline> => {
-  const { data } = await api.put<DisciplineResponse>(`/disciplines/${id}`, payload, {
-    params: clinicId ? { clinicId } : undefined,
-  });
+  const { data } = await api.put<DisciplineResponse>(`/disciplines/${id}`, payload);
   return data.data.discipline;
 };
 
-export const deleteDiscipline = async (id: string, clinicId?: string): Promise<void> => {
-  await api.delete(`/disciplines/${id}`, {
-    params: clinicId ? { clinicId } : undefined,
-  });
+export const deleteDiscipline = async (id: string): Promise<void> => {
+  await api.delete(`/disciplines/${id}`);
 };

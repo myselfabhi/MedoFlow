@@ -9,9 +9,8 @@ datasource db {
 
 enum Role {
   SUPER_ADMIN
-  CLINIC_ADMIN
   PROVIDER
-  STAFF
+  FRONT_DESK
   PATIENT
 }
 

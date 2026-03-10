@@ -12,7 +12,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isLoading || !user) return;
-    if (user.role === 'STAFF' || user.role === 'CLINIC_ADMIN' || user.role === 'SUPER_ADMIN') {
+    if (user.role === 'FRONT_DESK' || user.role === 'SUPER_ADMIN') {
       router.replace('/dashboard/front-desk');
       return;
     }
@@ -34,7 +34,7 @@ export default function DashboardPage() {
     return <PatientDashboard />;
   }
 
-  if (user.role === 'STAFF' || user.role === 'CLINIC_ADMIN' || user.role === 'SUPER_ADMIN') {
+  if (user.role === 'FRONT_DESK' || user.role === 'SUPER_ADMIN') {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />

@@ -157,21 +157,21 @@ export default function ProviderAppointmentDetailPage() {
 
   const { data: visitData } = useQuery({
     queryKey: ['visit', id],
-    queryFn: () => (appointment ? getVisitByAppointment(id, appointment.clinicId) : null),
+    queryFn: () => (appointment ? getVisitByAppointment(id) : null),
     enabled: !!appointment?.id,
   });
   const visitRecord = visitData?.visitRecord ?? null;
 
   const { data: invoices = [], refetch: refetchInvoices } = useQuery({
     queryKey: ['invoices', 'appointment', id],
-    queryFn: () => getInvoicesByAppointment(id, appointment?.clinicId),
+    queryFn: () => getInvoicesByAppointment(id),
     enabled: !!appointment?.id,
   });
 
   const { data: formResponses = [], isLoading: formsLoading } = useQuery({
-    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
-    queryFn: () => getPatientForms(appointment!.patientId, appointment?.clinicId),
-    enabled: !!appointment?.patientId && !!appointment?.clinicId,
+    queryKey: ['forms', 'patient', appointment?.patientId],
+    queryFn: () => getPatientForms(appointment!.patientId),
+    enabled: !!appointment?.patientId,
   });
 
   const createMutation = useMutation({
@@ -179,7 +179,6 @@ export default function ProviderAppointmentDetailPage() {
       createInvoice({
         appointmentId: id,
         providerId: appointment!.providerId,
-        clinicId: appointment?.clinicId,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
@@ -189,7 +188,7 @@ export default function ProviderAppointmentDetailPage() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: (invoiceId: string) => finalizeInvoice(invoiceId, appointment?.clinicId),
+    mutationFn: (invoiceId: string) => finalizeInvoice(invoiceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
       toast.success('Invoice finalized');
@@ -198,7 +197,7 @@ export default function ProviderAppointmentDetailPage() {
   });
 
   const payMutation = useMutation({
-    mutationFn: (invoiceId: string) => payInvoice(invoiceId, appointment?.clinicId),
+    mutationFn: (invoiceId: string) => payInvoice(invoiceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
       toast.success('Invoice marked as paid');
@@ -226,7 +225,7 @@ export default function ProviderAppointmentDetailPage() {
       unitPrice?: number;
       quantity?: number;
     }) =>
-      updateInvoiceItem(invoice!.id, itemId, { unitPrice, quantity }, appointment?.clinicId),
+      updateInvoiceItem(invoice!.id, itemId, { unitPrice, quantity }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
       toast.success('Item updated');
@@ -236,7 +235,7 @@ export default function ProviderAppointmentDetailPage() {
 
   const deleteItemMutation = useMutation({
     mutationFn: (itemId: string) =>
-      deleteInvoiceItem(invoice!.id, itemId, appointment?.clinicId),
+      deleteInvoiceItem(invoice!.id, itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
       toast.success('Item removed');
@@ -377,7 +376,7 @@ export default function ProviderAppointmentDetailPage() {
                 onClick={async () => {
                   setCreatingVisit(true);
                   try {
-                    const vr = await createVisitRecord(id, appointment.clinicId, {
+                    const vr = await createVisitRecord(id, {
                       patientId: appointment.patientId,
                     });
                     queryClient.invalidateQueries({ queryKey: ['visit', id] });
@@ -533,7 +532,6 @@ export default function ProviderAppointmentDetailPage() {
           open={addServiceOpen}
           onOpenChange={setAddServiceOpen}
           invoiceId={invoice.id}
-          clinicId={appointment.clinicId}
           onSuccess={handleAddItemSuccess}
         />
       )}

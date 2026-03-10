@@ -15,8 +15,6 @@ import {
 } from '@/lib/serviceApi';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClinic } from '@/contexts/ClinicContext';
-import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useSystemModal } from '@/hooks/useSystemModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -156,7 +154,6 @@ function ServiceForm({
 
 export default function ServicesPage() {
   const { user } = useAuth();
-  const { clinicId, ensureClinicSelected } = useClinicGuard();
   const { showModal } = useSystemModal();
   const toast = useAppToast();
   const queryClient = useQueryClient();
@@ -164,27 +161,25 @@ export default function ServicesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<DashboardService | null>(null);
 
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
-  const { clinics } = useClinic();
-  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
+  const clinicId = user?.clinicId ?? undefined;
   const canEdit =
-    user?.role === 'CLINIC_ADMIN' || user?.role === 'SUPER_ADMIN';
+    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: services = [], isLoading, error } = useQuery({
-    queryKey: ['services', effectiveClinicId],
-    queryFn: () => getDashboardServices(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['services'],
+    queryFn: () => getDashboardServices(),
+    enabled: !!clinicId,
   });
 
   const { data: disciplines = [] } = useQuery({
-    queryKey: ['disciplines', effectiveClinicId],
-    queryFn: () => getDisciplines(effectiveClinicId),
-    enabled: !!effectiveClinicId && (addOpen || editOpen),
+    queryKey: ['disciplines'],
+    queryFn: () => getDisciplines(),
+    enabled: !!clinicId && (addOpen || editOpen),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CreateServicePayload) =>
-      createService(data, effectiveClinicId),
+      createService(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setAddOpen(false);
@@ -203,7 +198,7 @@ export default function ServicesPage() {
       id: string;
       data: { name?: string; duration?: number; defaultPrice?: string; disciplineId?: string };
     }) =>
-      updateService(id, data, effectiveClinicId),
+      updateService(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditOpen(false);
@@ -217,7 +212,7 @@ export default function ServicesPage() {
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) =>
-      archiveService(id, effectiveClinicId),
+      archiveService(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service archived');
@@ -228,7 +223,6 @@ export default function ServicesPage() {
   });
 
   const handleAddSubmit = (data: ServiceFormData) => {
-    if (!ensureClinicSelected()) return;
     createMutation.mutate({
       name: data.name,
       duration: data.duration,
@@ -262,25 +256,7 @@ export default function ServicesPage() {
     );
   }
 
-  if (!effectiveClinicId && (user?.role === 'SUPER_ADMIN' || user?.role === 'CLINIC_ADMIN')) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
-        <EmptyState
-          title={hasNoClinics ? 'Oops! No Clinics Found' : 'No clinic selected'}
-          description={
-            hasNoClinics
-              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
-              : 'Select a clinic from the top-right to manage disciplines and services.'
-          }
-          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
-          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
-        />
-      </div>
-    );
-  }
-
-  if (!effectiveClinicId) {
+  if (!clinicId) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
@@ -309,7 +285,7 @@ export default function ServicesPage() {
           <p className="mt-1 text-sm text-gray-500">Manage clinic services</p>
         </div>
         {canEdit && (
-          <Button onClick={() => ensureClinicSelected() && setAddOpen(true)}>Add Service</Button>
+          <Button onClick={() => setAddOpen(true)}>Add Service</Button>
         )}
       </div>
 

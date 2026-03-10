@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import { getInvoices } from '@/lib/invoiceApi';
 import { getClinicAppointments } from '@/lib/patientApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -27,20 +26,18 @@ function formatTime(iso: string) {
 
 export default function FrontDeskDashboardPage() {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
-
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? '';
+  const clinicId = user?.clinicId ?? '';
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', effectiveClinicId],
-    queryFn: () => getInvoices(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['invoices'],
+    queryFn: () => getInvoices(),
+    enabled: !!clinicId,
   });
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['clinic-appointments', effectiveClinicId],
-    queryFn: () => getClinicAppointments(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['clinic-appointments'],
+    queryFn: () => getClinicAppointments(),
+    enabled: !!clinicId,
   });
 
   const today = new Date();

@@ -7,30 +7,26 @@ const router = Router();
 
 router.use(protect);
 
-const paymentScope = (
+const setClinicFromUser = (
   req: Request,
   _res: Response,
   next: NextFunction
 ): void => {
-  if (req.user!.role === 'PATIENT') {
-    req.clinicId = null;
-  } else if (req.user!.role === 'CLINIC_ADMIN') {
-    req.clinicId = req.user!.clinicId ?? null;
-  }
+  req.clinicId = req.user?.clinicId ?? null;
   next();
 };
 
 router.post(
   '/:appointmentId/confirm',
-  authorize(Role.PATIENT, Role.CLINIC_ADMIN),
-  paymentScope,
+  authorize(Role.PATIENT, Role.FRONT_DESK),
+  setClinicFromUser,
   paymentController.confirm
 );
 
 router.post(
   '/:appointmentId/fail',
-  authorize(Role.PATIENT, Role.CLINIC_ADMIN),
-  paymentScope,
+  authorize(Role.PATIENT, Role.FRONT_DESK),
+  setClinicFromUser,
   paymentController.fail
 );
 

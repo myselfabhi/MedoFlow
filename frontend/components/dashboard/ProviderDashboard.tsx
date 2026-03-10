@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import { getProviderAppointments } from '@/lib/patientApi';
 import { getInvoices } from '@/lib/invoiceApi';
 import { getTreatmentPlans } from '@/lib/treatmentPlanApi';
@@ -20,7 +19,7 @@ function formatTime(iso: string) {
 
 export function ProviderDashboard() {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
+  const clinicId = user?.clinicId ?? '';
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -28,24 +27,22 @@ export function ProviderDashboard() {
   todayEnd.setHours(23, 59, 59, 999);
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['provider-appointments', clinicId, today.toISOString()],
+    queryKey: ['provider-appointments', today.toISOString()],
     queryFn: () =>
-      getProviderAppointments(clinicId ?? undefined, today, todayEnd),
-    enabled: !!clinicId || !!user?.clinicId,
+      getProviderAppointments(today, todayEnd),
+    enabled: !!clinicId,
   });
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', clinicId, 'PENDING_PAYMENT'],
-    queryFn: () => getInvoices(clinicId ?? undefined, 'PENDING_PAYMENT'),
-    enabled: !!clinicId || !!user?.clinicId,
+    queryKey: ['invoices', 'PENDING_PAYMENT'],
+    queryFn: () => getInvoices('PENDING_PAYMENT'),
+    enabled: !!clinicId,
   });
 
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? '';
-
   const { data: plans = [], isLoading: plansLoading } = useQuery({
-    queryKey: ['treatment-plans', effectiveClinicId, 'ACTIVE'],
-    queryFn: () => getTreatmentPlans(effectiveClinicId, 'ACTIVE'),
-    enabled: !!effectiveClinicId,
+    queryKey: ['treatment-plans', 'ACTIVE'],
+    queryFn: () => getTreatmentPlans('ACTIVE'),
+    enabled: !!clinicId,
   });
 
   const todayAppointments = appointments.filter((a) => {

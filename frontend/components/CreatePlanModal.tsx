@@ -62,19 +62,19 @@ export function CreatePlanModal({
     const [goals, setGoals] = useState<string[]>([]);
     const [newGoal, setNewGoal] = useState('');
     const isEditMode = !!editingPlan;
-    const showProviderPicker = user?.role === 'CLINIC_ADMIN';
+    const showProviderPicker = user?.role === 'FRONT_DESK';
 
     // Disciplines list
     const { data: disciplines = [] } = useQuery<Discipline[]>({
-        queryKey: ['disciplines', clinicId],
-        queryFn: () => getDisciplines(clinicId),
+        queryKey: ['disciplines'],
+        queryFn: () => getDisciplines(),
         enabled: isOpen && !!clinicId,
     });
 
-    // Providers list (CLINIC_ADMIN only)
+    // Providers list (FRONT_DESK only)
     const { data: providers = [] } = useQuery<ProviderListItem[]>({
-        queryKey: ['providers', clinicId],
-        queryFn: () => listProviders(clinicId),
+        queryKey: ['providers'],
+        queryFn: () => listProviders(),
         enabled: isOpen && !!clinicId && showProviderPicker && !isEditMode,
     });
 
@@ -296,7 +296,7 @@ export function CreatePlanModal({
                             {errors.name && <p className={errorCls}>{errors.name.message}</p>}
                         </div>
 
-                        {/* Provider (CLINIC_ADMIN create only) */}
+                        {/* Provider (FRONT_DESK create only) */}
                         {showProviderPicker && !isEditMode && (
                             <div>
                                 <label className={labelCls}>Assign to Provider</label>

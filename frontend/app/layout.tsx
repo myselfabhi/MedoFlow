@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ClinicProvider } from '@/contexts/ClinicContext';
 import { SystemModalProvider } from '@/components/system/SystemModalProvider';
 import { QueryProvider } from '@/components/QueryProvider';
 import { Toaster } from '@/components/ui/sonner';
@@ -24,9 +23,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <QueryProvider>
           <AuthProvider>
-            <ClinicProvider>
-              <SystemModalProvider>{children}</SystemModalProvider>
-            </ClinicProvider>
+            <SystemModalProvider>{children}</SystemModalProvider>
           </AuthProvider>
         </QueryProvider>
         <Toaster />

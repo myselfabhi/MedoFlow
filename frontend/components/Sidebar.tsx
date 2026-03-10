@@ -37,8 +37,7 @@ export function Sidebar() {
   const isPatient = user?.role === 'PATIENT';
   const isProvider = user?.role === 'PROVIDER';
   const isStaffOrAdmin =
-    user?.role === 'STAFF' ||
-    user?.role === 'CLINIC_ADMIN' ||
+    user?.role === 'FRONT_DESK' ||
     user?.role === 'SUPER_ADMIN';
 
   const items = isPatient

@@ -68,15 +68,15 @@ export const createTreatmentPlan = async (
 };
 
 export const getTreatmentPlans = async (
-  clinicId: string,
   status?: 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED'
 ): Promise<TreatmentPlan[]> => {
-  const params = new URLSearchParams({ clinicId });
+  const params = new URLSearchParams();
   if (status) params.set('status', status);
+  const qs = params.toString();
   const { data } = await api.get<{
     success: boolean;
     data: { treatmentPlans: TreatmentPlan[] };
-  }>(`/treatment-plans?${params.toString()}`);
+  }>(`/treatment-plans${qs ? `?${qs}` : ''}`);
   return data.data.treatmentPlans;
 };
 

@@ -8,40 +8,34 @@ export interface AnalyticsOverview {
   completedVisits: number;
 }
 
-export const getAnalyticsOverview = async (
-  clinicId?: string
-): Promise<AnalyticsOverview> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getAnalyticsOverview = async (): Promise<AnalyticsOverview> => {
   const { data } = await api.get<{
     success: boolean;
     data: AnalyticsOverview;
-  }>(`/analytics/overview${params}`);
+  }>('/analytics/overview');
   return data.data;
 };
 
-export const getRevenueByService = async (clinicId?: string) => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getRevenueByService = async () => {
   const { data } = await api.get<{
     success: boolean;
     data: { data: { serviceName: string; total: number }[] };
-  }>(`/analytics/revenue-by-service${params}`);
+  }>('/analytics/revenue-by-service');
   return data.data.data;
 };
 
-export const getRevenueByProvider = async (clinicId?: string) => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getRevenueByProvider = async () => {
   const { data } = await api.get<{
     success: boolean;
     data: { data: { providerName: string; total: number }[] };
-  }>(`/analytics/revenue-by-provider${params}`);
+  }>('/analytics/revenue-by-provider');
   return data.data.data;
 };
 
-export const getAppointmentsByDiscipline = async (clinicId?: string) => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getAppointmentsByDiscipline = async () => {
   const { data } = await api.get<{
     success: boolean;
     data: { data: { disciplineName: string; count: number }[] };
-  }>(`/analytics/appointments-by-discipline${params}`);
+  }>('/analytics/appointments-by-discipline');
   return data.data.data;
 };

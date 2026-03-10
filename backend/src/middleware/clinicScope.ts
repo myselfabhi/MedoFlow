@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request } from 'express';
 import { ApiError } from '../types/errors';
 
 export const assertClinicAccess = (
@@ -9,10 +9,6 @@ export const assertClinicAccess = (
     const err = new Error('Authentication required') as ApiError;
     err.statusCode = 401;
     throw err;
-  }
-
-  if (req.user.role === 'SUPER_ADMIN') {
-    return;
   }
 
   if (!resourceClinicId) {
@@ -30,48 +26,13 @@ export const assertClinicAccess = (
   }
 };
 
-export const enforceClinicScope = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): void => {
-  if (!req.user) {
-    const err = new Error('Authentication required') as ApiError;
-    err.statusCode = 401;
-    next(err);
-    return;
-  }
-
-  if (req.user.role === 'SUPER_ADMIN') {
-    req.clinicId =
-      (req.query.clinicId as string) || (req.body?.clinicId as string) || null;
-    req.bypassClinicScope = true;
-    next();
-    return;
-  }
-
-  if (!req.user.clinicId) {
-    const err = new Error('User is not assigned to a clinic') as ApiError;
-    err.statusCode = 403;
-    next(err);
-    return;
-  }
-
-  req.clinicId = req.user.clinicId;
-  req.bypassClinicScope = false;
-  next();
-};
-
+/**
+ * Phase 1: All users belong to exactly one clinic.
+ * Sets req.clinicId from req.user.clinicId. No query/body clinicId.
+ */
 export const getClinicWhere = (
   req: Request
 ): { clinicId: string } | Record<string, never> => {
-  if (
-    req.bypassClinicScope &&
-    req.user?.role === 'SUPER_ADMIN' &&
-    !req.clinicId
-  ) {
-    return {};
-  }
   if (req.clinicId) {
     return { clinicId: req.clinicId };
   }

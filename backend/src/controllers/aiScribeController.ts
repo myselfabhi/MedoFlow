@@ -14,9 +14,7 @@ const providerScope = async (req: Request): Promise<{ providerId: string; clinic
     err.statusCode = 404;
     throw err;
   }
-  const clinicId = req.bypassClinicScope
-    ? (req.body?.clinicId as string) || (req.query?.clinicId as string)
-    : req.clinicId;
+  const clinicId = req.user!.clinicId!;
   if (!clinicId) {
     const err = new Error('Clinic ID is required') as ApiError;
     err.statusCode = 400;

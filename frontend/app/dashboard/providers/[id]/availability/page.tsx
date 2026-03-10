@@ -47,17 +47,17 @@ export default function ProviderAvailabilityPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) =>
+    mutationFn: (payload: { weekday: number; startTime: string; endTime: string }) =>
       createAvailability(providerId, payload),
   });
 
   const unavailabilityMutation = useMutation({
-    mutationFn: (payload: { date: string; startTime?: string; endTime?: string; reason?: string; clinicId: string }) =>
+    mutationFn: (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) =>
       createUnavailability(providerId, payload),
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (clinicId: string) => deactivateProvider(providerId, clinicId),
+    mutationFn: () => deactivateProvider(providerId),
   });
 
   const updateMutation = useMutation({
@@ -103,7 +103,7 @@ export default function ProviderAvailabilityPage() {
     }
   };
 
-  const handleAddSlot = async (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) => {
+  const handleAddSlot = async (payload: { weekday: number; startTime: string; endTime: string }) => {
     try {
       await createMutation.mutateAsync(payload);
       queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
@@ -156,7 +156,7 @@ export default function ProviderAvailabilityPage() {
       return;
     }
     try {
-      await deactivateMutation.mutateAsync(provider.clinicId);
+      await deactivateMutation.mutateAsync();
       queryClient.invalidateQueries({ queryKey: ['providers'] });
       router.push('/dashboard/providers');
     } catch {
@@ -211,7 +211,7 @@ export default function ProviderAvailabilityPage() {
         </div>
       )}
 
-      <ProviderServicesCard providerId={providerId} clinicId={provider.clinicId} />
+      <ProviderServicesCard providerId={providerId} />
 
       <Card>
         <CardHeader>
@@ -227,7 +227,6 @@ export default function ProviderAvailabilityPage() {
                 <AvailabilityRow
                   key={slot.id}
                   slot={slot}
-                  clinicId={provider.clinicId}
                   onUpdate={(payload) => handleUpdate(slot.id, payload)}
                   isSubmitting={updateMutation.isPending}
                 />
@@ -237,7 +236,6 @@ export default function ProviderAvailabilityPage() {
             )}
             {(showAddForm || !provider.providerAvailability?.length) && (
               <AddSlotForm
-                clinicId={provider.clinicId}
                 onSubmit={handleAddSlot}
                 onCancel={() => setShowAddForm(false)}
                 showCancel={!!provider.providerAvailability?.length}
@@ -267,9 +265,8 @@ export default function ProviderAvailabilityPage() {
         <CardContent>
           {showUnavailabilityForm ? (
             <AddUnavailabilityForm
-              clinicId={provider.clinicId}
               onSubmit={async (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) => {
-                await unavailabilityMutation.mutateAsync({ ...payload, clinicId: provider.clinicId });
+                await unavailabilityMutation.mutateAsync(payload);
                 queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
                 setShowUnavailabilityForm(false);
                 setToast('Time off added.');
@@ -308,7 +305,6 @@ function AddUnavailabilityForm({
   onCancel,
   isSubmitting,
 }: {
-  clinicId: string;
   onSubmit: (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
@@ -390,14 +386,12 @@ function AddUnavailabilityForm({
 }
 
 function AddSlotForm({
-  clinicId,
   onSubmit,
   onCancel,
   showCancel,
   isSubmitting,
 }: {
-  clinicId: string;
-  onSubmit: (payload: { weekday: number; startTime: string; endTime: string; clinicId: string }) => void;
+  onSubmit: (payload: { weekday: number; startTime: string; endTime: string }) => void;
   onCancel: () => void;
   showCancel: boolean;
   isSubmitting: boolean;
@@ -408,7 +402,7 @@ function AddSlotForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ weekday, startTime, endTime, clinicId });
+    onSubmit({ weekday, startTime, endTime });
   };
 
   return (
@@ -470,12 +464,10 @@ function AddSlotForm({
 
 function AvailabilityRow({
   slot,
-  clinicId,
   onUpdate,
   isSubmitting,
 }: {
   slot: ProviderAvailabilitySlot;
-  clinicId: string;
   onUpdate: (payload: UpdateAvailabilityPayload) => void;
   isSubmitting: boolean;
 }) {
@@ -489,7 +481,6 @@ function AvailabilityRow({
       weekday,
       startTime,
       endTime,
-      clinicId,
     });
   };
 

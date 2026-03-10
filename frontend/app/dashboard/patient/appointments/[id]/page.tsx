@@ -46,15 +46,15 @@ export default function PatientAppointmentDetailPage() {
   const { data: visitData } = useQuery({
     queryKey: ['patient', 'visit', id],
     queryFn: () =>
-      appointment ? getVisitByAppointment(id, appointment.clinicId) : null,
+      appointment ? getVisitByAppointment(id) : null,
     enabled: !!appointment?.id,
   });
   const visitRecord = visitData?.visitRecord ?? null;
   const patientSummary = visitData?.patientSummary;
 
   const { data: allPrescriptions } = useQuery({
-    queryKey: ['patient', 'prescriptions', appointment?.clinicId],
-    queryFn: () => getMyPrescriptions(appointment?.clinicId),
+    queryKey: ['patient', 'prescriptions'],
+    queryFn: () => getMyPrescriptions(),
     enabled: !!appointment,
   });
 
@@ -63,9 +63,9 @@ export default function PatientAppointmentDetailPage() {
   ) ?? [];
 
   const { data: formResponses = [], isLoading: formsLoading } = useQuery({
-    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
-    queryFn: () => getPatientForms(appointment!.patientId, appointment?.clinicId),
-    enabled: !!appointment?.patientId && !!appointment?.clinicId,
+    queryKey: ['forms', 'patient', appointment?.patientId],
+    queryFn: () => getPatientForms(appointment!.patientId),
+    enabled: !!appointment?.patientId,
   });
 
   if (appointmentLoading || !appointment) {

@@ -912,7 +912,7 @@ export const updateAppointmentStatus = async (
   }
 
   if (
-    req.user?.role === 'CLINIC_ADMIN' &&
+    req.user?.role === 'FRONT_DESK' &&
     req.clinicId !== appointment.clinicId
   ) {
     const err = new Error('Access denied') as ApiError;

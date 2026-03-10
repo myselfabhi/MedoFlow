@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
 import {
   getMyAppointments,
   getProviderAppointments,
@@ -25,27 +24,24 @@ function formatDateTime(iso: string) {
 
 export default function AppointmentsPage() {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? '';
   const isProvider = user?.role === 'PROVIDER';
   const isPatient = user?.role === 'PATIENT';
   const isStaffOrAdmin =
-    user?.role === 'STAFF' ||
-    user?.role === 'CLINIC_ADMIN' ||
+    user?.role === 'FRONT_DESK' ||
     user?.role === 'SUPER_ADMIN';
 
   const { data: appointments = [], isLoading, error } = useQuery({
-    queryKey: ['appointments', user?.role, effectiveClinicId],
+    queryKey: ['appointments', user?.role],
     queryFn: async () => {
-      if (isPatient) return getMyAppointments(user?.clinicId ?? undefined);
-      if (isProvider) return getProviderAppointments(effectiveClinicId || undefined);
-      if (isStaffOrAdmin) return getClinicAppointments(effectiveClinicId);
+      if (isPatient) return getMyAppointments();
+      if (isProvider) return getProviderAppointments(undefined, undefined);
+      if (isStaffOrAdmin) return getClinicAppointments();
       return [] as (PatientAppointment | ProviderAppointment)[];
     },
     enabled:
       isPatient ||
       isProvider ||
-      (isStaffOrAdmin && !!effectiveClinicId),
+      (isStaffOrAdmin && !!user?.clinicId),
   });
 
   const showClinicView = isStaffOrAdmin;

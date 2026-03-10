@@ -14,28 +14,28 @@ const registerSchema = z
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
-    role: z.enum(['SUPER_ADMIN', 'CLINIC_ADMIN', 'PROVIDER', 'STAFF']).optional(),
+    role: z.enum(['SUPER_ADMIN', 'PROVIDER', 'FRONT_DESK']).optional(),
     clinicId: z.string().optional(),
     clinicName: z.string().optional(),
     clinicEmail: z.string().optional(),
   })
   .refine(
     (data) => {
-      if (data.role === 'CLINIC_ADMIN') {
+      if (data.role === 'FRONT_DESK') {
         return !!data.clinicName && !!data.clinicEmail;
       }
       return true;
     },
-    { message: 'Clinic name and email are required for CLINIC_ADMIN', path: ['clinicName'] }
+    { message: 'Clinic name and email are required for FRONT_DESK', path: ['clinicName'] }
   )
   .refine(
     (data) => {
-      if (data.role === 'PROVIDER' || data.role === 'STAFF') {
+      if (data.role === 'PROVIDER') {
         return !!data.clinicId;
       }
       return true;
     },
-    { message: 'Clinic ID is required for PROVIDER and STAFF', path: ['clinicId'] }
+    { message: 'Clinic ID is required for PROVIDER', path: ['clinicId'] }
   );
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -52,7 +52,7 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: 'STAFF' },
+    defaultValues: { role: 'FRONT_DESK' },
   });
 
   const selectedRole = watch('role');
@@ -67,11 +67,11 @@ export default function RegisterPage() {
         password: data.password,
       };
       if (data.role) payload.role = data.role;
-      if (data.role === 'CLINIC_ADMIN' && data.clinicName && data.clinicEmail) {
+      if (data.role === 'FRONT_DESK' && data.clinicName && data.clinicEmail) {
         payload.clinicName = data.clinicName;
         payload.clinicEmail = data.clinicEmail;
       }
-      if ((data.role === 'PROVIDER' || data.role === 'STAFF') && data.clinicId) {
+      if (data.role === 'PROVIDER' && data.clinicId) {
         payload.clinicId = data.clinicId;
       }
       await api.post('/auth/register', payload);
@@ -152,13 +152,12 @@ export default function RegisterPage() {
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               {...register('role')}
             >
-              <option value="STAFF">Staff</option>
+              <option value="FRONT_DESK">Front Desk</option>
               <option value="PROVIDER">Provider</option>
-              <option value="CLINIC_ADMIN">Clinic Admin</option>
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
           </div>
-          {selectedRole === 'CLINIC_ADMIN' && (
+          {selectedRole === 'FRONT_DESK' && (
             <>
               <div>
                 <label htmlFor="clinicName" className="block text-sm font-medium text-gray-700">
@@ -190,7 +189,7 @@ export default function RegisterPage() {
               </div>
             </>
           )}
-          {(selectedRole === 'PROVIDER' || selectedRole === 'STAFF') && (
+          {selectedRole === 'PROVIDER' && (
             <div>
               <label htmlFor="clinicId" className="block text-sm font-medium text-gray-700">
                 Clinic ID

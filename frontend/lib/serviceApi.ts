@@ -28,13 +28,11 @@ export interface DashboardService {
   discipline: { id: string; name: string };
 }
 
-export const getDashboardServices = async (
-  clinicId?: string
-): Promise<DashboardService[]> => {
+export const getDashboardServices = async (): Promise<DashboardService[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { services: DashboardService[] };
-  }>('/services', { params: clinicId ? { clinicId } : undefined });
+  }>('/services');
   return data.data.services;
 };
 
@@ -59,35 +57,26 @@ export interface UpdateServicePayload {
 }
 
 export const createService = async (
-  payload: CreateServicePayload,
-  clinicId?: string
+  payload: CreateServicePayload
 ): Promise<ServiceWithCount> => {
-  const body = clinicId ? { ...payload, clinicId } : payload;
   const { data } = await api.post<{ success: boolean; data: { service: ServiceWithCount } }>(
     '/services',
-    body
+    payload
   );
   return data.data.service;
 };
 
 export const updateService = async (
   id: string,
-  payload: UpdateServicePayload,
-  clinicId?: string
+  payload: UpdateServicePayload
 ): Promise<ServiceWithCount> => {
   const { data } = await api.put<{ success: boolean; data: { service: ServiceWithCount } }>(
     `/services/${id}`,
-    payload,
-    { params: clinicId ? { clinicId } : undefined }
+    payload
   );
   return data.data.service;
 };
 
-export const archiveService = async (
-  id: string,
-  clinicId?: string
-): Promise<void> => {
-  await api.delete(`/services/${id}`, {
-    params: clinicId ? { clinicId } : undefined,
-  });
+export const archiveService = async (id: string): Promise<void> => {
+  await api.delete(`/services/${id}`);
 };

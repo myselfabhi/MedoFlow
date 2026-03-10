@@ -29,18 +29,14 @@ interface LocationResponse {
   data: { location: Location };
 }
 
-export const getLocations = async (clinicId?: string): Promise<Location[]> => {
-  const { data } = await api.get<LocationsResponse>('/locations', {
-    params: clinicId ? { clinicId } : undefined,
-  });
+export const getLocations = async (): Promise<Location[]> => {
+  const { data } = await api.get<LocationsResponse>('/locations');
   return data.data.locations;
 };
 
 export const createLocation = async (
-  payload: CreateLocationPayload,
-  clinicId?: string
+  payload: CreateLocationPayload
 ): Promise<Location> => {
-  const body = clinicId ? { ...payload, clinicId } : payload;
-  const { data } = await api.post<LocationResponse>('/locations', body);
+  const { data } = await api.post<LocationResponse>('/locations', payload);
   return data.data.location;
 };

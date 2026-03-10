@@ -53,9 +53,9 @@ export function EditProviderDialog({
   const toast = useAppToast();
 
   const { data: disciplines = [] } = useQuery({
-    queryKey: ['disciplines', provider.clinicId],
-    queryFn: () => getDisciplines(provider.clinicId),
-    enabled: open && !!provider.clinicId,
+    queryKey: ['disciplines'],
+    queryFn: () => getDisciplines(),
+    enabled: open,
   });
 
   const {
@@ -92,7 +92,7 @@ export function EditProviderDialog({
 
   const updateMutation = useMutation({
     mutationFn: (payload: UpdateProviderPayload) =>
-      updateProvider(provider.id, payload, provider.clinicId),
+      updateProvider(provider.id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider', provider.id] });
       queryClient.invalidateQueries({ queryKey: ['providers'] });

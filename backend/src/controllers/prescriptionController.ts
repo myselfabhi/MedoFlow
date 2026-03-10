@@ -13,9 +13,7 @@ export const create = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -32,9 +30,7 @@ export const create = asyncHandler(
 
 export const getMy = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.user?.clinicId;
+    const clinicId = req.clinicId ?? req.user?.clinicId;
     const prescriptions = await prescriptionService.getPrescriptionsByPatient(
       req.user!.id,
       clinicId
@@ -46,9 +42,7 @@ export const getMy = asyncHandler(
 export const getByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -70,9 +64,7 @@ export const getProvider = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     const prescriptions = await prescriptionService.getPrescriptionsByProvider(
       provider.id,
       clinicId
@@ -83,9 +75,7 @@ export const getProvider = asyncHandler(
 
 export const listClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;

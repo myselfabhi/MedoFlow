@@ -7,14 +7,7 @@ import { ApiError } from '../types/errors';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const discipline = await disciplineService.createDiscipline(
       req.body,
       clinicId
@@ -26,11 +19,6 @@ export const create = asyncHandler(
 export const list = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const disciplines = await disciplineService.getDisciplines(where);
     successResponse(res, 200, 'Disciplines retrieved', { disciplines });
   }
@@ -39,17 +27,7 @@ export const list = asyncHandler(
 export const getById = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    let where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const existing = await disciplineService.getDisciplineById(id, {});
-      if (existing && req.user?.role === 'SUPER_ADMIN') {
-        where = { clinicId: existing.clinicId };
-      } else {
-        const err = new Error('Clinic scope required') as ApiError;
-        err.statusCode = 400;
-        throw err;
-      }
-    }
+    const where = getClinicWhere(req);
     const discipline = await disciplineService.getDisciplineById(id, where);
     if (!discipline) {
       const err = new Error('Discipline not found') as ApiError;
@@ -63,17 +41,7 @@ export const getById = asyncHandler(
 export const update = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    let where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const existing = await disciplineService.getDisciplineById(id, {});
-      if (existing && req.user?.role === 'SUPER_ADMIN') {
-        where = { clinicId: existing.clinicId };
-      } else {
-        const err = new Error('Clinic scope required') as ApiError;
-        err.statusCode = 400;
-        throw err;
-      }
-    }
+    const where = getClinicWhere(req);
     const existing = await disciplineService.getDisciplineById(id, where);
     if (!existing) {
       const err = new Error('Discipline not found') as ApiError;
@@ -92,17 +60,7 @@ export const update = asyncHandler(
 export const remove = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    let where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const existing = await disciplineService.getDisciplineById(id, {});
-      if (existing && req.user?.role === 'SUPER_ADMIN') {
-        where = { clinicId: existing.clinicId };
-      } else {
-        const err = new Error('Clinic scope required') as ApiError;
-        err.statusCode = 400;
-        throw err;
-      }
-    }
+    const where = getClinicWhere(req);
     const existing = await disciplineService.getDisciplineById(id, where);
     if (!existing) {
       const err = new Error('Discipline not found') as ApiError;

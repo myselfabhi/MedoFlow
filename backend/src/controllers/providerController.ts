@@ -7,14 +7,7 @@ import { ApiError } from '../types/errors';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const provider = await providerService.createProvider(req.body, clinicId);
     successResponse(res, 201, 'Provider created', { provider });
   }
@@ -23,11 +16,6 @@ export const create = asyncHandler(
 export const list = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const providers = await providerService.getProviders(where);
     successResponse(res, 200, 'Providers retrieved', { providers });
   }
@@ -51,11 +39,6 @@ export const update = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const provider = await providerService.updateProvider(
       id,
       req.body,
@@ -69,11 +52,6 @@ export const remove = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const provider = await providerService.softDeleteProvider(id, where);
     successResponse(res, 200, 'Provider deactivated', { provider });
   }
@@ -83,14 +61,7 @@ export const addService = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const { serviceId, priceOverride } = req.body;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string) || req.clinicId
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     if (!serviceId) {
       const err = new Error('Service ID is required') as ApiError;
       err.statusCode = 400;
@@ -113,14 +84,7 @@ export const updateService = asyncHandler(
     const id = req.params.id as string;
     const serviceId = req.params.serviceId as string;
     const { priceOverride } = req.body;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string) || req.clinicId
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const assignment = await providerService.updateProviderService(
       id,
       serviceId,
@@ -138,14 +102,7 @@ export const removeService = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const serviceId = req.params.serviceId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string) || req.clinicId
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     await providerService.removeProviderService(id, serviceId, clinicId);
     successResponse(res, 200, 'Service removed from provider');
   }
@@ -154,14 +111,7 @@ export const removeService = asyncHandler(
 export const listServices = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string) || req.clinicId
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const providerServices = await providerService.getProviderServices(
       id,
       clinicId

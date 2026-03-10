@@ -1,78 +1,47 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as formController from '../controllers/formController';
 import { protect, authorize } from '../middleware/auth';
-import { enforceClinicScope } from '../middleware/clinicScope';
+import { requireClinic } from '../middleware/requireClinic';
 import { Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(protect);
 
-const templateScope = (
+const setClinicFromUser = (
   req: Request,
   _res: Response,
   next: NextFunction
 ): void => {
-  if (req.user!.role === 'SUPER_ADMIN') {
-    req.bypassClinicScope = true;
-    req.clinicId =
-      (req.body?.clinicId as string) ||
-      (req.query?.clinicId as string) ||
-      null;
-  } else if (req.user!.role === 'CLINIC_ADMIN') {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  }
-  next();
-};
-
-const responseScope = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): void => {
-  if (req.user!.role === 'SUPER_ADMIN') {
-    req.bypassClinicScope = true;
-    req.clinicId = (req.query?.clinicId as string) || null;
-  } else if (
-    req.user!.role === 'PROVIDER' ||
-    req.user!.role === 'CLINIC_ADMIN'
-  ) {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  }
+  req.clinicId = req.user?.clinicId ?? null;
   next();
 };
 
 router.post(
   '/templates',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  templateScope,
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   formController.createTemplate
 );
 
 router.get(
   '/templates',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  templateScope,
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   formController.listTemplates
 );
 
 router.put(
   '/templates/:id',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  templateScope,
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   formController.updateTemplate
 );
 
 router.delete(
   '/templates/:id',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  templateScope,
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   formController.disableTemplate
 );
 
@@ -90,17 +59,8 @@ router.post(
 
 router.get(
   '/patient/:patientId',
-  authorize(Role.PROVIDER, Role.PATIENT, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  responseScope,
-  (req: Request, _res: Response, next: NextFunction) => {
-    if (req.user!.role === 'SUPER_ADMIN' && !req.clinicId) {
-      req.clinicId = req.query.clinicId as string;
-    }
-    if (req.user!.role === 'PATIENT') {
-      req.clinicId = req.query.clinicId as string;
-    }
-    next();
-  },
+  authorize(Role.PROVIDER, Role.PATIENT, Role.SUPER_ADMIN, Role.FRONT_DESK),
+  setClinicFromUser,
   formController.getResponsesByPatient
 );
 

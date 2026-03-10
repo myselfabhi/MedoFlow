@@ -15,25 +15,24 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
 interface ProviderServicesCardProps {
   providerId: string;
-  clinicId: string;
 }
 
-export function ProviderServicesCard({ providerId, clinicId }: ProviderServicesCardProps) {
+export function ProviderServicesCard({ providerId }: ProviderServicesCardProps) {
   const queryClient = useQueryClient();
   const toast = useAppToast();
   const [addServiceId, setAddServiceId] = useState('');
   const [addPrice, setAddPrice] = useState('');
 
   const { data: services = [], isLoading } = useQuery({
-    queryKey: ['provider-services', providerId, clinicId],
-    queryFn: () => listProviderServices(providerId, clinicId),
-    enabled: !!providerId && !!clinicId,
+    queryKey: ['provider-services', providerId],
+    queryFn: () => listProviderServices(providerId),
+    enabled: !!providerId,
   });
 
   const { data: allServices = [] } = useQuery({
-    queryKey: ['services', clinicId],
-    queryFn: () => getDashboardServices(clinicId),
-    enabled: !!clinicId,
+    queryKey: ['services'],
+    queryFn: () => getDashboardServices(),
+    enabled: !!providerId,
   });
 
   const assignedServiceIds = new Set(services.map((s) => s.serviceId));
@@ -41,7 +40,7 @@ export function ProviderServicesCard({ providerId, clinicId }: ProviderServicesC
 
   const addMutation = useMutation({
     mutationFn: (payload: { serviceId: string; priceOverride?: number }) =>
-      addProviderService(providerId, payload.serviceId, clinicId, payload.priceOverride),
+      addProviderService(providerId, payload.serviceId, payload.priceOverride),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-services', providerId] });
       queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
@@ -56,7 +55,7 @@ export function ProviderServicesCard({ providerId, clinicId }: ProviderServicesC
 
   const updateMutation = useMutation({
     mutationFn: ({ serviceId, priceOverride }: { serviceId: string; priceOverride: number | null }) =>
-      updateProviderService(providerId, serviceId, priceOverride, clinicId),
+      updateProviderService(providerId, serviceId, priceOverride),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-services', providerId] });
       queryClient.invalidateQueries({ queryKey: ['provider', providerId] });
@@ -68,7 +67,7 @@ export function ProviderServicesCard({ providerId, clinicId }: ProviderServicesC
   });
 
   const removeMutation = useMutation({
-    mutationFn: (serviceId: string) => removeProviderService(providerId, serviceId, clinicId),
+    mutationFn: (serviceId: string) => removeProviderService(providerId, serviceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-services', providerId] });
       queryClient.invalidateQueries({ queryKey: ['provider', providerId] });

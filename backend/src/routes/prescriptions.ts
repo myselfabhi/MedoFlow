@@ -1,66 +1,50 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as prescriptionController from '../controllers/prescriptionController';
 import { protect, authorize } from '../middleware/auth';
-import { enforceClinicScope } from '../middleware/clinicScope';
+import { requireClinic } from '../middleware/requireClinic';
 import { Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(protect);
 
-const providerScope = (
+const setClinicFromUser = (
   req: Request,
   _res: Response,
   next: NextFunction
 ): void => {
-  if (req.user!.role === 'SUPER_ADMIN') {
-    req.bypassClinicScope = true;
-    req.clinicId =
-      (req.body?.clinicId as string) ||
-      (req.query?.clinicId as string) ||
-      null;
-  } else if (req.user!.role === 'PROVIDER') {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  } else if (req.user!.role === 'CLINIC_ADMIN') {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  }
+  req.clinicId = req.user?.clinicId ?? null;
   next();
 };
 
 router.post(
   '/',
   authorize(Role.PROVIDER),
-  providerScope,
+  requireClinic,
   prescriptionController.create
 );
 router.get(
   '/my',
   authorize(Role.PATIENT),
-  (req: Request, _res: Response, next: NextFunction) => {
-    req.bypassClinicScope = req.user!.role === 'SUPER_ADMIN';
-    req.clinicId = (req.query?.clinicId as string) || req.user?.clinicId || null;
-    next();
-  },
+  setClinicFromUser,
   prescriptionController.getMy
 );
 router.get(
   '/provider',
   authorize(Role.PROVIDER),
-  providerScope,
+  requireClinic,
   prescriptionController.getProvider
 );
 router.get(
   '/patient/:patientId',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  providerScope,
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   prescriptionController.getByPatient
 );
 router.get(
   '/clinic',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   prescriptionController.listClinic
 );
 

@@ -62,8 +62,8 @@ export default function ProviderCalendarPage() {
   const weekDates = useMemo(() => getWeekDates(start), [start]);
 
   const { data: appointments = [], refetch } = useQuery({
-    queryKey: ['provider-appointments', user?.clinicId, start.toISOString(), end.toISOString()],
-    queryFn: () => getProviderAppointments(user?.clinicId ?? undefined, start, end),
+    queryKey: ['provider-appointments', start.toISOString(), end.toISOString()],
+    queryFn: () => getProviderAppointments(start, end),
     enabled: isProvider && !!user?.clinicId,
   });
 

@@ -27,7 +27,6 @@ interface AddServiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoiceId: string;
-  clinicId?: string;
   onSuccess: (item: InvoiceItem) => void;
 }
 
@@ -35,7 +34,6 @@ export function AddServiceDialog({
   open,
   onOpenChange,
   invoiceId,
-  clinicId,
   onSuccess,
 }: AddServiceDialogProps) {
   const toast = useAppToast();
@@ -46,8 +44,8 @@ export function AddServiceDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: services = [] } = useQuery({
-    queryKey: ['dashboard-services', clinicId],
-    queryFn: () => getDashboardServices(clinicId),
+    queryKey: ['dashboard-services'],
+    queryFn: () => getDashboardServices(),
     enabled: open,
   });
 

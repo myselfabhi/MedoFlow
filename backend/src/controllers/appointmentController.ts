@@ -7,9 +7,7 @@ import { ApiError } from '../types/errors';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId ?? (req.body?.clinicId as string);
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -28,9 +26,7 @@ export const create = asyncHandler(
 
 export const createRecurring = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId ?? (req.body?.clinicId as string);
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -78,9 +74,7 @@ export const createRecurring = asyncHandler(
 
 export const getMy = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId;
     const appointments = await appointmentService.getAppointmentsByPatient(
       req.user!.id,
       clinicId
@@ -132,14 +126,7 @@ export const getTimeline = asyncHandler(
 export const getByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
-    if (!clinicId && req.user!.role === 'PROVIDER') {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.clinicId!;
     const appointments = await appointmentService.getAppointmentsByPatient(
       patientId,
       clinicId
@@ -156,9 +143,7 @@ export const getProvider = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
     const options =
@@ -176,14 +161,7 @@ export const getProvider = asyncHandler(
 
 export const getClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.clinicId!;
     const appointments = await appointmentService.getAppointmentsByClinic(
       clinicId
     );
@@ -231,7 +209,7 @@ const getCancelRescheduleWhere = async (
     const provider = await appointmentService.getProviderByUserId(req.user!.id);
     if (provider) return { providerId: provider.id };
   }
-  if (req.user!.role === 'CLINIC_ADMIN' && req.clinicId) return { clinicId: req.clinicId };
+  if ((req.user!.role === 'FRONT_DESK' || req.user!.role === 'SUPER_ADMIN') && req.clinicId) return { clinicId: req.clinicId };
   return {};
 };
 

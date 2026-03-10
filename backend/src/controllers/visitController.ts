@@ -13,9 +13,7 @@ export const create = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -34,9 +32,7 @@ export const create = asyncHandler(
 export const getById = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId;
     const includeHistory = req.query.includeHistory === 'true';
     const visitRecord = await visitService.getVisitRecordById(
       id,
@@ -78,9 +74,7 @@ export const getById = asyncHandler(
 export const getByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -97,9 +91,7 @@ export const getByPatient = asyncHandler(
 export const getByAppointment = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const appointmentId = req.params.appointmentId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId;
     const includeHistory = req.query.includeHistory === 'true';
     const visitRecord = await visitService.getVisitRecordByAppointment(
       appointmentId,
@@ -147,9 +139,7 @@ export const update = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -175,9 +165,7 @@ export const finalize = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -195,9 +183,7 @@ export const finalize = asyncHandler(
 
 export const listClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;

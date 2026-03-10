@@ -6,7 +6,7 @@ import { ApiError } from '../types/errors';
 
 export const add = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.body.clinicId as string;
+    const clinicId = (req.clinicId ?? req.body.clinicId) as string;
     if (!clinicId) {
       const err = new Error('clinicId is required') as ApiError;
       err.statusCode = 400;
@@ -50,7 +50,7 @@ export const add = asyncHandler(
 
 export const getMy = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = (req.query.clinicId as string) || undefined;
+    const clinicId = req.user?.clinicId ?? undefined;
     const entries = await waitlistService.getMyWaitlistEntries(
       req.user!.id,
       clinicId ?? null

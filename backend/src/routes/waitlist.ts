@@ -9,7 +9,7 @@ router.use(protect);
 router.use(authorize(Role.PATIENT));
 
 router.post('/', (req: Request, _res: Response, next: NextFunction): void => {
-  req.clinicId = (req.body?.clinicId as string) || null;
+  req.clinicId = req.user?.clinicId ?? (req.body?.clinicId as string) ?? null;
   next();
 }, waitlistController.add);
 

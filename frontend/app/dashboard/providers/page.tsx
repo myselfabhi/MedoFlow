@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClinic } from '@/contexts/ClinicContext';
-import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { listProviders } from '@/lib/availabilityApi';
 import {
   Card,
@@ -20,23 +18,20 @@ import { AddProviderDialog } from '@/components/providers/AddProviderDialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Plus } from 'lucide-react';
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN'] as const;
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'FRONT_DESK'] as const;
 
 export default function ProvidersPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { clinicId, ensureClinicSelected } = useClinicGuard();
-  const effectiveClinicId = (clinicId ?? user?.clinicId)?.trim() || undefined;
-  const { clinics } = useClinic();
-  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
+  const clinicId = user?.clinicId?.trim() || undefined;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const canAddProvider = user?.role && ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number]);
 
   const { data: providers, isLoading, error } = useQuery({
-    queryKey: ['providers', effectiveClinicId],
-    queryFn: () => listProviders(effectiveClinicId),
-    enabled: !!effectiveClinicId,
+    queryKey: ['providers'],
+    queryFn: () => listProviders(),
+    enabled: !!clinicId,
   });
 
   if (!user?.role || !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])) {
@@ -44,27 +39,13 @@ export default function ProvidersPage() {
     return null;
   }
 
-  if (!effectiveClinicId) {
+  if (!clinicId) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Providers</h1>
         <EmptyState
-          title={
-            hasNoClinics
-              ? 'Oops! No Clinics Found'
-              : user?.role === 'SUPER_ADMIN'
-                ? 'No clinic selected'
-                : 'No clinic assigned'
-          }
-          description={
-            hasNoClinics
-              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
-              : user?.role === 'SUPER_ADMIN'
-                ? 'Select a clinic from the top-right to manage providers and their availability.'
-                : 'You are not assigned to a clinic.'
-          }
-          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
-          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+          title="No clinic assigned"
+          description="You are not assigned to a clinic. Contact your administrator."
         />
       </div>
     );
@@ -88,7 +69,7 @@ export default function ProvidersPage() {
           </p>
         </div>
         {canAddProvider && (
-          <Button onClick={() => ensureClinicSelected() && setAddDialogOpen(true)}>
+          <Button onClick={() => setAddDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Add Provider
           </Button>
@@ -110,7 +91,7 @@ export default function ProvidersPage() {
               title="No providers yet"
               description="Add your first provider to start scheduling appointments."
               actionLabel={canAddProvider ? 'Add Provider' : undefined}
-              onAction={canAddProvider ? () => ensureClinicSelected() && setAddDialogOpen(true) : undefined}
+              onAction={canAddProvider ? () => setAddDialogOpen(true) : undefined}
             />
           )}
           {providers && providers.length > 0 && (

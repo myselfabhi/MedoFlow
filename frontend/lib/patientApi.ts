@@ -76,14 +76,11 @@ export interface Prescription {
   provider: { id: string; firstName: string; lastName: string };
 }
 
-export const getMyAppointments = async (
-  clinicId?: string
-): Promise<PatientAppointment[]> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getMyAppointments = async (): Promise<PatientAppointment[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { appointments: PatientAppointment[] };
-  }>(`/appointments/my${params}`);
+  }>('/appointments/my');
   return data.data.appointments;
 };
 
@@ -107,12 +104,10 @@ export interface ProviderAppointment {
 }
 
 export const getProviderAppointments = async (
-  clinicId?: string,
   startDate?: Date,
   endDate?: Date
 ): Promise<ProviderAppointment[]> => {
   const search = new URLSearchParams();
-  if (clinicId) search.set('clinicId', clinicId);
   if (startDate) search.set('startDate', startDate.toISOString());
   if (endDate) search.set('endDate', endDate.toISOString());
   const qs = search.toString();
@@ -123,13 +118,11 @@ export const getProviderAppointments = async (
   return data.data.appointments;
 };
 
-export const getClinicAppointments = async (
-  clinicId: string
-): Promise<ProviderAppointment[]> => {
+export const getClinicAppointments = async (): Promise<ProviderAppointment[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { appointments: ProviderAppointment[] };
-  }>(`/appointments/clinic?clinicId=${clinicId}`);
+  }>('/appointments/clinic');
   return data.data.appointments;
 };
 
@@ -168,10 +161,9 @@ export const getAppointmentById = async (
 
 export const createVisitRecord = async (
   appointmentId: string,
-  clinicId?: string,
   payload?: { patientId?: string; subjective?: string; objective?: string; assessment?: string; plan?: string }
 ): Promise<VisitRecord> => {
-  const body = clinicId ? { ...payload, appointmentId, clinicId } : { ...payload, appointmentId };
+  const body = { ...payload, appointmentId };
   const { data } = await api.post<{
     success: boolean;
     data: { visitRecord: VisitRecord };
@@ -180,28 +172,23 @@ export const createVisitRecord = async (
 };
 
 export const getVisitByAppointment = async (
-  appointmentId: string,
-  clinicId?: string
+  appointmentId: string
 ): Promise<{ visitRecord: VisitRecord; patientSummary?: PatientSummary } | null> => {
   try {
-    const params = clinicId ? `?clinicId=${clinicId}` : '';
     const { data } = await api.get<{
       success: boolean;
       data: { visitRecord: VisitRecord; patientSummary?: PatientSummary };
-    }>(`/visits/appointment/${appointmentId}${params}`);
+    }>(`/visits/appointment/${appointmentId}`);
     return data.data;
   } catch {
     return null;
   }
 };
 
-export const getMyPrescriptions = async (
-  clinicId?: string
-): Promise<Prescription[]> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getMyPrescriptions = async (): Promise<Prescription[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { prescriptions: Prescription[] };
-  }>(`/prescriptions/my${params}`);
+  }>('/prescriptions/my');
   return data.data.prescriptions;
 };

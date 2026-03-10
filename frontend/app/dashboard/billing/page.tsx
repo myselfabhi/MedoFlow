@@ -12,8 +12,7 @@ export default function BillingPage() {
   const router = useRouter();
 
   const canAccessInvoices =
-    user?.role === 'STAFF' ||
-    user?.role === 'CLINIC_ADMIN' ||
+    user?.role === 'FRONT_DESK' ||
     user?.role === 'SUPER_ADMIN';
 
   useEffect(() => {

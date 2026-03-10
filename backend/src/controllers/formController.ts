@@ -7,14 +7,7 @@ import { ApiError } from '../types/errors';
 
 export const createTemplate = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
-    if (!clinicId) {
-      const err = new Error('Clinic ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
+    const clinicId = req.user!.clinicId!;
     const template = await formService.createTemplate(
       req.body,
       clinicId,
@@ -27,11 +20,6 @@ export const createTemplate = asyncHandler(
 export const listTemplates = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const templates = await formService.listTemplates(where);
     successResponse(res, 200, 'Templates retrieved', { templates });
   }
@@ -41,11 +29,6 @@ export const updateTemplate = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const where = getClinicWhere(req);
-    if (Object.keys(where).length === 0) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const template = await formService.updateTemplate(
       id,
       req.body,
@@ -128,9 +111,7 @@ export const getResponsesByPatient = asyncHandler(
       err.statusCode = 403;
       throw err;
     }
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic scope required') as ApiError;
       err.statusCode = 400;

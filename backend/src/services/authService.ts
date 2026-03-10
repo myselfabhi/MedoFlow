@@ -3,7 +3,7 @@ import prisma from '../config/prisma';
 import * as clinicService from './clinicService';
 import { ApiError } from '../types/errors';
 
-const VALID_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN', 'PROVIDER', 'STAFF', 'PATIENT'] as const;
+const VALID_ROLES = ['SUPER_ADMIN', 'PROVIDER', 'FRONT_DESK', 'PATIENT'] as const;
 
 export interface RegisterBody {
   name: string;
@@ -42,22 +42,22 @@ const validateRegistration = (
   const roleToUse =
     role && VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])
       ? role
-      : 'STAFF';
+      : 'FRONT_DESK';
 
-  if (roleToUse === 'CLINIC_ADMIN') {
+  if (roleToUse === 'SUPER_ADMIN' && !creatorRole) {
     if (!clinicName || !clinicEmail) {
       const err = new Error(
-        'Clinic name and email are required for CLINIC_ADMIN registration'
+        'Clinic name and email are required for SUPER_ADMIN (clinic owner) registration'
       ) as ApiError;
       err.statusCode = 400;
       throw err;
     }
   }
 
-  if (roleToUse === 'PROVIDER' || roleToUse === 'STAFF') {
+  if (roleToUse === 'PROVIDER' || roleToUse === 'FRONT_DESK') {
     if (!clinicId) {
       const err = new Error(
-        'Clinic ID is required for PROVIDER and STAFF roles'
+        'Clinic ID is required for PROVIDER and FRONT_DESK roles'
       ) as ApiError;
       err.statusCode = 400;
       throw err;
@@ -96,13 +96,13 @@ export const registerUser = async (
 
   let resolvedClinicId: string | null = null;
 
-  if (roleToUse === 'CLINIC_ADMIN' && clinicName && clinicEmail) {
+  if (roleToUse === 'SUPER_ADMIN' && clinicName && clinicEmail && !creatorRole) {
     const clinic = await clinicService.createClinic({
       name: clinicName,
       email: clinicEmail,
     });
     resolvedClinicId = clinic.id;
-  } else if (roleToUse === 'PROVIDER' || roleToUse === 'STAFF') {
+  } else if (roleToUse === 'PROVIDER' || roleToUse === 'FRONT_DESK') {
     if (!clinicId) {
       const err = new Error('Clinic not found') as ApiError;
       err.statusCode = 404;
@@ -148,7 +148,7 @@ export const registerUser = async (
       name: body.name,
       email: body.email,
       password: hashedPassword,
-      role: roleToUse as 'SUPER_ADMIN' | 'CLINIC_ADMIN' | 'PROVIDER' | 'STAFF' | 'PATIENT',
+      role: roleToUse as 'SUPER_ADMIN' | 'PROVIDER' | 'FRONT_DESK' | 'PATIENT',
       clinicId: resolvedClinicId,
     },
     select: {

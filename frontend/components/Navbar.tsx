@@ -2,7 +2,6 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ClinicSwitcher } from '@/components/common/ClinicSwitcher';
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -23,7 +22,6 @@ export function Navbar() {
         )}
       </div>
       <div className="flex items-center gap-4">
-        {user?.role === 'SUPER_ADMIN' && <ClinicSwitcher />}
         {user && (
           <span className="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-800">
             {user.role.replace('_', ' ')}

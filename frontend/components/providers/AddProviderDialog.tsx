@@ -19,7 +19,6 @@ import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices, type DashboardService } from '@/lib/serviceApi';
 import { addProvider, type AddProviderPayload } from '@/lib/availabilityApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -42,21 +41,20 @@ interface AddProviderDialogProps {
 
 export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps) {
   const { user } = useAuth();
-  const { clinicId, ensureClinicSelected } = useClinicGuard();
-  const effectiveClinicId = (clinicId ?? user?.clinicId)?.trim() || undefined;
+  const clinicId = user?.clinicId?.trim() || undefined;
   const queryClient = useQueryClient();
   const toast = useAppToast();
 
   const { data: disciplines = [], isLoading: disciplinesLoading } = useQuery({
-    queryKey: ['disciplines', effectiveClinicId],
-    queryFn: () => getDisciplines(effectiveClinicId),
-    enabled: !!effectiveClinicId && open,
+    queryKey: ['disciplines'],
+    queryFn: () => getDisciplines(),
+    enabled: !!clinicId && open,
   });
 
   const { data: allServices = [], isLoading: servicesLoading } = useQuery({
-    queryKey: ['services', effectiveClinicId],
-    queryFn: () => getDashboardServices(effectiveClinicId),
-    enabled: !!effectiveClinicId && open,
+    queryKey: ['services'],
+    queryFn: () => getDashboardServices(),
+    enabled: !!clinicId && open,
   });
 
   const {
@@ -120,9 +118,9 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
 
   const addProviderMutation = useMutation({
     mutationFn: (payload: AddProviderPayload) =>
-      addProvider(payload, effectiveClinicId!),
+      addProvider(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['providers', effectiveClinicId] });
+      queryClient.invalidateQueries({ queryKey: ['providers'] });
       toast.success('Provider created successfully');
       onOpenChange(false);
       reset();
@@ -133,7 +131,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
   });
 
   const onSubmit = (data: AddProviderFormData) => {
-    if (!ensureClinicSelected()) return;
+    if (!clinicId) return;
     const services = data.serviceIds.map((serviceId) => {
       const override = data.priceOverrides?.[serviceId];
       return {

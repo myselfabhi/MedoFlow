@@ -73,9 +73,7 @@ export const previewAvailabilityUpdate = asyncHandler(
 export const createAvailability = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const providerId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -93,9 +91,7 @@ export const createAvailability = asyncHandler(
 export const updateAvailability = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.availabilityId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -124,9 +120,7 @@ export const updateAvailability = asyncHandler(
 export const createUnavailability = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const providerId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;

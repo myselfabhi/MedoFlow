@@ -12,14 +12,11 @@ export interface ProviderListItem {
   }[];
 }
 
-export const listProviders = async (
-  clinicId?: string
-): Promise<ProviderListItem[]> => {
-  const params = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : '';
+export const listProviders = async (): Promise<ProviderListItem[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { providers: ProviderListItem[] };
-  }>(`/providers${params}`);
+  }>('/providers');
   return data.data.providers;
 };
 
@@ -47,7 +44,6 @@ export interface UpdateAvailabilityPayload {
   weekday?: number;
   startTime?: string;
   endTime?: string;
-  clinicId?: string;
 }
 
 export type UpdateAvailabilityResult =
@@ -59,14 +55,12 @@ export type UpdateAvailabilityResult =
     };
 
 export const getProvider = async (
-  providerId: string,
-  clinicId?: string
+  providerId: string
 ): Promise<ProviderWithAvailability> => {
-  const params = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : '';
   const { data } = await api.get<{
     success: boolean;
     data: { provider: ProviderWithAvailability };
-  }>(`/providers/${providerId}${params}`);
+  }>(`/providers/${providerId}`);
   return data.data.provider;
 };
 
@@ -79,8 +73,7 @@ export interface AddProviderPayload {
 }
 
 export const addProvider = async (
-  payload: AddProviderPayload,
-  clinicId: string
+  payload: AddProviderPayload
 ): Promise<ProviderListItem> => {
   const body = {
     firstName: payload.firstName,
@@ -88,7 +81,6 @@ export const addProvider = async (
     email: payload.email,
     disciplineIds: payload.disciplineIds,
     services: payload.services,
-    clinicId,
   };
   const { data } = await api.post<{
     success: boolean;
@@ -101,7 +93,6 @@ export interface CreateAvailabilityPayload {
   weekday: number;
   startTime: string;
   endTime: string;
-  clinicId: string;
 }
 
 export interface CreateUnavailabilityPayload {
@@ -109,7 +100,6 @@ export interface CreateUnavailabilityPayload {
   startTime?: string;
   endTime?: string;
   reason?: string;
-  clinicId: string;
 }
 
 export const createUnavailability = async (
@@ -147,37 +137,33 @@ export interface ProviderServiceItem {
 }
 
 export const listProviderServices = async (
-  providerId: string,
-  clinicId?: string
+  providerId: string
 ): Promise<ProviderServiceItem[]> => {
-  const params = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : '';
   const { data } = await api.get<{
     success: boolean;
     data: { providerServices: ProviderServiceItem[] };
-  }>(`/providers/${providerId}/services${params}`);
+  }>(`/providers/${providerId}/services`);
   return data.data.providerServices;
 };
 
 export const addProviderService = async (
   providerId: string,
   serviceId: string,
-  clinicId: string,
   priceOverride?: number
 ): Promise<ProviderServiceItem> => {
   const { data } = await api.post<{
     success: boolean;
     data: { providerService: ProviderServiceItem };
-  }>(`/providers/${providerId}/services`, { serviceId, priceOverride, clinicId });
+  }>(`/providers/${providerId}/services`, { serviceId, priceOverride });
   return data.data.providerService;
 };
 
 export const updateProviderService = async (
   providerId: string,
   serviceId: string,
-  priceOverride: number | null,
-  clinicId?: string
+  priceOverride: number | null
 ): Promise<ProviderServiceItem> => {
-  const body = clinicId ? { priceOverride, clinicId } : { priceOverride };
+  const body = { priceOverride };
   const { data } = await api.put<{
     success: boolean;
     data: { providerService: ProviderServiceItem };
@@ -196,36 +182,30 @@ export interface UpdateProviderPayload {
 
 export const updateProvider = async (
   providerId: string,
-  payload: UpdateProviderPayload,
-  clinicId?: string
+  payload: UpdateProviderPayload
 ): Promise<ProviderListItem> => {
-  const body = clinicId ? { ...payload, clinicId } : payload;
   const { data } = await api.put<{
     success: boolean;
     data: { provider: ProviderListItem };
-  }>(`/providers/${providerId}`, body);
+  }>(`/providers/${providerId}`, payload);
   return data.data.provider;
 };
 
 export const deactivateProvider = async (
-  providerId: string,
-  clinicId?: string
+  providerId: string
 ): Promise<ProviderListItem> => {
-  const params = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : '';
   const { data } = await api.delete<{
     success: boolean;
     data: { provider: ProviderListItem };
-  }>(`/providers/${providerId}${params}`);
+  }>(`/providers/${providerId}`);
   return data.data.provider;
 };
 
 export const removeProviderService = async (
   providerId: string,
-  serviceId: string,
-  clinicId?: string
+  serviceId: string
 ): Promise<void> => {
-  const params = clinicId ? `?clinicId=${encodeURIComponent(clinicId)}` : '';
-  await api.delete(`/providers/${providerId}/services/${serviceId}${params}`);
+  await api.delete(`/providers/${providerId}/services/${serviceId}`);
 };
 
 export const updateAvailability = async (

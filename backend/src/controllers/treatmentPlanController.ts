@@ -6,7 +6,7 @@ import { getClinicWhere } from '../middleware/clinicScope';
 import { ApiError } from '../types/errors';
 
 const getUpdateWhere = async (req: Request): Promise<{ clinicId: string; providerId?: string }> => {
-  const clinicId = req.clinicId!;
+  const clinicId = req.user!.clinicId!;
   const where: { clinicId: string; providerId?: string } = { clinicId };
   if (req.user!.role === 'PROVIDER') {
     const provider = await treatmentPlanService.getProviderByUserId(req.user!.id);
@@ -17,7 +17,7 @@ const getUpdateWhere = async (req: Request): Promise<{ clinicId: string; provide
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope ? (req.body.clinicId as string) : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
@@ -39,9 +39,7 @@ export const create = asyncHandler(
 
 export const getList = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.clinicId!;
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;

@@ -22,9 +22,7 @@ const parseTags = (val: unknown): unknown => {
 
 export const upload = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = req.bypassClinicScope
-      ? (req.body.clinicId as string)
-      : req.clinicId;
+    const clinicId = req.user!.clinicId!;
     const patientId = req.body.patientId as string;
     const visitRecordId = (req.body.visitRecordId as string) || undefined;
 
@@ -70,16 +68,7 @@ export const upload = asyncHandler(
 export const listByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
-
-    if (!clinicId) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
-
+    const clinicId = req.clinicId!;
     const files = await fileService.getFilesByPatient(clinicId, patientId);
     successResponse(res, 200, 'Files retrieved', { files });
   }
@@ -88,16 +77,7 @@ export const listByPatient = asyncHandler(
 export const remove = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const fileId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
-
-    if (!clinicId) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
-
+    const clinicId = req.clinicId!;
     await fileService.softDeleteFile(fileId, clinicId, req.user!.id);
     successResponse(res, 200, 'File deleted');
   }
@@ -106,16 +86,7 @@ export const remove = asyncHandler(
 export const download = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const fileId = req.params.id as string;
-    const clinicId = req.bypassClinicScope
-      ? (req.query.clinicId as string)
-      : req.clinicId;
-
-    if (!clinicId) {
-      const err = new Error('Clinic scope required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
-
+    const clinicId = req.clinicId!;
     const file = await fileService.getFileById(fileId, clinicId);
     if (!file) {
       const err = new Error('File not found') as ApiError;

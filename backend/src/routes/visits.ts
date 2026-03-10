@@ -1,92 +1,63 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as visitController from '../controllers/visitController';
 import { protect, authorize } from '../middleware/auth';
-import { enforceClinicScope } from '../middleware/clinicScope';
+import { requireClinic } from '../middleware/requireClinic';
 import { Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(protect);
 
-const providerScope = (
+const setClinicFromUser = (
   req: Request,
   _res: Response,
   next: NextFunction
 ): void => {
-  if (req.user!.role === 'SUPER_ADMIN') {
-    req.bypassClinicScope = true;
-    req.clinicId =
-      (req.body?.clinicId as string) ||
-      (req.query?.clinicId as string) ||
-      null;
-  } else if (req.user!.role === 'PROVIDER' || req.user!.role === 'CLINIC_ADMIN') {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  }
+  req.clinicId = req.user?.clinicId ?? null;
   next();
 };
 
 router.post(
   '/',
   authorize(Role.PROVIDER),
-  providerScope,
+  requireClinic,
   visitController.create
 );
-const visitGetScope = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): void => {
-  if (req.user!.role === 'SUPER_ADMIN') {
-    req.bypassClinicScope = true;
-    req.clinicId =
-      (req.body?.clinicId as string) ||
-      (req.query?.clinicId as string) ||
-      null;
-  } else if (req.user!.role === 'PROVIDER' || req.user!.role === 'CLINIC_ADMIN') {
-    req.bypassClinicScope = false;
-    req.clinicId = req.user!.clinicId;
-  } else if (req.user!.role === 'PATIENT') {
-    req.bypassClinicScope = true;
-    req.clinicId = (req.query?.clinicId as string) || null;
-  }
-  next();
-};
 
 router.get(
   '/appointment/:appointmentId',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.PATIENT),
-  visitGetScope,
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.FRONT_DESK, Role.PATIENT),
+  setClinicFromUser,
   visitController.getByAppointment
 );
 router.get(
   '/patient/:patientId',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  visitGetScope,
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   visitController.getByPatient
 );
 router.get(
   '/:id',
-  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.PATIENT),
-  visitGetScope,
+  authorize(Role.PROVIDER, Role.SUPER_ADMIN, Role.FRONT_DESK, Role.PATIENT),
+  setClinicFromUser,
   visitController.getById
 );
 router.put(
   '/:id',
   authorize(Role.PROVIDER),
-  providerScope,
+  requireClinic,
   visitController.update
 );
 router.put(
   '/:id/finalize',
   authorize(Role.PROVIDER),
-  providerScope,
+  requireClinic,
   visitController.finalize
 );
 router.get(
   '/clinic',
-  authorize(Role.SUPER_ADMIN, Role.CLINIC_ADMIN),
-  enforceClinicScope,
+  authorize(Role.SUPER_ADMIN, Role.FRONT_DESK),
+  requireClinic,
   visitController.listClinic
 );
 

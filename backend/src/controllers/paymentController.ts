@@ -7,7 +7,7 @@ const getPaymentWhere = async (
   req: Request
 ): Promise<{ clinicId?: string; patientId?: string }> => {
   if (req.user!.role === 'PATIENT') return { patientId: req.user!.id };
-  if (req.user!.role === 'CLINIC_ADMIN' && req.clinicId)
+  if (req.user!.role === 'FRONT_DESK' && req.clinicId)
     return { clinicId: req.clinicId };
   return {};
 };

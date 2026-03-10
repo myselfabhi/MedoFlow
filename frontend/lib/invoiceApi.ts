@@ -31,7 +31,6 @@ export interface Invoice {
 export const createInvoice = async (payload: {
   appointmentId: string;
   providerId: string;
-  clinicId?: string;
 }): Promise<Invoice> => {
   const { data } = await api.post<{ success: boolean; data: { invoice: Invoice } }>(
     '/invoices',
@@ -59,12 +58,10 @@ export const addInvoiceItem = async (
 export const updateInvoiceItem = async (
   invoiceId: string,
   itemId: string,
-  payload: { unitPrice?: number; quantity?: number },
-  clinicId?: string
+  payload: { unitPrice?: number; quantity?: number }
 ): Promise<InvoiceItem> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
   const { data } = await api.put<{ success: boolean; data: { item: InvoiceItem } }>(
-    `/invoices/${invoiceId}/items/${itemId}${params}`,
+    `/invoices/${invoiceId}/items/${itemId}`,
     payload
   );
   return data.data.item;
@@ -72,52 +69,34 @@ export const updateInvoiceItem = async (
 
 export const deleteInvoiceItem = async (
   invoiceId: string,
-  itemId: string,
-  clinicId?: string
+  itemId: string
 ): Promise<void> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
-  await api.delete(`/invoices/${invoiceId}/items/${itemId}${params}`);
+  await api.delete(`/invoices/${invoiceId}/items/${itemId}`);
 };
 
-export const finalizeInvoice = async (
-  invoiceId: string,
-  clinicId?: string
-): Promise<Invoice> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const finalizeInvoice = async (invoiceId: string): Promise<Invoice> => {
   const { data } = await api.put<{ success: boolean; data: { invoice: Invoice } }>(
-    `/invoices/${invoiceId}/finalize${params}`
+    `/invoices/${invoiceId}/finalize`
   );
   return data.data.invoice;
 };
 
-export const payInvoice = async (
-  invoiceId: string,
-  clinicId?: string
-): Promise<Invoice> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const payInvoice = async (invoiceId: string): Promise<Invoice> => {
   const { data } = await api.put<{ success: boolean; data: { invoice: Invoice } }>(
-    `/invoices/${invoiceId}/pay${params}`
+    `/invoices/${invoiceId}/pay`
   );
   return data.data.invoice;
 };
 
-export const getInvoiceById = async (
-  id: string,
-  clinicId?: string
-): Promise<Invoice> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
+export const getInvoiceById = async (id: string): Promise<Invoice> => {
   const { data } = await api.get<{ success: boolean; data: { invoice: Invoice } }>(
-    `/invoices/${id}${params}`
+    `/invoices/${id}`
   );
   return data.data.invoice;
 };
 
-export const getInvoices = async (
-  clinicId?: string,
-  status?: string
-): Promise<Invoice[]> => {
+export const getInvoices = async (status?: string): Promise<Invoice[]> => {
   const params = new URLSearchParams();
-  if (clinicId) params.set('clinicId', clinicId);
   if (status && status !== 'ALL') params.set('status', status);
   const qs = params.toString();
   const { data } = await api.get<{
@@ -128,13 +107,11 @@ export const getInvoices = async (
 };
 
 export const getInvoicesByAppointment = async (
-  appointmentId: string,
-  clinicId?: string
+  appointmentId: string
 ): Promise<Invoice[]> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
   const { data } = await api.get<{
     success: boolean;
     data: { invoices: Invoice[] };
-  }>(`/invoices/appointment/${appointmentId}${params}`);
+  }>(`/invoices/appointment/${appointmentId}`);
   return data.data.invoices;
 };
