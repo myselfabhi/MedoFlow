@@ -20,10 +20,25 @@ export async function sendProviderInviteEmail(
   name: string,
   setupLink: string
 ): Promise<void> {
+  await sendStaffInviteEmail({
+    to,
+    name,
+    setupLink,
+    roleLabel: 'Provider',
+  });
+}
+
+export async function sendStaffInviteEmail(params: {
+  to: string;
+  name: string;
+  setupLink: string;
+  roleLabel: string;
+}): Promise<void> {
+  const { to, name, setupLink, roleLabel } = params;
   const subject = "You've been invited to Medoflow";
   const html = `
     <p>Hi ${name},</p>
-    <p>You've been invited to join Medoflow as a provider.</p>
+    <p>You've been invited to join Medoflow as ${roleLabel}.</p>
     <p>Click the link below to set your password and get started:</p>
     <p><a href="${setupLink}">${setupLink}</a></p>
     <p>This link expires in 24 hours.</p>
@@ -32,7 +47,7 @@ export async function sendProviderInviteEmail(
   const text = `
 Hi ${name},
 
-You've been invited to join Medoflow as a provider.
+You've been invited to join Medoflow as ${roleLabel}.
 
 Set your password here: ${setupLink}
 
@@ -42,7 +57,13 @@ If you didn't expect this invite, you can safely ignore this email.
   `.trim();
 
   if (!process.env.SMTP_HOST) {
-    console.log('[Email] SMTP not configured. Would send provider invite:');
+    const isExplicitDev = process.env.NODE_ENV !== 'production';
+    if (!isExplicitDev) {
+      throw new Error(
+        'SMTP is not configured. Refusing to log invite links outside development.'
+      );
+    }
+    console.log('[Email] SMTP not configured. Would send staff invite:');
     console.log(`  To: ${to}`);
     console.log(`  Subject: ${subject}`);
     console.log(`  Link: ${setupLink}`);

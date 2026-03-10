@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { listProviders } from '@/lib/availabilityApi';
@@ -19,30 +18,18 @@ import {
 import { AddProviderDialog } from '@/components/providers/AddProviderDialog';
 import { Plus } from 'lucide-react';
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'FRONT_DESK'] as const;
-
 export default function ProvidersPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const clinicId = user?.clinicId?.trim() || undefined;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  const canAddProvider =
-    user?.role && ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number]);
+  const canAddProvider = user?.role === 'SUPER_ADMIN';
 
   const { data: providers, isLoading, error } = useQuery({
     queryKey: ['providers'],
     queryFn: () => listProviders(),
     enabled: !!clinicId,
   });
-
-  if (
-    !user?.role ||
-    !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])
-  ) {
-    router.replace('/dashboard');
-    return null;
-  }
 
   if (!clinicId) {
     return (
@@ -103,9 +90,14 @@ export default function ProvidersPage() {
                 <AppCard key={p.id} className="flex flex-col">
                   <AppCardContent className="flex flex-1 flex-col">
                     <div className="flex min-w-0 flex-col gap-3">
-                      <p className="font-medium text-foreground">
-                        {p.firstName} {p.lastName}
-                      </p>
+                      <div className="space-y-1">
+                        <p className="font-medium text-foreground">
+                          {p.firstName} {p.lastName}
+                        </p>
+                        {p.email && (
+                          <p className="text-sm text-muted-foreground">{p.email}</p>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         {(p.disciplines?.length
                           ? p.disciplines.map((pd) => pd.discipline.name)
@@ -126,14 +118,28 @@ export default function ProvidersPage() {
                           <div className="flex flex-wrap gap-1">
                             {p.providerServices.map((ps) => (
                               <AppBadge
-                                key={ps.service.id}
+                                key={ps.id || ps.service.id}
                                 variant="outline"
                                 className="text-xs"
                               >
                                 {ps.service.name}
+                                {ps.priceOverride
+                                  ? ` · $${ps.priceOverride} override`
+                                  : ''}
                               </AppBadge>
                             ))}
                           </div>
+                        </div>
+                      )}
+                      {p.locationAssignments && p.locationAssignments.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Launch location
+                          </p>
+                          <AppBadge variant="secondary">
+                            {p.locationAssignments.find((assignment) => assignment.isPrimary)?.location.name ??
+                              p.locationAssignments[0].location.name}
+                          </AppBadge>
                         </div>
                       )}
                       <Link

@@ -88,6 +88,7 @@ model Clinic {
   inventoryItems  InventoryItem[]
   packages        Package[]
   memberships     Membership[]
+  patientMemberships PatientClinicMembership[]
   googleCalendarConnections GoogleCalendarConnection[]
   googleCalendarEvents GoogleCalendarEvent[]
 }
@@ -119,6 +120,7 @@ model User {
   uploadedFiles    PatientFile[] @relation("UploadedFiles")
   formResponses    FormResponse[]
   invoices         Invoice[]
+  patientClinicMemberships PatientClinicMembership[] @relation("PatientClinicMemberships")
   googleCalendarConnections GoogleCalendarConnection[]
 }
 
@@ -181,9 +183,26 @@ model Provider {
   invoices               Invoice[]
   aiScribeSessions       AIScribeSession[]
   slotHolds              SlotHold[]
+  locationAssignments    ProviderLocationAssignment[]
   googleCalendarEvents   GoogleCalendarEvent[]
 
   @@index([clinicId])
+}
+
+model ProviderLocationAssignment {
+  id         String   @id @default(cuid())
+  providerId String
+  locationId String
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, locationId])
+  @@index([locationId])
+  @@index([providerId, isPrimary])
 }
 
 model ProviderAvailability {
@@ -229,6 +248,28 @@ model Location {
   clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointments  Appointment[]
   slotHolds     SlotHold[]
+  providerAssignments ProviderLocationAssignment[]
+  patientMemberships  PatientClinicMembership[] @relation("PatientMembershipPrimaryLocation")
+
+  @@unique([clinicId, name])
+}
+
+model PatientClinicMembership {
+  id                String   @id @default(cuid())
+  clinicId          String
+  patientId         String
+  primaryLocationId String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinic          Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient         User      @relation("PatientClinicMemberships", fields: [patientId], references: [id], onDelete: Restrict)
+  primaryLocation Location? @relation("PatientMembershipPrimaryLocation", fields: [primaryLocationId], references: [id], onDelete: SetNull)
+
+  @@unique([clinicId, patientId])
+  @@index([patientId])
+  @@index([clinicId, isActive])
 }
 
 model SlotHold {

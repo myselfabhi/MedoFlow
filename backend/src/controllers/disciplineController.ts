@@ -10,7 +10,8 @@ export const create = asyncHandler(
     const clinicId = req.user!.clinicId!;
     const discipline = await disciplineService.createDiscipline(
       req.body,
-      clinicId
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 201, 'Discipline created', { discipline });
   }
@@ -51,7 +52,8 @@ export const update = asyncHandler(
     const discipline = await disciplineService.updateDiscipline(
       id,
       req.body,
-      where
+      where,
+      req.user!.id
     );
     successResponse(res, 200, 'Discipline updated', { discipline });
   }
@@ -68,6 +70,6 @@ export const remove = asyncHandler(
       throw err;
     }
     await disciplineService.deleteDiscipline(id, where, req.user!.id);
-    successResponse(res, 200, 'Discipline deleted');
+    successResponse(res, 200, 'Discipline archived');
   }
 );

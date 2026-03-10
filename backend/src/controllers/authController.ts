@@ -39,8 +39,7 @@ const clearRefreshTokenCookie = (res: Response): void => {
 
 export const register = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const creator = req.user?.role === 'SUPER_ADMIN' ? req.user : null;
-    const user = await authService.registerUser(req.body, creator);
+    const user = await authService.registerUser(req.body);
     successResponse(res, 201, 'Registration successful', { user });
   }
 );

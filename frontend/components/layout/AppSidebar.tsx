@@ -8,14 +8,12 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
-  Stethoscope,
-  BookOpen,
-  FileText,
   BarChart3,
   ClipboardList,
   Receipt,
-  Mic,
   Video,
+  Building2,
+  MapPin,
 } from 'lucide-react';
 
 const patientItems = [
@@ -25,25 +23,31 @@ const patientItems = [
 
 const providerItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
   { href: '/dashboard/provider/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/dashboard/providers', label: 'Providers', icon: Stethoscope },
-  { href: '/dashboard/services', label: 'Services', icon: BookOpen },
+  { href: '/dashboard/appointments', label: 'Appointments', icon: ClipboardList },
   { href: '/dashboard/provider/meetings', label: 'Meetings', icon: Video },
-  { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/dashboard/appointments', label: 'AI Scribe', icon: Mic },
 ];
 
-const staffAdminItems = [
+const superAdminItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/clinics/new', label: 'Clinic', icon: Building2 },
+  { href: '/dashboard/locations', label: 'Location', icon: MapPin },
+  { href: '/dashboard/staff', label: 'Staff', icon: Users },
+  { href: '/dashboard/appointments', label: 'Appointments', icon: ClipboardList },
+  { href: '/dashboard/patients', label: 'Patients', icon: Users },
+  { href: '/dashboard/providers', label: 'Providers', icon: Users },
+  { href: '/dashboard/services', label: 'Services', icon: ClipboardList },
+  { href: '/dashboard/disciplines', label: 'Disciplines', icon: ClipboardList },
+  { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+];
+
+const frontDeskItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/appointments', label: 'Appointments', icon: ClipboardList },
   { href: '/dashboard/patients', label: 'Patients', icon: Users },
-  { href: '/dashboard/providers', label: 'Providers', icon: Stethoscope },
-  { href: '/dashboard/services', label: 'Services', icon: BookOpen },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/dashboard/appointments', label: 'AI Scribe', icon: Mic },
 ];
 
 export function AppSidebar() {
@@ -51,15 +55,17 @@ export function AppSidebar() {
   const { user } = useAuth();
   const isPatient = user?.role === 'PATIENT';
   const isProvider = user?.role === 'PROVIDER';
-  const isStaffOrAdmin =
-    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isFrontDesk = user?.role === 'FRONT_DESK';
 
   const items = isPatient
     ? patientItems
     : isProvider
       ? providerItems
-      : isStaffOrAdmin
-        ? staffAdminItems
+      : isSuperAdmin
+        ? superAdminItems
+        : isFrontDesk
+          ? frontDeskItems
         : [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
   return (

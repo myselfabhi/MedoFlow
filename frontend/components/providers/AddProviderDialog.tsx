@@ -26,6 +26,7 @@ const addProviderSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().min(1, 'Valid email is required.').email('Valid email is required.'),
+  phone: z.string().optional(),
   disciplineIds: z.array(z.string()).min(1, 'Select at least one discipline'),
   serviceIds: z.array(z.string()).min(1, 'Select at least one service'),
   priceOverrides: z.record(z.string(), z.union([z.number(), z.undefined()])).optional(),
@@ -69,6 +70,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
       firstName: '',
       lastName: '',
       email: '',
+      phone: '',
       disciplineIds: [],
       serviceIds: [],
       priceOverrides: {},
@@ -143,6 +145,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
+      phone: data.phone || undefined,
       disciplineIds: data.disciplineIds,
       services,
     });
@@ -188,6 +191,18 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
                 type="email"
                 placeholder="john@example.com"
                 className={cn(errors.email && 'border-danger')}
+              />
+            </AppFormField>
+            <AppFormField
+              label="Phone"
+              description="Optional internal contact number."
+              error={errors.phone?.message}
+            >
+              <AppInput
+                {...register('phone')}
+                type="tel"
+                placeholder="(555) 555-5555"
+                className={cn(errors.phone && 'border-danger')}
               />
             </AppFormField>
           </div>

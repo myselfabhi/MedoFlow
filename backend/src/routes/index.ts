@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import healthRoutes from './health';
 import authRoutes from './auth';
+import clinicRoutes from './clinics';
 import disciplineRoutes from './disciplines';
 import providerRoutes from './providers';
 import locationRoutes from './locations';
@@ -18,12 +19,14 @@ import invoiceRoutes from './invoices';
 import analyticsRoutes from './analytics';
 import aiScribeRoutes from './aiScribe';
 import googleCalendarRoutes from './googleCalendar';
+import staffRoutes from './staff';
 
 const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/public', publicRoutes);
 router.use('/auth', authRoutes);
+router.use('/clinics', clinicRoutes);
 router.use('/disciplines', disciplineRoutes);
 router.use('/providers', providerRoutes);
 router.use('/locations', locationRoutes);
@@ -40,5 +43,6 @@ router.use('/invoices', invoiceRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/ai-scribe', aiScribeRoutes);
 router.use('/integrations/google', googleCalendarRoutes);
+router.use('/staff', staffRoutes);
 
 export default router;

@@ -16,6 +16,7 @@ export interface CreateProviderData {
   email: string;
   phone?: string;
   disciplineIds: string[];
+  locationIds?: string[];
   userId?: string | null;
   serviceIds?: string[];
   /** Services with optional price override (takes precedence over serviceIds) */
@@ -86,10 +87,56 @@ const validateServiceBelongsToClinic = async (
   return service;
 };
 
-export const createProvider = async (
-  data: CreateProviderData,
+const validateLocationBelongsToClinic = async (
+  locationId: string,
   clinicId: string
 ) => {
+  const location = await prisma.location.findFirst({
+    where: { id: locationId, clinicId, isActive: true },
+  });
+  if (!location) {
+    const err = new Error(
+      'Location not found or does not belong to this clinic'
+    ) as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+  return location;
+};
+
+const resolveProviderLocationIds = async (
+  clinicId: string,
+  locationIds?: string[]
+) => {
+  if (locationIds?.length) {
+    for (const locationId of locationIds) {
+      await validateLocationBelongsToClinic(locationId, clinicId);
+    }
+    return Array.from(new Set(locationIds));
+  }
+
+  const defaultLocations = await prisma.location.findMany({
+    where: { clinicId, isActive: true },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+
+  return defaultLocations.map((location) => location.id);
+};
+
+export const createProvider = async (
+  data: CreateProviderData,
+  clinicId: string,
+  performedById: string
+) => {
+  if (!process.env.SMTP_HOST && process.env.NODE_ENV === 'production') {
+    const err = new Error(
+      'SMTP is required to invite providers in production'
+    ) as ApiError;
+    err.statusCode = 500;
+    throw err;
+  }
+
   const email = (data.email ?? '').trim();
   if (!email) {
     const err = new Error('Valid email is required.') as ApiError;
@@ -120,6 +167,8 @@ export const createProvider = async (
   for (const disciplineId of data.disciplineIds) {
     await validateDisciplineBelongsToClinic(disciplineId, clinicId);
   }
+
+  const locationIds = await resolveProviderLocationIds(clinicId, data.locationIds);
 
   const servicesInput: CreateProviderServiceInput[] =
     data.services && data.services.length > 0
@@ -163,10 +212,21 @@ export const createProvider = async (
       disciplines: {
         create: data.disciplineIds.map((disciplineId) => ({ disciplineId })),
       },
+      locationAssignments: {
+        create: locationIds.map((locationId, index) => ({
+          locationId,
+          isPrimary: index === 0,
+        })),
+      },
     },
     include: {
       disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
     },
   });
 
@@ -181,11 +241,40 @@ export const createProvider = async (
         },
       });
   }
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'User',
+    entityId: user.id,
+    action: 'CREATE',
+    fieldChanged: 'role',
+    oldValue: null,
+    newValue: 'PROVIDER',
+    performedById,
+  });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Provider',
+    entityId: provider.id,
+    action: 'CREATE',
+    newValue: {
+      email,
+      disciplineIds: data.disciplineIds,
+      locationIds,
+    },
+    performedById,
+  });
+
   return prisma.provider.findUnique({
       where: { id: provider.id },
       include: {
         disciplines: { include: { discipline: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true, email: true } },
+        locationAssignments: {
+          include: {
+            location: { select: { id: true, name: true, timezone: true } },
+          },
+        },
         providerServices: {
           include: {
             service: { include: { discipline: { select: { id: true, name: true } } } },
@@ -203,6 +292,11 @@ export const getProviders = async (where: ClinicWhere) => {
     include: {
       disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
       providerServices: {
         include: {
           service: { select: { id: true, name: true, defaultPrice: true } },
@@ -223,6 +317,11 @@ export const getProviderById = async (
       disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
       providerAvailability: true,
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
     },
   });
 };
@@ -230,7 +329,8 @@ export const getProviderById = async (
 export const updateProvider = async (
   id: string,
   data: Partial<CreateProviderData & { isActive?: boolean }>,
-  where: ClinicWhere
+  where: ClinicWhere,
+  performedById: string
 ) => {
   const provider = await getProviderById(id, where);
   if (!provider) {
@@ -245,6 +345,10 @@ export const updateProvider = async (
     for (const disciplineId of data.disciplineIds) {
       await validateDisciplineBelongsToClinic(disciplineId, clinicId);
     }
+  }
+
+  if (data.locationIds && clinicId) {
+    await resolveProviderLocationIds(clinicId, data.locationIds);
   }
 
   if (data.userId !== undefined) {
@@ -307,8 +411,27 @@ export const updateProvider = async (
     include: {
       disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
     },
   });
+
+  if (data.locationIds && clinicId) {
+    await prisma.providerLocationAssignment.deleteMany({
+      where: { providerId: id },
+    });
+
+    await prisma.providerLocationAssignment.createMany({
+      data: data.locationIds.map((locationId, index) => ({
+        providerId: id,
+        locationId,
+        isPrimary: index === 0,
+      })),
+    });
+  }
 
   if (data.isActive !== undefined && provider.userId) {
     await prisma.user.update({
@@ -317,7 +440,37 @@ export const updateProvider = async (
     });
   }
 
-  return updatedProvider;
+  await auditService.logAudit({
+    clinicId: provider.clinicId,
+    entityType: 'Provider',
+    entityId: id,
+    action: 'UPDATE',
+    newValue: {
+      firstName: updatedProvider.firstName,
+      lastName: updatedProvider.lastName,
+      email: updatedProvider.email,
+      isActive: updatedProvider.isActive,
+      locationIds: data.locationIds,
+    },
+    performedById,
+  });
+
+  if (!data.locationIds) {
+    return updatedProvider;
+  }
+
+  return prisma.provider.findUnique({
+    where: { id },
+    include: {
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+      user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
+    },
+  });
 };
 
 export const softDeleteProvider = async (
@@ -405,7 +558,8 @@ export const addProviderService = async (
   providerId: string,
   serviceId: string,
   priceOverride: number | string | null | undefined,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const provider = await getProviderById(providerId, { clinicId });
   if (!provider) {
@@ -424,7 +578,7 @@ export const addProviderService = async (
     throw err;
   }
 
-  return prisma.providerService.create({
+  const assignment = await prisma.providerService.create({
     data: {
       providerId,
       serviceId,
@@ -436,6 +590,20 @@ export const addProviderService = async (
       },
     },
   });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'ProviderService',
+    entityId: assignment.id,
+    action: 'CREATE',
+    newValue: {
+      serviceId,
+      priceOverride: assignment.priceOverride?.toString() ?? null,
+    },
+    performedById,
+  });
+
+  return assignment;
 };
 
 export const updateProviderService = async (
@@ -495,7 +663,8 @@ export const updateProviderService = async (
 export const removeProviderService = async (
   providerId: string,
   serviceId: string,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const provider = await getProviderById(providerId, { clinicId });
   if (!provider) {
@@ -522,9 +691,23 @@ export const removeProviderService = async (
     throw err;
   }
 
-  return prisma.providerService.delete({
+  const deleted = await prisma.providerService.delete({
     where: { id: existing.id },
   });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'ProviderService',
+    entityId: existing.id,
+    action: 'DELETE',
+    oldValue: {
+      serviceId,
+      priceOverride: existing.priceOverride?.toString() ?? null,
+    },
+    performedById,
+  });
+
+  return deleted;
 };
 
 export const getProviderServices = async (

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { logAudit } from './auditService';
 import { ApiError } from '../types/errors';
 import { UPLOAD_BASE } from '../config/multer';
+import * as patientMembershipService from './patientMembershipService';
 
 export const uploadFile = async (params: {
   clinicId: string;
@@ -17,14 +18,10 @@ export const uploadFile = async (params: {
   size: number;
   tags?: unknown;
 }): Promise<{ id: string }> => {
-  const appointment = await prisma.appointment.findFirst({
-    where: { clinicId: params.clinicId, patientId: params.patientId },
-  });
-  if (!appointment) {
-    const err = new Error('Patient does not belong to clinic') as ApiError;
-    err.statusCode = 403;
-    throw err;
-  }
+  await patientMembershipService.assertPatientBelongsToClinic(
+    params.patientId,
+    params.clinicId
+  );
 
   if (params.visitRecordId) {
     const visit = await prisma.visitRecord.findFirst({
@@ -144,10 +141,14 @@ export const validatePatientBelongsToClinic = async (
   patientId: string,
   clinicId: string
 ): Promise<boolean> => {
-  const apt = await prisma.appointment.findFirst({
-    where: { patientId, clinicId },
+  const membership = await prisma.patientClinicMembership.findFirst({
+    where: {
+      patientId,
+      clinicId,
+      isActive: true,
+    },
   });
-  return !!apt;
+  return !!membership;
 };
 
 export const getFileById = async (

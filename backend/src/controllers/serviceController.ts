@@ -8,7 +8,11 @@ import { ApiError } from '../types/errors';
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
-    const service = await serviceService.createService(req.body, clinicId);
+    const service = await serviceService.createService(
+      req.body,
+      clinicId,
+      req.user!.id
+    );
     successResponse(res, 201, 'Service created', { service });
   }
 );

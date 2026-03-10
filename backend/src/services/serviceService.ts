@@ -31,7 +31,8 @@ const validateDisciplineBelongsToClinic = async (
 
 export const createService = async (
   data: CreateServiceData,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   await validateDisciplineBelongsToClinic(data.disciplineId, clinicId);
 
@@ -46,7 +47,7 @@ export const createService = async (
     throw err;
   }
 
-  return prisma.service.create({
+  const service = await prisma.service.create({
     data: {
       clinicId,
       disciplineId: data.disciplineId,
@@ -59,6 +60,21 @@ export const createService = async (
       discipline: { select: { id: true, name: true } },
     },
   });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Service',
+    entityId: service.id,
+    action: 'CREATE',
+    newValue: {
+      name: service.name,
+      defaultPrice: service.defaultPrice.toString(),
+      disciplineId: service.discipline.id,
+    },
+    performedById,
+  });
+
+  return service;
 };
 
 export const getServices = async (where: ClinicWhere) => {
@@ -145,6 +161,27 @@ export const updateService = async (
       newValue: String(data.defaultPrice),
       performedById,
     });
+  }
+
+  const auditFields: Array<'name' | 'duration' | 'disciplineId' | 'taxApplicable'> = [
+    'name',
+    'duration',
+    'disciplineId',
+    'taxApplicable',
+  ];
+  for (const field of auditFields) {
+    if (data[field] !== undefined && service[field] !== updated[field]) {
+      await auditService.logAudit({
+        clinicId: cid,
+        entityType: 'Service',
+        entityId: id,
+        action: 'UPDATE',
+        fieldChanged: field,
+        oldValue: service[field] as string | number | boolean | null,
+        newValue: updated[field] as string | number | boolean | null,
+        performedById,
+      });
+    }
   }
 
   return updated;

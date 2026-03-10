@@ -3,6 +3,7 @@ import prisma from '../config/prisma';
 import { logAudit } from './auditService';
 import { ApiError } from '../types/errors';
 import type { FormScope } from '@prisma/client';
+import * as patientMembershipService from './patientMembershipService';
 
 type ClinicWhere = { clinicId?: string } | Record<string, never>;
 
@@ -328,16 +329,7 @@ export const getResponsesByPatient = async (
   clinicId: string,
   patientId: string
 ) => {
-  const hasAppointment = await prisma.appointment.findFirst({
-    where: { clinicId, patientId },
-  });
-  if (!hasAppointment) {
-    const err = new Error(
-      'Patient has no appointments at this clinic'
-    ) as ApiError;
-    err.statusCode = 403;
-    throw err;
-  }
+  await patientMembershipService.assertPatientBelongsToClinic(patientId, clinicId);
   return prisma.formResponse.findMany({
     where: { clinicId, patientId },
     include: {

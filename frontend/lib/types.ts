@@ -23,8 +23,4 @@ export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
-  role?: Role;
-  clinicId?: string;
-  clinicName?: string;
-  clinicEmail?: string;
 }

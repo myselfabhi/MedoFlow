@@ -11,7 +11,8 @@ type ClinicWhere = { clinicId?: string } | Record<string, never>;
 
 export const createDiscipline = async (
   data: CreateDisciplineData,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
   const existing = await prisma.discipline.findFirst({
     where: { clinicId, name: data.name },
@@ -23,13 +24,27 @@ export const createDiscipline = async (
     err.statusCode = 409;
     throw err;
   }
-  return prisma.discipline.create({
+  const discipline = await prisma.discipline.create({
     data: {
       clinicId,
       name: data.name,
       description: data.description,
     },
   });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Discipline',
+    entityId: discipline.id,
+    action: 'CREATE',
+    newValue: {
+      name: discipline.name,
+      description: discipline.description,
+    },
+    performedById,
+  });
+
+  return discipline;
 };
 
 export const getDisciplines = async (where: ClinicWhere) => {
@@ -54,7 +69,8 @@ export const getDisciplineById = async (
 export const updateDiscipline = async (
   id: string,
   data: Partial<CreateDisciplineData>,
-  where: ClinicWhere
+  where: ClinicWhere,
+  performedById: string
 ) => {
   const discipline = await prisma.discipline.findUnique({ where: { id } });
   if (!discipline) {
@@ -79,13 +95,31 @@ export const updateDiscipline = async (
       throw err;
     }
   }
-  return prisma.discipline.update({
+  const updated = await prisma.discipline.update({
     where: { id },
     data: {
       ...(data.name && { name: data.name }),
       ...(data.description !== undefined && { description: data.description }),
     },
   });
+
+  const auditFields: Array<keyof CreateDisciplineData> = ['name', 'description'];
+  for (const field of auditFields) {
+    if (data[field] !== undefined && discipline[field] !== updated[field]) {
+      await auditService.logAudit({
+        clinicId: discipline.clinicId,
+        entityType: 'Discipline',
+        entityId: id,
+        action: 'UPDATE',
+        fieldChanged: field,
+        oldValue: discipline[field] ?? null,
+        newValue: updated[field] ?? null,
+        performedById,
+      });
+    }
+  }
+
+  return updated;
 };
 
 /**

@@ -1,4 +1,5 @@
 import prisma from '../config/prisma';
+import * as auditService from './auditService';
 
 export interface CreateLocationData {
   name: string;
@@ -10,9 +11,10 @@ type ClinicWhere = { clinicId?: string } | Record<string, never>;
 
 export const createLocation = async (
   data: CreateLocationData,
-  clinicId: string
+  clinicId: string,
+  performedById: string
 ) => {
-  return prisma.location.create({
+  const location = await prisma.location.create({
     data: {
       clinicId,
       name: data.name,
@@ -20,6 +22,20 @@ export const createLocation = async (
       timezone: data.timezone,
     },
   });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Location',
+    entityId: location.id,
+    action: 'CREATE',
+    newValue: {
+      name: location.name,
+      timezone: location.timezone,
+    },
+    performedById,
+  });
+
+  return location;
 };
 
 export const getLocations = async (where: ClinicWhere) => {

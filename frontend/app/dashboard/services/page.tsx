@@ -177,8 +177,7 @@ export default function ServicesPage() {
   const [editing, setEditing] = useState<DashboardService | null>(null);
 
   const clinicId = user?.clinicId ?? undefined;
-  const canEdit =
-    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
+  const canEdit = user?.role === 'SUPER_ADMIN';
 
   const { data: services = [], isLoading, error } = useQuery({
     queryKey: ['services'],

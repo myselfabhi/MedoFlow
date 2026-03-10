@@ -24,10 +24,14 @@ import {
   AppInput,
   AppPageHeader,
   AppEmptyState,
-  AppModal,
   AppTable,
-  type AppTableColumn,
 } from '@/components/ui-system';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const disciplineSchema = z.object({
@@ -144,7 +148,7 @@ export default function DisciplinesPage() {
     mutationFn: deleteDiscipline,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disciplines'] });
-      toast.success('Discipline deleted successfully');
+      toast.success('Discipline archived successfully');
     },
   });
 
@@ -167,9 +171,9 @@ export default function DisciplinesPage() {
 
   const handleDeleteClick = (id: string) => {
     showModal({
-      title: 'Delete Discipline',
-      description: 'Are you sure you want to delete this discipline?',
-      actionLabel: 'Delete',
+      title: 'Archive Discipline',
+      description: 'Archive this discipline? Historical records remain intact, but it will be hidden from future setup and booking flows.',
+      actionLabel: 'Archive',
       onAction: () => deleteMutation.mutate(id),
     });
   };
@@ -280,7 +284,7 @@ export default function DisciplinesPage() {
                         onClick={() => handleDeleteClick(d.id)}
                         disabled={deleteMutation.isPending}
                       >
-                        Delete
+                        Archive
                       </AppButton>
                     </div>
                   ),
@@ -293,28 +297,31 @@ export default function DisciplinesPage() {
         </AppCardContent>
       </AppCard>
 
-      <AppModal
-        open={addModalOpen}
-        onOpenChange={setAddModalOpen}
-        title="Add Discipline"
-        content={
+      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Discipline</DialogTitle>
+          </DialogHeader>
           <DisciplineForm
             onSubmit={handleAddSubmit}
             isSubmitting={createMutation.isPending}
             submitLabel="Create"
           />
-        }
-      />
+        </DialogContent>
+      </Dialog>
 
-      <AppModal
+      <Dialog
         open={editModalOpen}
         onOpenChange={(open) => {
           setEditModalOpen(open);
           if (!open) setEditingDiscipline(null);
         }}
-        title="Edit Discipline"
-        content={
-          editingDiscipline ? (
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Discipline</DialogTitle>
+          </DialogHeader>
+          {editingDiscipline ? (
             <DisciplineForm
               defaultValues={{
                 name: editingDiscipline.name,
@@ -324,9 +331,9 @@ export default function DisciplinesPage() {
               isSubmitting={updateMutation.isPending}
               submitLabel="Save"
             />
-          ) : null
-        }
-      />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

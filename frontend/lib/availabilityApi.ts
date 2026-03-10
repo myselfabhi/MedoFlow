@@ -5,9 +5,18 @@ export interface ProviderListItem {
   clinicId: string;
   firstName: string;
   lastName: string;
+  email?: string | null;
+  phone?: string | null;
   discipline?: { id: string; name: string };
   disciplines?: { discipline: { id: string; name: string } }[];
+  locationAssignments?: {
+    id: string;
+    isPrimary: boolean;
+    location: { id: string; name: string; timezone: string };
+  }[];
   providerServices?: {
+    id?: string;
+    priceOverride?: string | null;
     service: { id: string; name: string; defaultPrice: string };
   }[];
 }
@@ -68,7 +77,9 @@ export interface AddProviderPayload {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
   disciplineIds: string[];
+  locationIds?: string[];
   services: { serviceId: string; priceOverride?: number }[];
 }
 
@@ -79,7 +90,9 @@ export const addProvider = async (
     firstName: payload.firstName,
     lastName: payload.lastName,
     email: payload.email,
+    ...(payload.phone && { phone: payload.phone }),
     disciplineIds: payload.disciplineIds,
+    ...(payload.locationIds && { locationIds: payload.locationIds }),
     services: payload.services,
   };
   const { data } = await api.post<{

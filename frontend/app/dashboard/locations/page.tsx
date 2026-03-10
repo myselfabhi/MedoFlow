@@ -1,28 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  getLocations,
-  createLocation,
-  type Location,
-  type CreateLocationPayload,
-} from '@/lib/locationApi';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
+import { AppPageHeader, AppEmptyState } from '@/components/ui-system';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { getCurrentClinic, upsertLaunchLocation } from '@/lib/clinicAdminApi';
 
-const locationSchema = z.object({
+const launchLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   address: z.string().optional(),
   timezone: z.string().min(1, 'Timezone is required'),
 });
 
-type LocationFormData = z.infer<typeof locationSchema>;
+type LaunchLocationFormData = z.infer<typeof launchLocationSchema>;
 
 const COMMON_TIMEZONES = [
   'America/New_York',
@@ -40,24 +37,28 @@ const COMMON_TIMEZONES = [
   'UTC',
 ];
 
-function LocationForm({
+function LaunchLocationForm({
+  defaultValues,
   onSubmit,
   isSubmitting,
 }: {
-  onSubmit: (data: LocationFormData) => void;
+  defaultValues?: LaunchLocationFormData;
+  onSubmit: (data: LaunchLocationFormData) => void;
   isSubmitting: boolean;
 }) {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LocationFormData>({
-    resolver: zodResolver(locationSchema),
-    defaultValues: {
-      name: '',
-      address: '',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
-    },
+  } = useForm<LaunchLocationFormData>({
+    resolver: zodResolver(launchLocationSchema),
+    defaultValues:
+      defaultValues || {
+        name: '',
+        address: '',
+        timezone:
+          Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
+      },
   });
 
   return (
@@ -66,11 +67,10 @@ function LocationForm({
         <label htmlFor="name" className="block text-sm font-medium text-gray-700">
           Name
         </label>
-        <input
+        <Input
           id="name"
           type="text"
           placeholder="e.g. Main Office"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           {...register('name')}
         />
         {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
@@ -79,11 +79,10 @@ function LocationForm({
         <label htmlFor="address" className="block text-sm font-medium text-gray-700">
           Address
         </label>
-        <input
+        <Input
           id="address"
           type="text"
           placeholder="e.g. 123 Main St, City"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           {...register('address')}
         />
       </div>
@@ -93,7 +92,7 @@ function LocationForm({
         </label>
         <select
           id="timezone"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           {...register('timezone')}
         >
           {COMMON_TIMEZONES.map((tz) => (
@@ -105,29 +104,11 @@ function LocationForm({
         {errors.timezone && <p className="mt-1 text-sm text-red-600">{errors.timezone.message}</p>}
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          {isSubmitting ? 'Creating...' : 'Create Location'}
-        </button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : 'Save Launch Location'}
+        </Button>
       </div>
     </form>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="animate-pulse space-y-3">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex gap-4 border-b border-gray-200 pb-3">
-          <div className="h-4 flex-1 rounded bg-gray-200" />
-          <div className="h-4 flex-1 rounded bg-gray-200" />
-          <div className="h-4 w-32 rounded bg-gray-200" />
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -135,127 +116,83 @@ export default function LocationsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const toast = useAppToast();
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const clinicId = user?.clinicId ?? undefined;
 
-  const { data: locations, isLoading, error } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => getLocations(),
-    enabled: !!user,
+  const { data: clinic, isLoading } = useQuery({
+    queryKey: ['admin-clinic', 'current'],
+    queryFn: () => getCurrentClinic(),
+    enabled: user?.role === 'SUPER_ADMIN' && !!user?.clinicId,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateLocationPayload) =>
-      createLocation(data),
+  const saveMutation = useMutation({
+    mutationFn: (data: LaunchLocationFormData) =>
+      upsertLaunchLocation({
+        id: clinic?.launchLocation?.id,
+        name: data.name,
+        address: data.address || undefined,
+        timezone: data.timezone,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
-      setAddModalOpen(false);
-      toast.success('Location created successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-clinic', 'current'] });
+      toast.success('Launch location saved');
+    },
+    onError: (error: { response?: { data?: { message?: string } }; message?: string }) => {
+      toast.error(error.response?.data?.message ?? error.message ?? 'Unable to save location');
     },
   });
 
-  const handleAddSubmit = (data: LocationFormData) => {
-    createMutation.mutate({
-      name: data.name,
-      address: data.address || undefined,
-      timezone: data.timezone,
-    });
-  };
+  const clinicId = user?.clinicId ?? undefined;
+
+  if (user?.role !== 'SUPER_ADMIN') {
+    return (
+      <div className="space-y-6">
+        <AppPageHeader title="Location" description="Launch location settings are limited to super admins." />
+        <AppEmptyState
+          title="Access restricted"
+          description="Only super admins can manage the launch location."
+        />
+      </div>
+    );
+  }
+
+  if (!clinicId) {
+    return (
+      <div className="space-y-6">
+        <AppPageHeader title="Location" description="Complete clinic setup before editing the launch location." />
+        <AppEmptyState
+          title="Clinic setup required"
+          description="Create the clinic first, then return here to update its launch location."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Locations</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage clinic locations. Optional for online-only clinics.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAddModalOpen(true)}
-          className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-        >
-          Add Location
-        </button>
-      </div>
+      <AppPageHeader
+        title="Launch Location"
+        description="The admin UI is single-location for now, while the backend stays multi-location ready."
+      />
 
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">All Locations</h2>
+          <h2 className="text-lg font-medium text-gray-900">Primary Operational Location</h2>
         </CardHeader>
         <CardContent>
-          {isLoading && <TableSkeleton />}
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-              Failed to load locations. Please try again.
-            </div>
-          )}
-
-          {!isLoading && !error && (!locations || locations.length === 0) && (
-            <div className="py-12 text-center">
-              <p className="text-gray-500">No locations yet.</p>
-              <p className="mt-1 text-sm text-gray-400">
-                Add a location to enable patient booking for this clinic.
-              </p>
-              <button
-                type="button"
-                onClick={() => setAddModalOpen(true)}
-                className="mt-4 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-              >
-                Add Location
-              </button>
-            </div>
-          )}
-
-          {!isLoading && !error && locations && locations.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Address
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Timezone
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {locations.map((loc: Location) => (
-                    <tr key={loc.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                        {loc.name}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {loc.address || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                        {loc.timezone}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {isLoading ? (
+            <p className="text-sm text-gray-500">Loading location settings...</p>
+          ) : (
+            <LaunchLocationForm
+              defaultValues={{
+                name: clinic?.launchLocation?.name ?? '',
+                address: clinic?.launchLocation?.address ?? '',
+                timezone: clinic?.launchLocation?.timezone ?? 'America/New_York',
+              }}
+              onSubmit={(values) => saveMutation.mutate(values)}
+              isSubmitting={saveMutation.isPending}
+            />
           )}
         </CardContent>
       </Card>
-
-      <Modal
-        isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        title="Add Location"
-      >
-        <LocationForm
-          onSubmit={handleAddSubmit}
-          isSubmitting={createMutation.isPending}
-        />
-      </Modal>
     </div>
   );
 }

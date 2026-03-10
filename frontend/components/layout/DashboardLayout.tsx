@@ -14,15 +14,43 @@ export interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  const superAdminOnlyPrefixes = [
+    '/dashboard/providers',
+    '/dashboard/services',
+    '/dashboard/disciplines',
+    '/dashboard/staff',
+    '/dashboard/locations',
+    '/dashboard/clinic',
+    '/dashboard/clinics/new',
+  ];
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push(
         `/login?returnUrl=${encodeURIComponent(pathname || '/dashboard')}`
       );
+      return;
     }
-  }, [isLoading, isAuthenticated, router, pathname]);
+
+    if (isLoading || !user) return;
+
+    if (user.role === 'SUPER_ADMIN' && !user.clinicId) {
+      if (pathname !== '/dashboard/clinics/new') {
+        router.replace('/dashboard/clinics/new');
+      }
+      return;
+    }
+
+    const isSuperAdminOnlyRoute = superAdminOnlyPrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
+
+    if (isSuperAdminOnlyRoute && user.role !== 'SUPER_ADMIN') {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, isAuthenticated, router, pathname, user]);
 
   if (isLoading) {
     return (
@@ -33,6 +61,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  if (user?.role === 'SUPER_ADMIN' && !user.clinicId && pathname !== '/dashboard/clinics/new') {
     return null;
   }
 

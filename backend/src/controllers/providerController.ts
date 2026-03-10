@@ -8,7 +8,11 @@ import { ApiError } from '../types/errors';
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
-    const provider = await providerService.createProvider(req.body, clinicId);
+    const provider = await providerService.createProvider(
+      req.body,
+      clinicId,
+      req.user!.id
+    );
     successResponse(res, 201, 'Provider created', { provider });
   }
 );
@@ -42,7 +46,8 @@ export const update = asyncHandler(
     const provider = await providerService.updateProvider(
       id,
       req.body,
-      where
+      where,
+      req.user!.id
     );
     successResponse(res, 200, 'Provider updated', { provider });
   }
@@ -64,18 +69,13 @@ export const remove = asyncHandler(
 export const addService = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    const { serviceId, priceOverride } = req.body;
     const clinicId = req.user!.clinicId!;
-    if (!serviceId) {
-      const err = new Error('Service ID is required') as ApiError;
-      err.statusCode = 400;
-      throw err;
-    }
     const assignment = await providerService.addProviderService(
       id,
-      serviceId,
-      priceOverride,
-      clinicId
+      req.body.serviceId as string,
+      req.body.priceOverride as number | string | null | undefined,
+      clinicId,
+      req.user!.id
     );
     successResponse(res, 201, 'Service assigned to provider', {
       providerService: assignment,
@@ -87,12 +87,11 @@ export const updateService = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const serviceId = req.params.serviceId as string;
-    const { priceOverride } = req.body;
     const clinicId = req.user!.clinicId!;
     const assignment = await providerService.updateProviderService(
       id,
       serviceId,
-      priceOverride,
+      req.body.priceOverride as number | string | null | undefined,
       clinicId,
       req.user!.id
     );
@@ -107,7 +106,7 @@ export const removeService = asyncHandler(
     const id = req.params.id as string;
     const serviceId = req.params.serviceId as string;
     const clinicId = req.user!.clinicId!;
-    await providerService.removeProviderService(id, serviceId, clinicId);
+    await providerService.removeProviderService(id, serviceId, clinicId, req.user!.id);
     successResponse(res, 200, 'Service removed from provider');
   }
 );

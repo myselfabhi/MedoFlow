@@ -326,6 +326,25 @@ export const createAppointment = async (
       throw err;
     }
 
+    await tx.patientClinicMembership.upsert({
+      where: {
+        clinicId_patientId: {
+          clinicId,
+          patientId,
+        },
+      },
+      create: {
+        clinicId,
+        patientId,
+        primaryLocationId: locationId ?? null,
+        isActive: true,
+      },
+      update: {
+        isActive: true,
+        ...(locationId !== undefined && { primaryLocationId: locationId ?? null }),
+      },
+    });
+
     const samePatientConflict = await tx.appointment.findFirst({
       where: {
         patientId,
