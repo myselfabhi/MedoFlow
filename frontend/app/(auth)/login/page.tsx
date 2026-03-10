@@ -7,7 +7,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardContent,
+  AppButton,
+  AppInput,
+  AppFormField,
+} from '@/components/ui-system';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -43,8 +50,6 @@ function LoginForm() {
     setIsSubmitting(true);
     try {
       await login(data.email, data.password);
-      // Let useEffect handle redirect when isAuthenticated updates - avoids race where
-      // dashboard mounts before auth state propagates and redirects back to login
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
@@ -56,12 +61,12 @@ function LoginForm() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <h1 className="text-2xl font-semibold text-gray-900">Sign in to Medoflow</h1>
-        <p className="mt-1 text-sm text-gray-500">Enter your credentials</p>
-      </CardHeader>
-      <CardContent>
+    <AppCard>
+      <AppCardHeader>
+        <h1 className="text-2xl font-semibold text-slate-900">Sign in to Medoflow</h1>
+        <p className="mt-1 text-sm text-slate-600">Enter your credentials</p>
+      </AppCardHeader>
+      <AppCardContent>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -70,60 +75,58 @@ function LoginForm() {
           className="space-y-4"
         >
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-xl border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
+              {error}
+            </div>
           )}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
+          <AppFormField label="Email" htmlFor="email" error={errors.email?.message}>
+            <AppInput
               id="email"
               type="email"
               autoComplete="email"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className={errors.email ? 'border-danger' : ''}
               {...register('email')}
             />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
+          </AppFormField>
+          <AppFormField label="Password" htmlFor="password" error={errors.password?.message}>
+            <AppInput
               id="password"
               type="password"
               autoComplete="current-password"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className={errors.password ? 'border-danger' : ''}
               {...register('password')}
             />
-            {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-            )}
-          </div>
-          <button
+          </AppFormField>
+          <AppButton
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
+            className="w-full"
           >
             {isSubmitting ? 'Signing in...' : 'Sign in'}
-          </button>
+          </AppButton>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-slate-600">
           Don&apos;t have an account?{' '}
           <Link href="/register" className="font-medium text-primary-600 hover:text-primary-500">
             Register
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      </AppCardContent>
+    </AppCard>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<Card><CardContent className="py-12 text-center text-gray-500">Loading...</CardContent></Card>}>
+    <Suspense
+      fallback={
+        <AppCard>
+          <AppCardContent className="py-12 text-center text-slate-600">
+            Loading...
+          </AppCardContent>
+        </AppCard>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

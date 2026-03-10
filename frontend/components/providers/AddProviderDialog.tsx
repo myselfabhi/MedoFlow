@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { AppButton, AppInput } from '@/components/ui-system';
+import { AppButton, AppInput, AppFormField } from '@/components/ui-system';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices, type DashboardService } from '@/lib/serviceApi';
@@ -158,54 +158,38 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-900">
+            <h4 className="text-sm font-medium text-slate-900">
               Provider Information
             </h4>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  First Name
-                </label>
+              <AppFormField label="First Name" error={errors.firstName?.message}>
                 <AppInput
                   {...register('firstName')}
                   placeholder="John"
                   className={cn(errors.firstName && 'border-danger')}
                 />
-                {errors.firstName && (
-                  <p className="text-xs text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Last Name
-                </label>
+              </AppFormField>
+              <AppFormField label="Last Name" error={errors.lastName?.message}>
                 <AppInput
                   {...register('lastName')}
                   placeholder="Doe"
                   className={cn(errors.lastName && 'border-danger')}
                 />
-                {errors.lastName && (
-                  <p className="text-xs text-red-600">{errors.lastName.message}</p>
-                )}
-              </div>
+              </AppFormField>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Email (required)
-              </label>
+            <AppFormField
+              label="Email"
+              description="This email will be used for provider login."
+              error={errors.email?.message}
+              required
+            >
               <AppInput
                 {...register('email')}
                 type="email"
                 placeholder="john@example.com"
                 className={cn(errors.email && 'border-danger')}
               />
-              <p className="text-xs text-gray-500">
-                This email will be used for provider login.
-              </p>
-              {errors.email && (
-                <p className="text-xs text-red-600">{errors.email.message}</p>
-              )}
-            </div>
+            </AppFormField>
           </div>
 
           <div className="space-y-4">
@@ -239,7 +223,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
               </ScrollArea>
             )}
             {errors.disciplineIds && (
-              <p className="text-xs text-red-600">{errors.disciplineIds.message}</p>
+              <p className="text-sm text-danger">{errors.disciplineIds.message}</p>
             )}
           </div>
 
@@ -274,7 +258,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
               </ScrollArea>
             )}
             {errors.serviceIds && (
-              <p className="text-xs text-red-600">{errors.serviceIds.message}</p>
+              <p className="text-sm text-danger">{errors.serviceIds.message}</p>
             )}
           </div>
 

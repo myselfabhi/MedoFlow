@@ -21,7 +21,14 @@ import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringAp
 import { LoginModal } from '@/components/LoginModal';
 import { WaitlistModal } from '@/components/WaitlistModal';
 import { RecurringConflictModal } from '@/components/RecurringConflictModal';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardContent,
+  AppCardHeader,
+  AppButton,
+  AppInput,
+  AppFormField,
+} from '@/components/ui-system';
 
 const patientSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -374,16 +381,16 @@ export default function BookingPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <h1 className="text-xl font-semibold text-gray-900">
+      <AppCard>
+        <AppCardHeader>
+          <h1 className="text-xl font-semibold text-slate-900">
             Book {service?.name || 'Service'}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-slate-600">
             {service?.duration} min · ${service?.defaultPrice}
           </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        </AppCardHeader>
+        <AppCardContent className="space-y-6">
           {step === 0 && (
             <div className="space-y-4">
               <h2 className="font-medium text-gray-900">Select Provider</h2>
@@ -535,67 +542,50 @@ export default function BookingPage() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit(nextStep)} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Name</label>
-                    <input
+                  <AppFormField label="Name" error={errors.name?.message}>
+                    <AppInput
                       {...register('name')}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className={errors.name ? 'border-danger' : ''}
                     />
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <input
+                  </AppFormField>
+                  <AppFormField
+                    label="Email"
+                    error={errors.email?.message}
+                    description={
+                      patientExists === true
+                        ? 'Existing patient. Sign in to continue.'
+                        : checkingEmail
+                          ? 'Checking...'
+                          : undefined
+                    }
+                  >
+                    <AppInput
                       {...register('email')}
                       type="email"
                       onBlur={checkEmail}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className={errors.email ? 'border-danger' : ''}
                     />
-                    {checkingEmail && (
-                      <p className="mt-1 text-sm text-gray-500">Checking...</p>
-                    )}
-                    {errors.email && (
-                      <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-                    )}
-                    {patientExists === true && (
-                      <p className="mt-1 text-sm text-amber-600">
-                        Existing patient. Sign in to continue.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    <input
-                      {...register('phone')}
-                      type="tel"
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Password {patientExists === true ? '(to confirm identity)' : '(for new account)'}
-                    </label>
-                    <input
+                  </AppFormField>
+                  <AppFormField label="Phone">
+                    <AppInput {...register('phone')} type="tel" />
+                  </AppFormField>
+                  <AppFormField
+                    label={patientExists === true ? 'Password (to confirm identity)' : 'Password (for new account)'}
+                    error={errors.password?.message}
+                  >
+                    <AppInput
                       {...register('password')}
                       type="password"
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className={errors.password ? 'border-danger' : ''}
                     />
-                    {errors.password && (
-                      <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-                    )}
-                  </div>
+                  </AppFormField>
                   <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={prevStep} className="rounded-lg border px-4 py-2">
+                    <AppButton type="button" variant="outline" onClick={prevStep}>
                       Back
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary-600 px-4 py-2 font-medium text-white"
-                    >
+                    </AppButton>
+                    <AppButton type="submit">
                       Next
-                    </button>
+                    </AppButton>
                   </div>
                 </form>
               )}
@@ -764,8 +754,8 @@ export default function BookingPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
       <LoginModal
         isOpen={showLoginModal}

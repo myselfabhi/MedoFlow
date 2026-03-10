@@ -7,7 +7,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardContent,
+  AppButton,
+  AppInput,
+  AppFormField,
+} from '@/components/ui-system';
 
 const registerSchema = z
   .object({
@@ -89,138 +96,110 @@ export default function RegisterPage() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <h1 className="text-2xl font-semibold text-gray-900">Create account</h1>
-        <p className="mt-1 text-sm text-gray-500">Register for Medoflow</p>
-      </CardHeader>
-      <CardContent>
+    <AppCard>
+      <AppCardHeader>
+        <h1 className="text-2xl font-semibold text-slate-900">Create account</h1>
+        <p className="mt-1 text-sm text-slate-600">Register for Medoflow</p>
+      </AppCardHeader>
+      <AppCardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-xl border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
+              {error}
+            </div>
           )}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
+          <AppFormField label="Name" htmlFor="name" error={errors.name?.message}>
+            <AppInput
               id="name"
               type="text"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className={errors.name ? 'border-danger' : ''}
               {...register('name')}
             />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
+          </AppFormField>
+          <AppFormField label="Email" htmlFor="email" error={errors.email?.message}>
+            <AppInput
               id="email"
               type="email"
               autoComplete="email"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className={errors.email ? 'border-danger' : ''}
               {...register('email')}
             />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
+          </AppFormField>
+          <AppFormField label="Password" htmlFor="password" error={errors.password?.message}>
+            <AppInput
               id="password"
               type="password"
               autoComplete="new-password"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className={errors.password ? 'border-danger' : ''}
               {...register('password')}
             />
-            {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-              Role
-            </label>
+          </AppFormField>
+          <AppFormField label="Role" htmlFor="role">
             <select
               id="role"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="flex h-9 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               {...register('role')}
             >
               <option value="FRONT_DESK">Front Desk</option>
               <option value="PROVIDER">Provider</option>
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
-          </div>
+          </AppFormField>
           {selectedRole === 'FRONT_DESK' && (
             <>
-              <div>
-                <label htmlFor="clinicName" className="block text-sm font-medium text-gray-700">
-                  Clinic Name
-                </label>
-                <input
+              <AppFormField
+                label="Clinic Name"
+                htmlFor="clinicName"
+                error={errors.clinicName?.message}
+              >
+                <AppInput
                   id="clinicName"
                   type="text"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className={errors.clinicName ? 'border-danger' : ''}
                   {...register('clinicName')}
                 />
-                {errors.clinicName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.clinicName.message}</p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="clinicEmail" className="block text-sm font-medium text-gray-700">
-                  Clinic Email
-                </label>
-                <input
+              </AppFormField>
+              <AppFormField
+                label="Clinic Email"
+                htmlFor="clinicEmail"
+                error={errors.clinicEmail?.message}
+              >
+                <AppInput
                   id="clinicEmail"
                   type="email"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className={errors.clinicEmail ? 'border-danger' : ''}
                   {...register('clinicEmail')}
                 />
-                {errors.clinicEmail && (
-                  <p className="mt-1 text-sm text-red-600">{errors.clinicEmail.message}</p>
-                )}
-              </div>
+              </AppFormField>
             </>
           )}
           {selectedRole === 'PROVIDER' && (
-            <div>
-              <label htmlFor="clinicId" className="block text-sm font-medium text-gray-700">
-                Clinic ID
-              </label>
-              <input
+            <AppFormField
+              label="Clinic ID"
+              htmlFor="clinicId"
+              description="Enter existing clinic ID"
+              error={errors.clinicId?.message}
+            >
+              <AppInput
                 id="clinicId"
                 type="text"
                 placeholder="Enter existing clinic ID"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className={errors.clinicId ? 'border-danger' : ''}
                 {...register('clinicId')}
               />
-              {errors.clinicId && (
-                <p className="mt-1 text-sm text-red-600">{errors.clinicId.message}</p>
-              )}
-            </div>
+            </AppFormField>
           )}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-          >
+          <AppButton type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? 'Creating account...' : 'Create account'}
-          </button>
+          </AppButton>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-slate-600">
           Already have an account?{' '}
           <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
             Sign in
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      </AppCardContent>
+    </AppCard>
   );
 }

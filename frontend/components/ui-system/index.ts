@@ -2,6 +2,8 @@ export { AppButton } from './AppButton';
 export { AppCard, AppCardHeader, AppCardTitle, AppCardContent, AppCardFooter } from './AppCard';
 export { AppInput } from './AppInput';
 export { AppBadge } from './AppBadge';
+export { AppFormField } from './AppFormField';
+export { AppGrid } from './AppGrid';
 export { AppTable } from './AppTable';
 export type { AppTableColumn, AppTableProps } from './AppTable';
 export { AppModal } from './AppModal';
