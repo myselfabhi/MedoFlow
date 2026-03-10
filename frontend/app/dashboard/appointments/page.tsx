@@ -72,10 +72,10 @@ export default function AppointmentsPage() {
         <AppCardContent>
           {isLoading ? (
             <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
             </div>
           ) : error ? (
-            <p className="text-sm text-danger">Failed to load appointments.</p>
+            <p className="text-sm text-destructive">Failed to load appointments.</p>
           ) : !appointments.length ? (
             <AppEmptyState
               title="No appointments yet"
@@ -93,20 +93,20 @@ export default function AppointmentsPage() {
                 (apt: PatientAppointment | ProviderAppointment) => (
                   <div
                     key={apt.id}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200/80 p-4"
+                    className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-subtle"
                   >
                     <div>
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-foreground">
                         {apt.service.name}
                         {(isProvider || showClinicView) &&
                           'patient' in apt &&
                           apt.patient && (
-                            <span className="ml-2 text-sm font-normal text-slate-600">
+                            <span className="ml-2 text-sm font-normal text-muted-foreground">
                               · {apt.patient.name}
                             </span>
                           )}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         {isPatient && 'provider' in apt && apt.provider && (
                           <span>
                             {apt.provider.firstName} {apt.provider.lastName} ·{' '}

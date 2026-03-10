@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 
 export interface AppBadgeProps
   extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'default' | 'secondary' | 'outline';
+  variant?: 'success' | 'warning' | 'destructive' | 'danger' | 'accent' | 'outline' | 'default' | 'secondary' | 'neutral';
 }
 
-function AppBadge({ className, variant = 'neutral', ...props }: AppBadgeProps) {
+function AppBadge({ className, variant = 'outline', ...props }: AppBadgeProps) {
   return (
     <Badge
       variant="outline"
@@ -17,10 +17,10 @@ function AppBadge({ className, variant = 'neutral', ...props }: AppBadgeProps) {
         'rounded-md border px-2.5 py-0.5 text-xs font-medium',
         variant === 'success' && 'bg-success/10 text-success border-success/20',
         variant === 'warning' && 'bg-warning/10 text-warning border-warning/20',
-        variant === 'danger' && 'bg-danger/10 text-danger border-danger/20',
-        (variant === 'info' || variant === 'default') && 'bg-primary-100/80 text-primary-700 border-primary-200',
-        (variant === 'neutral' || variant === 'secondary') && 'bg-slate-100 text-slate-700 border-slate-200',
-        variant === 'outline' && 'border-slate-200 text-slate-700 bg-transparent',
+        (variant === 'destructive' || variant === 'danger') && 'bg-destructive/10 text-destructive border-destructive/20',
+        (variant === 'accent' || variant === 'default') && 'bg-accent/10 text-accent border-accent/20',
+        (variant === 'neutral' || variant === 'secondary') && 'bg-muted/10 text-muted-foreground border-border',
+        variant === 'outline' && 'border-border text-muted-foreground bg-transparent',
         className
       )}
       {...props}

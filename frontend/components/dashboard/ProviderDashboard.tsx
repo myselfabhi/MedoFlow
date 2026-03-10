@@ -63,49 +63,46 @@ export function ProviderDashboard() {
 
   return (
     <div className="space-y-6">
-      <AppPageHeader
-        title="Dashboard"
-        description="Welcome back"
-      />
+      <AppPageHeader title="Dashboard" description="Welcome back" />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <AppCard>
-          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
-            <AppCardTitle className="text-sm font-medium text-slate-500">
-              Today&apos;s Appointments
-            </AppCardTitle>
-            <CalendarDays className="h-4 w-4 text-slate-500" />
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-semibold text-slate-900">
-              {isLoading ? '—' : todayAppointments.length}
+          <AppCardContent className="flex flex-row items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Today&apos;s Appointments
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {isLoading ? '—' : todayAppointments.length}
+              </p>
             </div>
+            <CalendarDays className="h-8 w-8 text-muted-foreground/50" />
           </AppCardContent>
         </AppCard>
         <AppCard>
-          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
-            <AppCardTitle className="text-sm font-medium text-slate-500">
-              Pending Payments
-            </AppCardTitle>
-            <CreditCard className="h-4 w-4 text-slate-500" />
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-semibold text-slate-900">
-              {isLoading ? '—' : invoices.length}
+          <AppCardContent className="flex flex-row items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Pending Payments
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {isLoading ? '—' : invoices.length}
+              </p>
             </div>
+            <CreditCard className="h-8 w-8 text-muted-foreground/50" />
           </AppCardContent>
         </AppCard>
         <AppCard>
-          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
-            <AppCardTitle className="text-sm font-medium text-slate-500">
-              Active Treatment Plans
-            </AppCardTitle>
-            <FileText className="h-4 w-4 text-slate-500" />
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-semibold text-slate-900">
-              {isLoading ? '—' : plans.length}
+          <AppCardContent className="flex flex-row items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Active Treatment Plans
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {isLoading ? '—' : plans.length}
+              </p>
             </div>
+            <FileText className="h-8 w-8 text-muted-foreground/50" />
           </AppCardContent>
         </AppCard>
       </div>
@@ -113,7 +110,7 @@ export function ProviderDashboard() {
       <AppCard>
         <AppCardHeader className="flex flex-row items-center justify-between">
           <AppCardTitle>Today&apos;s Schedule</AppCardTitle>
-          <AppButton asChild size="sm">
+          <AppButton asChild size="sm" variant="outline">
             <Link href="/dashboard/provider/calendar">
               <Calendar className="mr-2 h-4 w-4" />
               Open Calendar
@@ -123,22 +120,22 @@ export function ProviderDashboard() {
         <AppCardContent>
           {isLoading ? (
             <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-accent" />
             </div>
           ) : nextFive.length === 0 ? (
-            <p className="text-sm text-slate-600">No appointments today</p>
+            <p className="text-sm text-muted-foreground">No appointments today</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {nextFive.map((apt) => (
                 <li
                   key={apt.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200/80 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-border px-4 py-3 transition-colors hover:bg-subtle"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-foreground">
                       {apt.patient?.name ?? 'Patient'}
                     </p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted-foreground">
                       {apt.service?.name ?? '—'} · {formatTime(apt.startTime)}
                     </p>
                   </div>

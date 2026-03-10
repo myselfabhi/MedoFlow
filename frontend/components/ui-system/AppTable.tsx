@@ -44,12 +44,12 @@ export function AppTable<T>({
     <div className={cn('w-full overflow-x-auto', className)}>
       <Table>
         <TableHeader>
-          <TableRow className="border-slate-200/80 hover:bg-transparent">
+          <TableRow className="border-b border-border hover:bg-transparent">
             {columns.map((col) => (
               <TableHead
                 key={col.key}
                 className={cn(
-                  'h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500',
+                  'h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground',
                   col.className
                 )}
               >
@@ -77,13 +77,13 @@ export function AppTable<T>({
             data.map((item) => (
               <TableRow
                 key={keyExtractor(item)}
-                className="border-slate-200/60 hover:bg-slate-50/50"
+                className="border-b border-border text-sm hover:bg-subtle transition-colors"
               >
                 {columns.map((col) => (
                   <TableCell
                     key={col.key}
                     className={cn(
-                      'px-4 py-3 text-sm text-slate-700',
+                      'px-4 py-3 text-sm text-foreground',
                       col.className
                     )}
                   >

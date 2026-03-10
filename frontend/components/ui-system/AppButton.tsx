@@ -32,12 +32,12 @@ const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
         variant={variantMap[variant]}
         size={size}
         className={cn(
-          'rounded-xl font-medium transition-colors',
-          isPrimary && 'bg-primary-600 text-white hover:bg-primary-700',
-          variant === 'secondary' && 'bg-slate-100 text-slate-700 hover:bg-slate-200',
-          variant === 'outline' && 'border-slate-200 text-slate-700 hover:bg-slate-50',
-          isDanger && 'bg-danger text-white hover:bg-danger/90',
-          variant === 'ghost' && 'text-slate-700 hover:bg-slate-100',
+          'rounded-lg font-medium transition-colors',
+          isPrimary && 'bg-accent text-accent-foreground hover:bg-accent/90',
+          variant === 'secondary' && 'bg-muted/20 text-foreground hover:bg-muted/30',
+          variant === 'outline' && 'border-border text-foreground hover:bg-subtle',
+          isDanger && 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+          variant === 'ghost' && 'text-muted-foreground hover:bg-subtle hover:text-foreground',
           className
         )}
         {...props}

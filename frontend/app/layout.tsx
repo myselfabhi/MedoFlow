@@ -1,16 +1,20 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SystemModalProvider } from '@/components/system/SystemModalProvider';
 import { QueryProvider } from '@/components/QueryProvider';
 import { Toaster } from '@/components/ui/sonner';
 
-const inter = Inter({ subsets: ['latin'] });
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-ibm-plex-sans',
+});
 
 export const metadata: Metadata = {
   title: 'Medoflow',
-  description: 'Medoflow SaaS Platform',
+  description: 'Clinical SaaS Platform',
 };
 
 export default function RootLayout({
@@ -20,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${ibmPlexSans.variable} font-sans antialiased`}>
         <QueryProvider>
           <AuthProvider>
             <SystemModalProvider>{children}</SystemModalProvider>

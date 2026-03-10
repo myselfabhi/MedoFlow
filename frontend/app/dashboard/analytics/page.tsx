@@ -29,7 +29,13 @@ import {
   Cell,
 } from 'recharts';
 
-const CHART_COLORS = ['#2563EB', '#16A34A', '#F59E0B', '#DC2626', '#64748B'];
+const CHART_COLORS = [
+  'hsl(217 91% 60%)', // accent
+  'hsl(142 76% 36%)', // success
+  'hsl(38 92% 50%)',  // warning
+  'hsl(0 72% 51%)',   // destructive
+  'hsl(215 16% 47%)', // muted
+];
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
@@ -84,7 +90,7 @@ export default function AnalyticsPage() {
   if (overviewLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
       </div>
     );
   }
@@ -99,48 +105,48 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <AppCard>
           <AppCardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-slate-500">
+            <h3 className="text-sm font-medium text-muted-foreground">
               Total Revenue
             </h3>
           </AppCardHeader>
           <AppCardContent>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-2xl font-semibold text-foreground">
               ${overview?.totalRevenue?.toFixed(2) ?? '0.00'}
             </p>
           </AppCardContent>
         </AppCard>
         <AppCard>
           <AppCardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-slate-500">
+            <h3 className="text-sm font-medium text-muted-foreground">
               Total Appointments
             </h3>
           </AppCardHeader>
           <AppCardContent>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-2xl font-semibold text-foreground">
               {overview?.totalAppointments ?? 0}
             </p>
           </AppCardContent>
         </AppCard>
         <AppCard>
           <AppCardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-slate-500">
+            <h3 className="text-sm font-medium text-muted-foreground">
               Active Treatment Plans
             </h3>
           </AppCardHeader>
           <AppCardContent>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-2xl font-semibold text-foreground">
               {overview?.activeTreatmentPlans ?? 0}
             </p>
           </AppCardContent>
         </AppCard>
         <AppCard>
           <AppCardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-slate-500">
+            <h3 className="text-sm font-medium text-muted-foreground">
               Completed Visits
             </h3>
           </AppCardHeader>
           <AppCardContent>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-2xl font-semibold text-foreground">
               {overview?.completedVisits ?? 0}
             </p>
           </AppCardContent>
@@ -150,7 +156,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <AppCard>
           <AppCardHeader>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-foreground">
               Revenue by Service
             </h2>
           </AppCardHeader>
@@ -162,13 +168,13 @@ export default function AnalyticsPage() {
                     data={revenueByService}
                     margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis
                       dataKey="serviceName"
-                      tick={{ fontSize: 12, fill: '#64748B' }}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                     />
                     <YAxis
-                      tick={{ fontSize: 12, fill: '#64748B' }}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                     />
                     <Tooltip
                       formatter={(v: number) => [
@@ -178,13 +184,13 @@ export default function AnalyticsPage() {
                     />
                     <Bar
                       dataKey="total"
-                      fill="#2563EB"
+                      fill="hsl(var(--accent))"
                       radius={[8, 8, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-slate-600">
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   No revenue data
                 </div>
               )}
@@ -194,7 +200,7 @@ export default function AnalyticsPage() {
 
         <AppCard>
           <AppCardHeader>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-foreground">
               Revenue by Provider
             </h2>
           </AppCardHeader>
@@ -206,13 +212,13 @@ export default function AnalyticsPage() {
                     data={revenueByProvider}
                     margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis
                       dataKey="providerName"
-                      tick={{ fontSize: 12, fill: '#64748B' }}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                     />
                     <YAxis
-                      tick={{ fontSize: 12, fill: '#64748B' }}
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                     />
                     <Tooltip
                       formatter={(v: number) => [
@@ -222,13 +228,13 @@ export default function AnalyticsPage() {
                     />
                     <Bar
                       dataKey="total"
-                      fill="#16A34A"
+                      fill="hsl(var(--success))"
                       radius={[8, 8, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-slate-600">
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   No revenue data
                 </div>
               )}

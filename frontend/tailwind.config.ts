@@ -10,72 +10,57 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: '#0F172A',
-          foreground: '#FFFFFF',
-          50: '#F8FAFC',
-          100: '#F1F5F9',
-          200: '#E2E8F0',
-          300: '#CBD5E1',
-          400: '#94A3B8',
-          500: '#64748B',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#0F172A',
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
         },
         accent: {
-          DEFAULT: '#2563EB',
-          foreground: '#FFFFFF',
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
         },
         success: {
-          DEFAULT: '#16A34A',
-          foreground: '#FFFFFF',
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
         },
         warning: {
-          DEFAULT: '#F59E0B',
-          foreground: '#FFFFFF',
-        },
-        danger: {
-          DEFAULT: '#DC2626',
-          foreground: '#FFFFFF',
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
         },
         destructive: {
-          DEFAULT: '#DC2626',
-          foreground: '#FFFFFF',
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
         },
-        muted: {
-          DEFAULT: '#64748B',
-          foreground: '#94A3B8',
-        },
-        background: {
-          DEFAULT: '#F8FAFC',
-          foreground: '#0F172A',
-        },
+        danger: 'hsl(var(--destructive))',
         card: {
-          DEFAULT: '#FFFFFF',
-          foreground: '#0F172A',
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
-        border: '#E2E8F0',
-        input: '#E2E8F0',
-        ring: '#0F172A',
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        subtle: 'hsl(var(--subtle))',
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
       },
       borderRadius: {
-        lg: '16px',
-        md: '12px',
-        sm: '8px',
+        lg: '0.5rem',
+        md: '0.375rem',
+        sm: '0.25rem',
       },
       boxShadow: {
-        card: '0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)',
+        card: '0 1px 2px 0 rgb(0 0 0 / 0.04)',
+        'card-hover': '0 2px 8px -2px rgb(0 0 0 / 0.06), 0 4px 12px -4px rgb(0 0 0 / 0.04)',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-      },
-      typography: {
-        h1: 'text-2xl font-semibold text-slate-900',
-        h2: 'text-xl font-semibold text-slate-900',
-        h3: 'text-lg font-medium text-slate-900',
-        body: 'text-sm text-slate-600',
+        sans: ['var(--font-ibm-plex-sans)', 'IBM Plex Sans', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         'accordion-down': {

@@ -20,15 +20,15 @@ export default function ProviderPatientLayout({
 
     return (
         <div>
-            <nav className="mb-6 flex gap-1 border-b border-gray-200">
+            <nav className="mb-6 flex gap-1 border-b border-border">
                 {tabs.map(({ href, label }) => (
                     <Link
                         key={href}
                         href={href}
                         className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
                             pathname === href
-                                ? 'border-primary-600 text-primary-600'
-                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                ? 'border-accent text-accent'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
                         }`}
                     >
                         {label}

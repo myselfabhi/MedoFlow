@@ -25,7 +25,7 @@ export function PatientDashboard() {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
       </div>
     );
   }
@@ -34,7 +34,7 @@ export function PatientDashboard() {
     return (
       <AppCard>
         <AppCardContent>
-          <p className="text-danger">Failed to load user data</p>
+          <p className="text-destructive">Failed to load user data</p>
         </AppCardContent>
       </AppCard>
     );
@@ -59,20 +59,20 @@ export function PatientDashboard() {
 
       <AppCard>
         <AppCardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">Your Profile</h2>
+          <h2 className="text-lg font-medium text-foreground">Your Profile</h2>
         </AppCardHeader>
         <AppCardContent className="space-y-4">
           <div>
-            <span className="text-sm font-medium text-slate-500">Name</span>
-            <p className="text-slate-900">{data.name}</p>
+            <span className="text-sm font-medium text-muted-foreground">Name</span>
+            <p className="text-foreground">{data.name}</p>
           </div>
           <div>
-            <span className="text-sm font-medium text-slate-500">Email</span>
-            <p className="text-slate-900">{data.email}</p>
+            <span className="text-sm font-medium text-muted-foreground">Email</span>
+            <p className="text-foreground">{data.email}</p>
           </div>
           <div>
-            <span className="text-sm font-medium text-slate-500">Role</span>
-            <p className="text-slate-900">{data.role.replace('_', ' ')}</p>
+            <span className="text-sm font-medium text-muted-foreground">Role</span>
+            <p className="text-foreground">{data.role.replace('_', ' ')}</p>
           </div>
         </AppCardContent>
       </AppCard>

@@ -59,7 +59,7 @@ export default function ProvidersPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
       </div>
     );
   }
@@ -85,7 +85,7 @@ export default function ProvidersPage() {
         </AppCardHeader>
         <AppCardContent>
           {error && (
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
               Failed to load providers.
             </div>
           )}
@@ -103,7 +103,7 @@ export default function ProvidersPage() {
                 <AppCard key={p.id} className="flex flex-col">
                   <AppCardContent className="flex flex-1 flex-col">
                     <div className="flex min-w-0 flex-col gap-3">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-foreground">
                         {p.firstName} {p.lastName}
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -120,7 +120,7 @@ export default function ProvidersPage() {
                       </div>
                       {p.providerServices && p.providerServices.length > 0 && (
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-slate-500">
+                          <p className="text-xs font-medium text-muted-foreground">
                             Services offered
                           </p>
                           <div className="flex flex-wrap gap-1">

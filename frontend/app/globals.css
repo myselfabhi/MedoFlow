@@ -4,36 +4,43 @@
 
 @layer base {
   :root {
-    /* Medoflow design tokens */
-    --background: #F8FAFC;
-    --foreground: #0F172A;
-    --card: #FFFFFF;
-    --card-foreground: #0F172A;
-    --primary: #0F172A;
-    --primary-foreground: #FFFFFF;
-    --accent: #2563EB;
-    --accent-foreground: #FFFFFF;
-    --success: #16A34A;
-    --warning: #F59E0B;
-    --danger: #DC2626;
-    --muted: #64748B;
-    --muted-foreground: #94A3B8;
-    --border: #E2E8F0;
-    --input: #E2E8F0;
-    --ring: #0F172A;
-    --radius: 16px;
+    --background: 210 40% 98%;
+    --foreground: 222 84% 5%;
+    --primary: 222 84% 5%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 5%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    --muted: 215 16% 47%;
+    --muted-foreground: 215 16% 47%;
+    --subtle: 210 40% 96%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 84% 5%;
   }
   .dark {
-    --background: #0F172A;
-    --foreground: #F8FAFC;
-    --card: #1E293B;
-    --card-foreground: #F8FAFC;
-    --primary: #F8FAFC;
-    --primary-foreground: #0F172A;
-    --accent: #3B82F6;
-    --accent-foreground: #FFFFFF;
-    --border: #334155;
-    --input: #334155;
-    --ring: #94A3B8;
+    --background: 222 84% 5%;
+    --foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 84% 5%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --border: 214 32% 20%;
+    --input: 214 32% 20%;
+    --muted-foreground: 215 16% 57%;
+    --subtle: 222 47% 15%;
+    --secondary: 222 47% 15%;
+    --secondary-foreground: 210 40% 98%;
   }
 }

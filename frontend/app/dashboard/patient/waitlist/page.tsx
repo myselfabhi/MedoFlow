@@ -9,16 +9,24 @@ import {
   type WaitlistEntry,
   type WaitlistStatus,
 } from '@/lib/waitlistApi';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppPageHeader,
+  AppButton,
+  AppBadge,
+} from '@/components/ui-system';
 
 const statusConfig: Record<
   WaitlistStatus,
-  { label: string; className: string }
+  { label: string; variant: 'warning' | 'accent' | 'success' | 'outline' }
 > = {
-  WAITING: { label: 'Waiting', className: 'bg-amber-100 text-amber-800' },
-  OFFERED: { label: 'Offered', className: 'bg-blue-100 text-blue-800' },
-  BOOKED: { label: 'Booked', className: 'bg-green-100 text-green-800' },
-  EXPIRED: { label: 'Expired', className: 'bg-gray-100 text-gray-800' },
+  WAITING: { label: 'Waiting', variant: 'warning' },
+  OFFERED: { label: 'Offered', variant: 'accent' },
+  BOOKED: { label: 'Booked', variant: 'success' },
+  EXPIRED: { label: 'Expired', variant: 'outline' },
 };
 
 function formatDate(dateStr: string) {
@@ -53,7 +61,7 @@ export default function PatientWaitlistPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent" />
       </div>
     );
   }
@@ -61,18 +69,13 @@ export default function PatientWaitlistPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">My waitlist</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View and manage your waitlist entries
-          </p>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <AppPageHeader title="My waitlist" description="View and manage your waitlist entries" />
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
           Failed to load waitlist. Please try again.
         </div>
         <Link
           href="/dashboard/patient/appointments"
-          className="inline-block text-sm text-primary-600 hover:text-primary-700"
+          className="inline-block text-sm text-accent hover:text-accent/90"
         >
           ← Back to appointments
         </Link>
@@ -82,49 +85,46 @@ export default function PatientWaitlistPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">My waitlist</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          View and manage your waitlist entries. Claim offered slots before they expire.
-        </p>
-      </div>
+      <AppPageHeader
+        title="My waitlist"
+        description="View and manage your waitlist entries. Claim offered slots before they expire."
+      />
 
       {!entries?.length ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-600">No waitlist entries yet.</p>
-            <Link
-              href="/"
-              className="mt-4 inline-block text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              Browse clinics to join a waitlist
+        <AppCard>
+          <AppCardContent className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">No waitlist entries yet.</p>
+            <Link href="/" className="mt-4 inline-block">
+              <AppButton variant="outline" size="sm">
+                Browse clinics to join a waitlist
+              </AppButton>
             </Link>
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
       ) : (
         <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
           {entries.map((entry: WaitlistEntry) => {
             const config = statusConfig[entry.status] ?? {
               label: entry.status,
-              className: 'bg-gray-100 text-gray-800',
+              variant: 'outline' as const,
             };
             const isOffered = entry.status === 'OFFERED';
             const isClaiming = claimMutation.isPending && claimMutation.variables === entry.id;
 
             return (
-              <Card key={entry.id} className="flex flex-col">
-                <CardHeader className="pb-2">
+              <AppCard key={entry.id} className="flex flex-col">
+                <AppCardHeader className="pb-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h2 className="text-base font-semibold text-gray-900">
+                      <h2 className="text-base font-semibold text-foreground">
                         {entry.service.name}
                       </h2>
-                      <p className="mt-0.5 text-sm text-gray-600">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {entry.provider.firstName} {entry.provider.lastName}
                         {(entry.provider.disciplines?.length
                             ? entry.provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
                             : entry.provider.discipline?.name) && (
-                          <span className="text-gray-500">
+                          <span className="text-muted-foreground">
                             {' '}
                             ·{' '}
                             {entry.provider.disciplines?.length
@@ -134,23 +134,19 @@ export default function PatientWaitlistPage() {
                         )}
                       </p>
                     </div>
-                    <span
-                      className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}
-                    >
-                      {config.label}
-                    </span>
+                    <AppBadge variant={config.variant}>{config.label}</AppBadge>
                   </div>
-                </CardHeader>
-                <CardContent className="mt-auto space-y-3 pt-2">
+                </AppCardHeader>
+                <AppCardContent className="mt-auto space-y-3 pt-2">
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <dt className="text-gray-500">Clinic</dt>
-                    <dd className="font-medium text-gray-900">{entry.clinic.name}</dd>
-                    <dt className="text-gray-500">Preferred date</dt>
-                    <dd className="font-medium text-gray-900">
+                    <dt className="text-muted-foreground">Clinic</dt>
+                    <dd className="font-medium text-foreground">{entry.clinic.name}</dd>
+                    <dt className="text-muted-foreground">Preferred date</dt>
+                    <dd className="font-medium text-foreground">
                       {formatDate(entry.preferredDate)}
                     </dd>
-                    <dt className="text-gray-500">Preferred time</dt>
-                    <dd className="font-medium text-gray-900">
+                    <dt className="text-muted-foreground">Preferred time</dt>
+                    <dd className="font-medium text-foreground">
                       {formatTimeRange(
                         entry.preferredStartTime,
                         entry.preferredEndTime
@@ -159,23 +155,14 @@ export default function PatientWaitlistPage() {
                   </dl>
                   {isOffered && (
                     <div className="pt-2">
-                      <button
-                        type="button"
+                      <AppButton
                         onClick={() => claimMutation.mutate(entry.id)}
                         disabled={isClaiming}
-                        className="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
                       >
-                        {isClaiming ? (
-                          <>
-                            <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            Claiming...
-                          </>
-                        ) : (
-                          'Claim slot'
-                        )}
-                      </button>
+                        {isClaiming ? 'Claiming...' : 'Claim slot'}
+                      </AppButton>
                       {claimMutation.isError && claimMutation.variables === entry.id && (
-                        <p className="mt-2 text-sm text-red-600">
+                        <p className="mt-2 text-sm text-destructive">
                           {(claimMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
                             (claimMutation.error instanceof Error
                               ? claimMutation.error.message
@@ -184,8 +171,8 @@ export default function PatientWaitlistPage() {
                       )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </AppCardContent>
+              </AppCard>
             );
           })}
         </div>
@@ -193,7 +180,7 @@ export default function PatientWaitlistPage() {
 
       <Link
         href="/dashboard/patient/appointments"
-        className="inline-block text-sm text-primary-600 hover:text-primary-700"
+        className="inline-block text-sm text-accent hover:text-accent/90"
       >
         ← Back to appointments
       </Link>

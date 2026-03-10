@@ -18,35 +18,35 @@ export type TreatmentPlanStatus = 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
 
 export type VisitRecordStatus = 'DRAFT' | 'FINAL';
 
-const APPOINTMENT_MAP: Record<AppointmentStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  PENDING_PAYMENT: 'bg-amber-100 text-amber-800',
-  CONFIRMED: 'bg-blue-100 text-blue-800',
-  COMPLETED: 'bg-green-100 text-green-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-  NO_SHOW: 'bg-red-100 text-red-800',
-  RESCHEDULED: 'bg-slate-100 text-slate-700',
+const APPOINTMENT_MAP: Record<AppointmentStatus, 'outline' | 'warning' | 'accent' | 'success' | 'destructive' | 'neutral'> = {
+  DRAFT: 'outline',
+  PENDING_PAYMENT: 'warning',
+  CONFIRMED: 'accent',
+  COMPLETED: 'success',
+  CANCELLED: 'destructive',
+  NO_SHOW: 'destructive',
+  RESCHEDULED: 'neutral',
 };
 
-const INVOICE_MAP: Record<InvoiceStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  FINALIZED: 'bg-blue-100 text-blue-800',
-  PENDING_PAYMENT: 'bg-amber-100 text-amber-800',
-  PAID: 'bg-green-100 text-green-800',
+const INVOICE_MAP: Record<InvoiceStatus, 'outline' | 'warning' | 'accent' | 'success'> = {
+  DRAFT: 'outline',
+  FINALIZED: 'accent',
+  PENDING_PAYMENT: 'warning',
+  PAID: 'success',
 };
 
-const TREATMENT_PLAN_MAP: Record<TreatmentPlanStatus, string> = {
-  ACTIVE: 'bg-emerald-100 text-emerald-800',
-  COMPLETED: 'bg-slate-100 text-slate-700',
-  DISCONTINUED: 'bg-red-100 text-red-800',
+const TREATMENT_PLAN_MAP: Record<TreatmentPlanStatus, 'success' | 'neutral' | 'destructive'> = {
+  ACTIVE: 'success',
+  COMPLETED: 'neutral',
+  DISCONTINUED: 'destructive',
 };
 
-const VISIT_RECORD_MAP: Record<VisitRecordStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  FINAL: 'bg-green-100 text-green-800',
+const VISIT_RECORD_MAP: Record<VisitRecordStatus, 'outline' | 'success'> = {
+  DRAFT: 'outline',
+  FINAL: 'success',
 };
 
-const ALL_MAP: Record<string, string> = {
+const ALL_MAP: Record<string, 'success' | 'warning' | 'destructive' | 'accent' | 'outline' | 'neutral'> = {
   ...APPOINTMENT_MAP,
   ...INVOICE_MAP,
   ...TREATMENT_PLAN_MAP,
@@ -64,7 +64,7 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, variant = 'auto', className }: StatusBadgeProps) {
-  const colorClass =
+  const badgeVariant =
     variant === 'appointment'
       ? APPOINTMENT_MAP[status as AppointmentStatus]
       : variant === 'invoice'
@@ -73,13 +73,10 @@ export function StatusBadge({ status, variant = 'auto', className }: StatusBadge
           ? TREATMENT_PLAN_MAP[status as TreatmentPlanStatus]
           : variant === 'visitRecord'
             ? VISIT_RECORD_MAP[status as VisitRecordStatus]
-            : ALL_MAP[status] ?? 'bg-gray-100 text-gray-600';
+            : ALL_MAP[status] ?? 'outline';
 
   return (
-    <AppBadge
-      variant="outline"
-      className={cn('font-medium border-0', colorClass, className)}
-    >
+    <AppBadge variant={badgeVariant} className={cn('font-medium', className)}>
       {formatLabel(status)}
     </AppBadge>
   );

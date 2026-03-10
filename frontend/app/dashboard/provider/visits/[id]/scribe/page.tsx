@@ -116,10 +116,10 @@ function highlightTranscript(text: string): React.ReactNode {
     if (p.type === 'plain') return p.text;
     const cls =
       p.type === 'symptom'
-        ? 'bg-amber-100/80 text-amber-800 rounded px-0.5'
+        ? 'bg-warning/10 text-warning rounded px-0.5'
         : p.type === 'body'
           ? 'bg-accent/10 text-accent rounded px-0.5'
-          : 'bg-slate-200/80 text-slate-700 rounded px-0.5';
+          : 'bg-muted/30 text-muted-foreground rounded px-0.5';
     return (
       <span key={i} className={cls}>
         {p.text}
@@ -130,38 +130,14 @@ function highlightTranscript(text: string): React.ReactNode {
 
 const STATUS_BADGES: Record<
   string,
-  {
-    label: string;
-    variant: 'default' | 'secondary' | 'danger' | 'outline';
-    className?: string;
-  }
+  { label: string; variant: 'destructive' | 'warning' | 'accent' | 'outline' | 'success' }
 > = {
-  RECORDING: { label: 'Recording', variant: 'danger' },
-  TRANSCRIBING: {
-    label: 'Processing',
-    variant: 'secondary',
-    className: 'bg-amber-100/80 text-amber-800 border-amber-200',
-  },
-  DRAFT_GENERATED: {
-    label: 'Draft Ready',
-    variant: 'default',
-    className: 'bg-accent/10 text-accent border-accent/20',
-  },
-  EDITED: {
-    label: 'Edited',
-    variant: 'outline',
-    className: 'bg-slate-100 text-slate-700 border-slate-200',
-  },
-  APPROVED: {
-    label: 'Approved',
-    variant: 'default',
-    className: 'bg-success/10 text-success border-success/20',
-  },
-  FAILED: {
-    label: 'Failed',
-    variant: 'danger',
-    className: 'bg-danger/10 text-danger border-danger/20',
-  },
+  RECORDING: { label: 'Recording', variant: 'destructive' },
+  TRANSCRIBING: { label: 'Processing', variant: 'warning' },
+  DRAFT_GENERATED: { label: 'Draft Ready', variant: 'accent' },
+  EDITED: { label: 'Edited', variant: 'outline' },
+  APPROVED: { label: 'Approved', variant: 'success' },
+  FAILED: { label: 'Failed', variant: 'destructive' },
 };
 
 function SoapEditor({
@@ -472,10 +448,7 @@ export default function ProviderAIScribePage() {
         description="Record or upload consultation audio for automated documentation"
         actions={
           session && (
-            <AppBadge
-              variant={STATUS_BADGES[session.status]?.variant ?? 'secondary'}
-              className={STATUS_BADGES[session.status]?.className}
-            >
+            <AppBadge variant={STATUS_BADGES[session.status]?.variant ?? 'outline'}>
               {STATUS_BADGES[session.status]?.label ?? session.status}
             </AppBadge>
           )
@@ -485,7 +458,7 @@ export default function ProviderAIScribePage() {
       {!session ? (
         <AppCard>
           <AppCardContent className="flex flex-col items-center gap-4 py-8">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Start an AI Scribe session to record or upload consultation audio.
             </p>
             <AppButton
@@ -504,9 +477,9 @@ export default function ProviderAIScribePage() {
           {isFailed && (
             <AppCard>
               <AppCardContent>
-                <div className="rounded-xl border border-danger/20 bg-danger/5 p-4">
-                  <p className="font-medium text-danger">AI processing failed.</p>
-                  <p className="mt-1 text-sm text-danger/90">
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+                  <p className="font-medium text-destructive">AI processing failed.</p>
+                  <p className="mt-1 text-sm text-destructive/90">
                     {session.errorMessage ||
                       'An error occurred during processing.'}{' '}
                     Please try regenerating the draft.
@@ -515,7 +488,7 @@ export default function ProviderAIScribePage() {
                     <AppButton
                       variant="outline"
                       size="sm"
-                      className="mt-3 border-danger/30 text-danger hover:bg-danger/10"
+                      className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
                       onClick={() => retryMutation.mutate(session.id)}
                       disabled={retryMutation.isPending}
                     >

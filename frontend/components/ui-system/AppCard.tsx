@@ -5,14 +5,16 @@ import { cn } from '@/lib/utils';
 
 interface AppCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  hover?: boolean;
 }
 
 const AppCard = React.forwardRef<HTMLDivElement, AppCardProps>(
-  ({ className, children, ...props }, ref) => (
+  ({ className, children, hover, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        'rounded-xl border border-slate-200 bg-white shadow-card',
+        'rounded-lg border border-border bg-card shadow-card transition-shadow',
+        hover && 'hover:shadow-card-hover',
         className
       )}
       {...props}
@@ -30,7 +32,7 @@ const AppCardHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'border-b border-slate-200/60 px-6 py-4',
+      'border-b border-border px-6 py-4',
       className
     )}
     {...props}
@@ -44,7 +46,7 @@ const AppCardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref as React.Ref<HTMLHeadingElement>}
-    className={cn('text-lg font-semibold text-slate-900', className)}
+    className={cn('text-lg font-medium text-foreground', className)}
     {...props}
   />
 ));
@@ -65,7 +67,7 @@ const AppCardFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex items-center gap-2 border-t border-slate-200/60 px-6 py-4',
+      'flex items-center gap-2 border-t border-border px-6 py-4',
       className
     )}
     {...props}
