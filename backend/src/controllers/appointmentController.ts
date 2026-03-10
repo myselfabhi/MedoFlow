@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../config/prisma';
 import * as appointmentService from '../services/appointmentService';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -109,7 +110,15 @@ export const getById = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
-    successResponse(res, 200, 'Appointment retrieved', { appointment });
+    const event = await prisma.googleCalendarEvent.findFirst({
+      where: { appointmentId: id },
+      select: { meetLink: true },
+    });
+    const payload = {
+      ...appointment,
+      meetLink: event?.meetLink ?? null,
+    };
+    successResponse(res, 200, 'Appointment retrieved', { appointment: payload });
   }
 );
 

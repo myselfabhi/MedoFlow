@@ -276,6 +276,7 @@ export default function ProviderAIScribePage() {
   );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const [isRecordingLocal, setIsRecordingLocal] = useState(false);
 
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['ai-scribe', 'session', visitRecordId],
@@ -393,6 +394,7 @@ export default function ProviderAIScribePage() {
         if (e.data.size) chunksRef.current.push(e.data);
       };
       recorder.onstop = async () => {
+        setIsRecordingLocal(false);
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const file = new File([blob], 'recording.webm', { type: 'audio/webm' });
@@ -400,6 +402,7 @@ export default function ProviderAIScribePage() {
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
+      setIsRecordingLocal(true);
     } catch {
       toast.error('Microphone access denied');
     }
@@ -407,6 +410,7 @@ export default function ProviderAIScribePage() {
 
   const handleStopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
+      setIsRecordingLocal(false);
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
     }
@@ -538,7 +542,7 @@ export default function ProviderAIScribePage() {
                       variant="destructive"
                       size="sm"
                       onClick={handleStartRecording}
-                      disabled={uploadMutation.isPending}
+                      disabled={uploadMutation.isPending || isRecordingLocal}
                     >
                       <Mic className="mr-2 h-4 w-4" />
                       Start Recording
@@ -547,7 +551,7 @@ export default function ProviderAIScribePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleStopRecording}
-                      disabled={!mediaRecorderRef.current}
+                      disabled={!isRecordingLocal}
                     >
                       <MicOff className="mr-2 h-4 w-4" />
                       Stop Recording

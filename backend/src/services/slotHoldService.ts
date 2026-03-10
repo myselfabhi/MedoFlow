@@ -27,7 +27,7 @@ export const createSlotHold = async (input: CreateSlotHoldInput) => {
   const date = input.startTime.toISOString().slice(0, 10);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`slot-hold:${input.providerId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`slot-hold:${input.providerId}`}))`;
 
     const availableSlots = await availabilityService.getAvailableSlots({
       providerId: input.providerId,

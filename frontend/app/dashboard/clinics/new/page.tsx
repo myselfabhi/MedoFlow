@@ -18,23 +18,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppToast } from '@/hooks/useAppToast';
 
+import { US_TIMEZONES, DEFAULT_US_TIMEZONE } from '@/lib/constants/timezones';
+
 const clinicSetupSchema = z.object({
   name: z.string().min(1, 'Clinic name is required'),
   email: z.string().email('Valid clinic email is required'),
-  locationName: z.string().min(1, 'Launch location name is required'),
+  locationName: z.string().min(1, 'Location name is required (e.g. Online)'),
   locationAddress: z.string().optional(),
   timezone: z.string().min(1, 'Timezone is required'),
 });
 
 type ClinicSetupFormData = z.infer<typeof clinicSetupSchema>;
-
-const COMMON_TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'UTC',
-];
 
 export default function CreateClinicPage() {
   const { user } = useAuth();
@@ -59,7 +53,7 @@ export default function CreateClinicPage() {
       email: '',
       locationName: '',
       locationAddress: '',
-      timezone: 'America/New_York',
+      timezone: DEFAULT_US_TIMEZONE,
     },
   });
 
@@ -70,7 +64,7 @@ export default function CreateClinicPage() {
       email: clinic.email,
       locationName: clinic.launchLocation?.name ?? '',
       locationAddress: clinic.launchLocation?.address ?? '',
-      timezone: clinic.launchLocation?.timezone ?? 'America/New_York',
+      timezone: clinic.launchLocation?.timezone ?? DEFAULT_US_TIMEZONE,
     });
   }, [clinic, reset]);
 
@@ -158,28 +152,28 @@ export default function CreateClinicPage() {
 
               <div className="rounded-lg border border-border bg-background/60 p-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-slate-900">Launch location</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Location (all meets are online)</h3>
                   <p className="text-sm text-slate-600">
-                    This is the single operational location shown in the admin UI today.
+                    One location is used for timezone and scheduling. Name it e.g. &quot;Online&quot; or &quot;Virtual&quot;.
                   </p>
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-700">Location name</label>
-                    <Input {...register('locationName')} placeholder="Main Clinic" />
+                    <Input {...register('locationName')} placeholder="e.g. Online or Virtual" />
                     {errors.locationName && (
                       <p className="text-sm text-danger">{errors.locationName.message}</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Timezone</label>
+                    <label className="text-sm font-medium text-slate-700">US timezone</label>
                     <select
                       {...register('timezone')}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     >
-                      {COMMON_TIMEZONES.map((timezone) => (
-                        <option key={timezone} value={timezone}>
-                          {timezone}
+                      {US_TIMEZONES.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
                         </option>
                       ))}
                     </select>
@@ -188,10 +182,10 @@ export default function CreateClinicPage() {
                     )}
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-slate-700">Address</label>
+                    <label className="text-sm font-medium text-slate-700">Address (optional)</label>
                     <Input
                       {...register('locationAddress')}
-                      placeholder="123 Main St, New York, NY"
+                      placeholder="Leave blank for online-only"
                     />
                   </div>
                 </div>

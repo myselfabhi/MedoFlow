@@ -27,6 +27,7 @@ import {
   AppCard,
   AppCardContent,
   AppCardHeader,
+  AppCardFooter,
   AppButton,
   AppInput,
   AppFormField,
@@ -112,8 +113,12 @@ export default function BookingPage() {
     }
   }, [providerShortcutId, providersForService]);
 
-  const { data: slots, isLoading: slotsLoading } = useQuery({
-    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any', launchLocation?.id || 'no-location'],
+  React.useEffect(() => {
+    setBookingError(null);
+  }, [selectedDate, providerId]);
+
+  const { data: slots, isLoading: slotsLoading, isError: slotsError } = useQuery({
+    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any', launchLocation?.id || 'any'],
     queryFn: () =>
       getAvailability(
         clinicId,
@@ -122,7 +127,7 @@ export default function BookingPage() {
         providerId || undefined,
         launchLocation?.id
       ),
-    enabled: !!clinicId && !!serviceId && !!selectedDate && !!launchLocation?.id,
+    enabled: !!clinicId && !!serviceId && !!selectedDate && (locations?.length ?? 0) > 0,
   });
 
   const {
@@ -169,12 +174,20 @@ export default function BookingPage() {
     };
   }, [slotHoldId, clinicId]);
 
+  // When user changes provider or date, release any hold and clear selected time so they must pick again.
+  const prevProviderRef = React.useRef(providerId);
+  const prevDateRef = React.useRef(selectedDate);
   React.useEffect(() => {
-    if (slotHoldId) {
-      void releaseCurrentHold();
+    if (prevProviderRef.current !== providerId || prevDateRef.current !== selectedDate) {
+      prevProviderRef.current = providerId;
+      prevDateRef.current = selectedDate;
+      setSelectedSlot(null);
+      if (slotHoldId && clinicId) {
+        void releaseSlotHold(slotHoldId, clinicId);
+        setSlotHoldId(null);
+      }
     }
-    setSelectedSlot(null);
-  }, [providerId, selectedDate, slotHoldId, releaseCurrentHold]);
+  }, [providerId, selectedDate, slotHoldId, clinicId]);
 
   const handleLoginSubmit = useCallback(
     async (loginEmail: string, password: string) => {
@@ -191,14 +204,17 @@ export default function BookingPage() {
 
   const doCreateAppointment = useCallback(
     async (patientId: string) => {
+      if (!selectedSlot) {
+        throw new Error('No time slot selected. Please go back and choose a time.');
+      }
       const appointment = await createAppointment({
         clinicId,
-        ...(selectedSlot?.locationId && { locationId: selectedSlot.locationId }),
-        providerId: selectedSlot!.providerId,
+        ...(selectedSlot.locationId && { locationId: selectedSlot.locationId }),
+        providerId: selectedSlot.providerId,
         serviceId,
         patientId,
-        startTime: selectedSlot!.start,
-        endTime: selectedSlot!.end,
+        startTime: selectedSlot.start,
+        endTime: selectedSlot.end,
         ...(slotHoldId && { slotHoldId }),
       });
       if (appointment.status === 'PENDING_PAYMENT') {
@@ -221,14 +237,17 @@ export default function BookingPage() {
 
   const doCreateRecurringSeries = useCallback(
     async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
+      if (!selectedSlot) {
+        throw new Error('No time slot selected. Please go back and choose a time.');
+      }
       const payload = {
         clinicId,
-        ...(selectedSlot?.locationId && { locationId: selectedSlot.locationId }),
-        providerId: selectedSlot!.providerId,
+        ...(selectedSlot.locationId && { locationId: selectedSlot.locationId }),
+        providerId: selectedSlot.providerId,
         serviceId,
         patientId,
-        startTime: selectedSlot!.start,
-        endTime: selectedSlot!.end,
+        startTime: selectedSlot.start,
+        endTime: selectedSlot.end,
         frequency: 'WEEKLY' as const,
         ...(recurringUseEndDate && recurringEndDate
           ? { endDate: recurringEndDate }
@@ -517,30 +536,29 @@ export default function BookingPage() {
                 min={new Date().toISOString().split('T')[0]}
                 className="block w-full rounded-lg border border-gray-300 px-4 py-3"
               />
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  disabled={!selectedDate}
-                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
               <h2 className="font-medium text-gray-900">Select Time</h2>
-              {slotsLoading ? (
+              {bookingError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {bookingError}
+                </div>
+              )}
+              {(locations?.length ?? 0) === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
+                  <p className="font-medium">No location set up yet</p>
+                  <p className="mt-1 text-amber-700">
+                    Even for online-only care, the clinic needs one location (e.g. &quot;Virtual&quot; or &quot;Online&quot;) so appointment times and timezones are set correctly. Ask the clinic to add a location in their dashboard under Locations.
+                  </p>
+                </div>
+              ) : slotsError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">
+                  Unable to load available times. Please try another date or contact the clinic.
+                </div>
+              ) : slotsLoading ? (
                 <div className="flex justify-center py-12">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
                 </div>
@@ -570,9 +588,13 @@ export default function BookingPage() {
                           setSlotHoldId(hold.id);
                           setSelectedSlot(slot);
                           nextStep();
-                        } catch {
+                        } catch (err: unknown) {
+                          const message =
+                            err && typeof err === 'object' && 'response' in err
+                              ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+                              : null;
                           setBookingError(
-                            'Unable to lock this slot. Please pick another time.'
+                            message || 'Unable to lock this slot. Please pick another time.'
                           );
                         } finally {
                           setHoldingSlot(false);
@@ -618,9 +640,6 @@ export default function BookingPage() {
                   Locking slot for checkout...
                 </p>
               )}
-              <button type="button" onClick={prevStep} className="text-sm text-gray-600 hover:underline">
-                Back
-              </button>
             </div>
           )}
 
@@ -702,6 +721,11 @@ export default function BookingPage() {
           {step === 4 && (
             <div className="space-y-4">
               <h2 className="font-medium text-gray-900">Confirm Booking</h2>
+              {!selectedSlot && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No time slot selected. Please go back and choose a time.
+                </div>
+              )}
               <div className="rounded-lg bg-gray-50 p-5 text-sm">
                 <p>
                   <strong>Clinic:</strong> {clinic?.name}
@@ -824,6 +848,7 @@ export default function BookingPage() {
                     type="button"
                     onClick={handleConfirmAuthenticated}
                     disabled={
+                      !selectedSlot ||
                       appointmentMutation.isPending ||
                       Boolean(
                         isRecurring &&
@@ -847,6 +872,7 @@ export default function BookingPage() {
                     <button
                       type="submit"
                       disabled={
+                        !selectedSlot ||
                         appointmentMutation.isPending ||
                         Boolean(
                           isRecurring &&
@@ -871,6 +897,29 @@ export default function BookingPage() {
             </div>
           )}
         </AppCardContent>
+
+        {/* Sticky step navigation - always visible at bottom */}
+        {(step === 1 || step === 2) && (
+          <AppCardFooter className="sticky bottom-0 z-10 flex-wrap gap-3 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button
+              type="button"
+              onClick={prevStep}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Back
+            </button>
+            {step === 1 && (
+              <button
+                type="button"
+                onClick={nextStep}
+                disabled={!selectedDate}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            )}
+          </AppCardFooter>
+        )}
       </AppCard>
 
       <LoginModal

@@ -167,8 +167,8 @@ const lockBookingScope = async (
   providerId: string,
   patientId: string
 ) => {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-provider:${providerId}`}))`;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-patient:${patientId}`}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-provider:${providerId}`}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-patient:${patientId}`}))`;
 };
 
 const checkSamePatientOverlap = async (

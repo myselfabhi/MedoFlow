@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getCurrentClinic, upsertLaunchLocation } from '@/lib/clinicAdminApi';
+import { US_TIMEZONES, US_TIMEZONE_VALUES, DEFAULT_US_TIMEZONE } from '@/lib/constants/timezones';
 
 const launchLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -20,22 +21,6 @@ const launchLocationSchema = z.object({
 });
 
 type LaunchLocationFormData = z.infer<typeof launchLocationSchema>;
-
-const COMMON_TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Toronto',
-  'America/Vancouver',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Asia/Kolkata',
-  'Asia/Singapore',
-  'Australia/Sydney',
-  'UTC',
-];
 
 function LaunchLocationForm({
   defaultValues,
@@ -57,7 +42,7 @@ function LaunchLocationForm({
         name: '',
         address: '',
         timezone:
-          Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
+          Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_US_TIMEZONE,
       },
   });
 
@@ -70,34 +55,35 @@ function LaunchLocationForm({
         <Input
           id="name"
           type="text"
-          placeholder="e.g. Main Office"
+          placeholder="e.g. Online or Virtual"
           {...register('name')}
         />
+        <p className="mt-1 text-xs text-gray-500">All meets are online; this is for timezone and display.</p>
         {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
       </div>
       <div>
         <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-          Address
+          Address (optional)
         </label>
         <Input
           id="address"
           type="text"
-          placeholder="e.g. 123 Main St, City"
+          placeholder="Leave blank for online-only"
           {...register('address')}
         />
       </div>
       <div>
         <label htmlFor="timezone" className="block text-sm font-medium text-gray-700">
-          Timezone
+          US timezone
         </label>
         <select
           id="timezone"
           className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           {...register('timezone')}
         >
-          {COMMON_TIMEZONES.map((tz) => (
-            <option key={tz} value={tz}>
-              {tz}
+          {US_TIMEZONES.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
             </option>
           ))}
         </select>
@@ -185,7 +171,10 @@ export default function LocationsPage() {
               defaultValues={{
                 name: clinic?.launchLocation?.name ?? '',
                 address: clinic?.launchLocation?.address ?? '',
-                timezone: clinic?.launchLocation?.timezone ?? 'America/New_York',
+                timezone: (() => {
+                  const tz = clinic?.launchLocation?.timezone ?? '';
+                  return (US_TIMEZONE_VALUES as readonly string[]).includes(tz) ? tz : DEFAULT_US_TIMEZONE;
+                })(),
               }}
               onSubmit={(values) => saveMutation.mutate(values)}
               isSubmitting={saveMutation.isPending}

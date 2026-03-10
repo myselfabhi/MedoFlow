@@ -124,6 +124,107 @@ const resolveProviderLocationIds = async (
   return defaultLocations.map((location) => location.id);
 };
 
+/** Re-add a deactivated provider: reactivate user and provider, update details and services. */
+async function reactivateAndUpdateProvider(
+  providerId: string,
+  data: CreateProviderData,
+  clinicId: string,
+  locationIds: string[],
+  servicesInput: CreateProviderServiceInput[],
+  performedById: string
+) {
+  const provider = await prisma.provider.findFirst({
+    where: { id: providerId, clinicId },
+    include: { user: { select: { id: true } } },
+  });
+  if (!provider) {
+    const err = new Error('Provider not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+  const providerName = `${data.firstName} ${data.lastName}`.trim();
+  const email = (data.email ?? '').trim().toLowerCase();
+
+  if (provider.userId) {
+    await prisma.user.update({
+      where: { id: provider.userId },
+      data: { name: providerName, isActive: true },
+    });
+  }
+
+  await prisma.provider.update({
+    where: { id: providerId },
+    data: {
+      isActive: true,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email,
+      phone: data.phone ?? null,
+    },
+  });
+
+  await prisma.providerDiscipline.deleteMany({ where: { providerId } });
+  await prisma.providerDiscipline.createMany({
+    data: data.disciplineIds.map((disciplineId) => ({ providerId, disciplineId })),
+  });
+
+  await prisma.providerLocationAssignment.deleteMany({ where: { providerId } });
+  await prisma.providerLocationAssignment.createMany({
+    data: locationIds.map((locationId, index) => ({
+      providerId,
+      locationId,
+      isPrimary: index === 0,
+    })),
+  });
+
+  await prisma.providerService.deleteMany({ where: { providerId } });
+  for (const item of servicesInput) {
+    await prisma.providerService.create({
+      data: {
+        providerId,
+        serviceId: item.serviceId,
+        priceOverride: item.priceOverride ?? null,
+      },
+    });
+  }
+
+  if (provider.userId) {
+    const token = await passwordSetupService.createPasswordSetupToken(provider.userId);
+    const frontendUrl = (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const setupLink = `${frontendUrl}/set-password?token=${token}`;
+    await emailService.sendProviderInviteEmail(email, providerName, setupLink);
+  }
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Provider',
+    entityId: providerId,
+    action: 'REACTIVATE',
+    fieldChanged: 'isActive',
+    oldValue: false,
+    newValue: true,
+    performedById,
+  });
+
+  return prisma.provider.findUnique({
+    where: { id: providerId },
+    include: {
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+      user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
+        },
+      },
+      providerServices: {
+        include: {
+          service: { include: { discipline: { select: { id: true, name: true } } } },
+        },
+      },
+    },
+  });
+}
+
 export const createProvider = async (
   data: CreateProviderData,
   clinicId: string,
@@ -150,15 +251,6 @@ export const createProvider = async (
     throw err;
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
-  if (existingUser) {
-    const err = new Error('A provider with this email already exists.') as ApiError;
-    err.statusCode = 409;
-    throw err;
-  }
-
   if (!data.disciplineIds?.length) {
     const err = new Error('At least one discipline is required') as ApiError;
     err.statusCode = 400;
@@ -178,6 +270,33 @@ export const createProvider = async (
   if (servicesInput.length === 0) {
     const err = new Error('Provider must offer at least one service.') as ApiError;
     err.statusCode = 400;
+    throw err;
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: {
+      provider: { select: { id: true, clinicId: true, isActive: true } },
+    },
+  });
+  if (existingUser) {
+    const existingProvider = existingUser.provider;
+    if (
+      existingProvider &&
+      existingProvider.clinicId === clinicId &&
+      !existingProvider.isActive
+    ) {
+      return reactivateAndUpdateProvider(
+        existingProvider.id,
+        data,
+        clinicId,
+        locationIds,
+        servicesInput,
+        performedById
+      );
+    }
+    const err = new Error('A provider with this email already exists.') as ApiError;
+    err.statusCode = 409;
     throw err;
   }
 

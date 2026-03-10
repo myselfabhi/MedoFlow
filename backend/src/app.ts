@@ -29,6 +29,13 @@ app.use(
         cb(null, true);
         return;
       }
+      // In development, allow localhost when CORS_ORIGIN is not set
+      if (!isProduction && allowed.length === 0) {
+        const isLocalhost =
+          origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+        cb(null, isLocalhost);
+        return;
+      }
       const isVercelPreview = origin.endsWith('.vercel.app');
       const isAllowed =
         allowed.includes(origin) ||

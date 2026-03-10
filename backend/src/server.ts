@@ -71,13 +71,14 @@ const bootstrap = async (): Promise<void> => {
   validateProductionEnv();
   await connectDatabase();
   startCronJobs();
-  if (process.env.REDIS_URL || process.env.REDIS_HOST) {
-    try {
-      aiScribeWorker = createAiScribeWorker();
-      console.log('AI Scribe worker started');
-    } catch (err) {
-      console.warn('AI Scribe worker failed to start:', err);
-    }
+  try {
+    aiScribeWorker = createAiScribeWorker();
+    console.log('AI Scribe worker started (transcription will run when Redis is available)');
+  } catch (err) {
+    console.warn(
+      'AI Scribe worker not started — transcription will stay "Processing" until Redis is running and the server is restarted:',
+      err instanceof Error ? err.message : err
+    );
   }
   startServer();
 };

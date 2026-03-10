@@ -131,6 +131,21 @@ export default function PatientAppointmentDetailPage() {
               </dd>
             </div>
           </dl>
+          {appointment.meetLink && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <a
+                href={appointment.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              >
+                Join online meeting
+              </a>
+              <p className="mt-2 text-xs text-gray-500">
+                Use the link above at your appointment time to join the video call with your provider.
+              </p>
+            </div>
+          )}
           </CardContent>
         </Card>
 
