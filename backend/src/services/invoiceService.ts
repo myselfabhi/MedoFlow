@@ -15,7 +15,7 @@ export const createInvoice = async (
 ) => {
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, clinicId, providerId },
-    include: { patient: true },
+    select: { patientId: true, locationId: true },
   });
 
   if (!appointment) {
@@ -44,6 +44,7 @@ export const createInvoice = async (
       appointmentId,
       patientId: appointment.patientId,
       providerId,
+      locationId: appointment.locationId ?? null,
       status: 'DRAFT',
       subtotal: ZERO,
       taxAmount: ZERO,

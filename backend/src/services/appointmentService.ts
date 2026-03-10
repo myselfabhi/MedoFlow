@@ -239,12 +239,20 @@ export const createAppointment = async (
   return prisma.$transaction(async (tx) => {
     const service = await tx.service.findFirst({
       where: { id: serviceId, clinicId, isActive: true },
+      include: { discipline: { select: { isArchived: true } } },
     });
     if (!service) {
       const err = new Error(
         'Service not found or does not belong to this clinic'
       ) as ApiError;
       err.statusCode = 404;
+      throw err;
+    }
+    if (service.isArchived || service.discipline?.isArchived) {
+      const err = new Error(
+        'This service is no longer available for booking.'
+      ) as ApiError;
+      err.statusCode = 400;
       throw err;
     }
 

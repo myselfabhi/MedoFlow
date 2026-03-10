@@ -256,12 +256,13 @@ export const updateProvider = async (
     }
   }
 
+  // PRD: Block booking when provider inactive. If deactivating with future appointments, require reassignment first.
   if (data.isActive === false && provider.isActive) {
     const futureCount = await prisma.appointment.count({
       where: {
         providerId: id,
         startTime: { gt: new Date() },
-        status: { notIn: ['CANCELLED'] },
+        status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
       },
     });
     if (futureCount > 0) {
@@ -299,7 +300,11 @@ export const updateProvider = async (
   });
 };
 
-export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
+export const softDeleteProvider = async (
+  id: string,
+  where: ClinicWhere,
+  performedById: string
+) => {
   const provider = await getProviderById(id, where);
   if (!provider) {
     const err = new Error('Provider not found') as ApiError;
@@ -311,7 +316,7 @@ export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
     where: {
       providerId: id,
       startTime: { gt: new Date() },
-      status: { notIn: ['CANCELLED'] },
+      status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
     },
   });
   if (futureCount > 0) {
@@ -322,7 +327,7 @@ export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
     throw err;
   }
 
-  return prisma.provider.update({
+  const updated = await prisma.provider.update({
     where: { id },
     data: { isActive: false },
     include: {
@@ -330,6 +335,19 @@ export const softDeleteProvider = async (id: string, where: ClinicWhere) => {
       user: { select: { id: true, name: true, email: true } },
     },
   });
+
+  await auditService.logAudit({
+    clinicId: provider.clinicId,
+    entityType: 'Provider',
+    entityId: id,
+    action: 'ARCHIVE',
+    fieldChanged: 'isActive',
+    oldValue: true,
+    newValue: false,
+    performedById,
+  });
+
+  return updated;
 };
 
 export const addProviderService = async (

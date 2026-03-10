@@ -45,7 +45,12 @@ export const getClinicServices = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const services = await prisma.service.findMany({
-      where: { clinicId: id, isActive: true },
+      where: {
+        clinicId: id,
+        isActive: true,
+        isArchived: false,
+        discipline: { isArchived: false },
+      },
       orderBy: { name: 'asc' },
       include: {
         discipline: { select: { id: true, name: true } },
@@ -126,7 +131,13 @@ export const getAvailability = asyncHandler(
     }
 
     const service = await prisma.service.findFirst({
-      where: { id: serviceId, clinicId, isActive: true },
+      where: {
+        id: serviceId,
+        clinicId,
+        isActive: true,
+        isArchived: false,
+        discipline: { isArchived: false },
+      },
     });
     if (!service) {
       const err = new Error('Service not found') as ApiError;

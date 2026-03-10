@@ -172,6 +172,8 @@ model Provider {
   treatmentPlans          TreatmentPlan[]
   invoices               Invoice[]
   aiScribeSessions       AIScribeSession[]
+
+  @@index([clinicId])
 }
 
 model ProviderAvailability {
@@ -235,6 +237,7 @@ model Service {
   depositAmount         Decimal?  @db.Decimal(10, 2)
   requirePrepayment     Boolean   @default(false)
   isActive              Boolean   @default(true)
+  isArchived            Boolean   @default(false)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

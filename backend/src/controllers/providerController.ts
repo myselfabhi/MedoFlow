@@ -52,7 +52,11 @@ export const remove = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
     const where = getClinicWhere(req);
-    const provider = await providerService.softDeleteProvider(id, where);
+    const provider = await providerService.softDeleteProvider(
+      id,
+      where,
+      req.user!.id
+    );
     successResponse(res, 200, 'Provider deactivated', { provider });
   }
 );
