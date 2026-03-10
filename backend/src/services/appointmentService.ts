@@ -413,6 +413,7 @@ export const createAppointment = async (
       locationId,
       providerId,
       serviceId,
+      disciplineId: service.disciplineId ?? null,
       patientId,
       startTime: new Date(startTime),
       endTime: new Date(endTime),

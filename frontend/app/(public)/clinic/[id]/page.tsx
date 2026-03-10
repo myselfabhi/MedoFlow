@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getClinic } from '@/lib/clinicApi';
 import { getClinicServices } from '@/lib/serviceApi';
 import type { Service } from '@/lib/types/booking';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 
 export default function ClinicDetailPage() {
   const params = useParams();
@@ -51,12 +51,8 @@ export default function ClinicDetailPage() {
     );
   }
 
-  const byDiscipline = (services || []).reduce<Record<string, Service[]>>((acc, svc) => {
-    const d = svc.discipline.name;
-    if (!acc[d]) acc[d] = [];
-    acc[d].push(svc);
-    return acc;
-  }, {});
+  // PRD: Patient booking flow is Service → Provider → Date → Time. Discipline is internal only - never show.
+  const serviceList = services || [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -72,15 +68,12 @@ export default function ClinicDetailPage() {
         <p className="mt-1 text-gray-600">{clinic.email}</p>
       </div>
 
-      <div className="space-y-10">
-        {Object.entries(byDiscipline).map(([disciplineName, disciplineServices]) => (
-          <Card key={disciplineName} className="overflow-hidden">
-            <CardHeader className="bg-gray-50/50">
-              <h2 className="text-lg font-semibold text-gray-900">{disciplineName}</h2>
-            </CardHeader>
+      <div className="space-y-4">
+        {serviceList.length > 0 ? (
+          <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="divide-y divide-gray-100">
-                {disciplineServices.map((svc) => (
+                {serviceList.map((svc) => (
                   <div
                     key={svc.id}
                     className="flex flex-col items-start justify-between gap-4 border-gray-100 p-6 sm:flex-row sm:items-center"
@@ -103,9 +96,7 @@ export default function ClinicDetailPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
-
-        {(!services || services.length === 0) && (
+        ) : (
           <Card>
             <CardContent className="py-16 text-center text-gray-500">
               No services available at this clinic.

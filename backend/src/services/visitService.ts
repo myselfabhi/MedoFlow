@@ -59,6 +59,12 @@ export const createVisitRecord = async (
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
+    select: {
+      patientId: true,
+      serviceId: true,
+      disciplineId: true,
+      locationId: true,
+    },
   });
 
   if (!appointment) {
@@ -73,6 +79,9 @@ export const createVisitRecord = async (
         clinicId,
         appointmentId,
         providerId,
+        serviceId: appointment.serviceId ?? null,
+        disciplineId: appointment.disciplineId ?? null,
+        locationId: appointment.locationId ?? null,
         patientId: patientId || appointment.patientId,
         subjective,
         objective,

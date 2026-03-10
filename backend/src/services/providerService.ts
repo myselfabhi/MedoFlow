@@ -125,7 +125,12 @@ export const createProvider = async (
     data.services && data.services.length > 0
       ? data.services
       : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? []);
-  const hasServices = servicesInput.length > 0;
+
+  if (servicesInput.length === 0) {
+    const err = new Error('Provider must offer at least one service.') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
 
   const providerName = `${data.firstName} ${data.lastName}`.trim();
   const tempPassword = 'pending-setup';
@@ -165,8 +170,7 @@ export const createProvider = async (
     },
   });
 
-  if (hasServices) {
-    for (const item of servicesInput) {
+  for (const item of servicesInput) {
       const { serviceId, priceOverride } = item;
       await validateServiceBelongsToClinic(serviceId, clinicId);
       await prisma.providerService.create({
@@ -176,8 +180,8 @@ export const createProvider = async (
           priceOverride: priceOverride ?? null,
         },
       });
-    }
-    return prisma.provider.findUnique({
+  }
+  return prisma.provider.findUnique({
       where: { id: provider.id },
       include: {
         disciplines: { include: { discipline: { select: { id: true, name: true } } } },
@@ -189,9 +193,6 @@ export const createProvider = async (
         },
       },
     });
-  }
-
-  return provider;
 };
 
 export const getProviders = async (where: ClinicWhere) => {

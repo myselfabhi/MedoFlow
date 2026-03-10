@@ -88,6 +88,10 @@ export const updateDiscipline = async (
   });
 };
 
+/**
+ * Archive discipline (never delete). PRD: Cannot delete if services exist.
+ * Instead set isArchived = true. Services under archived discipline remain visible in historical data.
+ */
 export const deleteDiscipline = async (
   id: string,
   where: ClinicWhere,
@@ -96,37 +100,26 @@ export const deleteDiscipline = async (
   const findWhere = Object.keys(where).length === 0 ? { id } : { id, ...where };
   const discipline = await prisma.discipline.findFirst({
     where: findWhere as { id: string; clinicId?: string },
-    include: { _count: { select: { services: true } } },
   });
   if (!discipline) {
     const err = new Error('Discipline not found') as ApiError;
     err.statusCode = 404;
     throw err;
   }
-  const activeServicesCount = await prisma.service.count({
-    where: { disciplineId: id, isActive: true },
-  });
-  if (activeServicesCount > 0) {
-    const err = new Error(
-      'Cannot delete discipline with active services. Archive instead.'
-    ) as ApiError;
-    err.statusCode = 400;
-    throw err;
-  }
   const updateWhere = Object.keys(where).length === 0 ? { id } : { id, ...where };
   const updated = await prisma.discipline.update({
     where: updateWhere as { id: string; clinicId?: string },
-    data: { isActive: false },
+    data: { isActive: false, isArchived: true },
   });
-  if (discipline.isActive) {
+  if (discipline.isActive || !discipline.isArchived) {
     await auditService.logAudit({
       clinicId: discipline.clinicId,
       entityType: 'Discipline',
       entityId: id,
       action: 'ARCHIVE',
-      fieldChanged: 'isActive',
-      oldValue: true,
-      newValue: false,
+      fieldChanged: 'isArchived',
+      oldValue: discipline.isArchived,
+      newValue: true,
       performedById,
     });
   }

@@ -35,10 +35,17 @@ export const confirmPayment = async (
 
   const amount = appointment.priceAtBooking;
 
+  const invoice = await prisma.invoice.findFirst({
+    where: { appointmentId, clinicId: appointment.clinicId },
+    select: { id: true },
+  });
+
   const [payment, updatedAppointment] = await prisma.$transaction([
     prisma.payment.create({
       data: {
         clinicId: appointment.clinicId,
+        providerId: appointment.providerId,
+        invoiceId: invoice?.id ?? null,
         appointmentId: appointment.id,
         patientId: appointment.patientId,
         amount,
@@ -109,9 +116,16 @@ export const failPayment = async (
 
   const amount = appointment.priceAtBooking;
 
+  const invoice = await prisma.invoice.findFirst({
+    where: { appointmentId, clinicId: appointment.clinicId },
+    select: { id: true },
+  });
+
   const payment = await prisma.payment.create({
     data: {
       clinicId: appointment.clinicId,
+      providerId: appointment.providerId,
+      invoiceId: invoice?.id ?? null,
       appointmentId: appointment.id,
       patientId: appointment.patientId,
       amount,
@@ -148,16 +162,28 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
       status: 'PENDING_PAYMENT',
       slotHeldUntil: { lt: now },
     },
-    select: { id: true, clinicId: true, patientId: true, priceAtBooking: true },
+    select: {
+      id: true,
+      clinicId: true,
+      patientId: true,
+      providerId: true,
+      priceAtBooking: true,
+    },
   });
 
   if (expired.length === 0) return 0;
 
   for (const apt of expired) {
+    const invoice = await prisma.invoice.findFirst({
+      where: { appointmentId: apt.id, clinicId: apt.clinicId },
+      select: { id: true },
+    });
     await prisma.$transaction([
       prisma.payment.create({
         data: {
           clinicId: apt.clinicId,
+          providerId: apt.providerId,
+          invoiceId: invoice?.id ?? null,
           appointmentId: apt.id,
           patientId: apt.patientId,
           amount: apt.priceAtBooking,

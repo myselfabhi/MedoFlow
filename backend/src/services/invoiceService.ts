@@ -158,6 +158,8 @@ export const addInvoiceItem = async (
       data: {
         invoiceId,
         serviceId,
+        disciplineId: service.disciplineId ?? null,
+        providerId: invoice.providerId ?? null,
         description,
         unitPrice: unitPriceDecimal,
         quantity: qty,
