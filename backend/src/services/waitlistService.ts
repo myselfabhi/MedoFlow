@@ -2,11 +2,12 @@ import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
 import { createAppointment } from './appointmentService';
+import { BookingSource, WaitlistStatus } from '@prisma/client';
 
-const WAITING = 'WAITING';
-const OFFERED = 'OFFERED';
-const BOOKED = 'BOOKED';
-const EXPIRED = 'EXPIRED';
+const WAITING = WaitlistStatus.WAITING;
+const OFFERED = WaitlistStatus.OFFERED;
+const BOOKED = WaitlistStatus.BOOKED;
+const EXPIRED = WaitlistStatus.EXPIRED;
 const OFFER_EXPIRY_MINUTES = 30;
 
 function startOfDay(d: Date): Date {
@@ -26,6 +27,8 @@ export interface AddToWaitlistInput {
   providerId: string;
   serviceId: string;
   patientId: string;
+  preferredLocationId?: string | null;
+  timezone: string;
   preferredDate: Date;
   preferredStartTime: string;
   preferredEndTime: string;
@@ -103,6 +106,8 @@ export const addToWaitlist = async (
       providerId: input.providerId,
       serviceId: input.serviceId,
       patientId: input.patientId,
+      preferredLocationId: input.preferredLocationId ?? null,
+      timezone: input.timezone,
       preferredDate: input.preferredDate,
       preferredStartTime: input.preferredStartTime,
       preferredEndTime: input.preferredEndTime,
@@ -175,6 +180,7 @@ export const offerSlotToWaitlist = async (
       serviceId: input.serviceId,
       status: WAITING,
       preferredDate: { gte: dayStart, lte: dayEnd },
+      ...(input.locationId ? { preferredLocationId: input.locationId } : {}),
     },
     orderBy: { createdAt: 'asc' },
     include: {
@@ -336,7 +342,7 @@ export const claimWaitlistOffer = async (
       endTime: entry.offeredEndTime,
     },
     entry.clinicId,
-    { performedById }
+    { performedById, bookingSource: BookingSource.WAITLIST }
   );
 
   await prisma.waitlistEntry.update({

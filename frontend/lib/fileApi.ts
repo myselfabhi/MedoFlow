@@ -49,6 +49,16 @@ export const getPatientFiles = async (
   return data.data.files;
 };
 
+/** Patient fetches their own files via /patient/me (membership-scoped) */
+export const getMyFiles = async (clinicId?: string): Promise<PatientFile[]> => {
+  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  const { data } = await api.get<{
+    success: boolean;
+    data: { files: PatientFile[] };
+  }>(`/files/patient/me${params}`);
+  return data.data.files;
+};
+
 export const deletePatientFile = async (
   fileId: string,
   clinicId?: string
@@ -65,6 +75,29 @@ export const downloadPatientFile = async (
   const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const params = clinicId ? `?clinicId=${clinicId}` : '';
   const url = `${base}/api/v1/files/${fileId}/download${params}`;
+  const token = getAccessToken();
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error('Download failed');
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = originalName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/** Patient downloads their own file via /patient/me/:id/download */
+export const downloadMyFile = async (
+  fileId: string,
+  originalName: string,
+  clinicId?: string
+): Promise<void> => {
+  const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const params = clinicId ? `?clinicId=${clinicId}` : '';
+  const url = `${base}/api/v1/files/patient/me/${fileId}/download${params}`;
   const token = getAccessToken();
   const res = await fetch(url, {
     credentials: 'include',

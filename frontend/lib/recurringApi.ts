@@ -19,7 +19,7 @@ export interface CreateRecurringSeriesPayload {
 export interface CreatedAppointmentRecurring {
   id: string;
   status: AppointmentStatus;
-  slotHeldUntil?: string | null;
+  bookingHoldExpiresAt?: string | null;
 }
 
 export interface RecurringConflict {

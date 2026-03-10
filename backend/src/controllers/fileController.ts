@@ -83,6 +83,45 @@ export const remove = asyncHandler(
   }
 );
 
+export const listMyFiles = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const patientId = req.user!.id;
+    const clinicId = (req.query.clinicId as string) || await fileService.getPatientPrimaryClinicId(patientId);
+    if (!clinicId) {
+      const err = new Error('Clinic scope required. Provide clinicId or ensure you have clinic membership.') as ApiError;
+      err.statusCode = 400;
+      err.code = 'validation_error';
+      throw err;
+    }
+    await fileService.assertPatientCanAccessClinicFiles(patientId, clinicId);
+    const files = await fileService.getFilesByPatient(clinicId, patientId);
+    successResponse(res, 200, 'Files retrieved', { files });
+  }
+);
+
+export const downloadMyFile = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const fileId = req.params.id as string;
+    const patientId = req.user!.id;
+    const clinicId = (req.query.clinicId as string) || await fileService.getPatientPrimaryClinicId(patientId);
+    if (!clinicId) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const result = await fileService.getFileForPatientDownload(fileId, patientId, clinicId, req.user!.id);
+    if (!result) {
+      const err = new Error('File not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    const { filePath, originalName, mimeType } = result;
+    res.download(filePath, originalName, {
+      headers: mimeType ? { 'Content-Type': mimeType } : undefined,
+    });
+  }
+);
+
 export const download = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const fileId = req.params.id as string;

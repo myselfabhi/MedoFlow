@@ -38,6 +38,7 @@ const STATUS_BADGE: Record<string, string> = {
   CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
   COMPLETED: 'bg-green-100 text-green-800 border-green-200',
   CANCELLED: 'bg-gray-100 text-gray-600 border-gray-200',
+  PENDING_PROVIDER_APPROVAL: 'bg-purple-100 text-purple-800 border-purple-200',
   PENDING_PAYMENT: 'bg-amber-100 text-amber-800 border-amber-200',
   DRAFT: 'bg-gray-100 text-gray-600 border-gray-200',
   NO_SHOW: 'bg-gray-100 text-gray-600 border-gray-200',

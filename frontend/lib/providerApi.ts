@@ -28,10 +28,12 @@ export const getAvailability = async (
   clinicId: string,
   serviceId: string,
   date: string,
-  providerId?: string
+  providerId?: string,
+  locationId?: string
 ): Promise<TimeSlot[]> => {
   const params = new URLSearchParams({ clinicId, serviceId, date });
   if (providerId) params.set('providerId', providerId);
+  if (locationId) params.set('locationId', locationId);
   const { data } = await api.get<GetAvailabilityResponse>(
     `/availability?${params}`
   );

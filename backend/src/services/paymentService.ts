@@ -1,6 +1,7 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
+import { PaymentStatus } from '@prisma/client';
 
 export const confirmPayment = async (
   appointmentId: string,
@@ -49,16 +50,17 @@ export const confirmPayment = async (
         appointmentId: appointment.id,
         patientId: appointment.patientId,
         amount,
-        status: 'SUCCESS',
+        status: PaymentStatus.PAID,
       },
     }),
     prisma.appointment.update({
       where: { id: appointmentId },
       data: {
         status: 'CONFIRMED',
-        paymentStatus: 'PAID',
+        paymentStatus: PaymentStatus.PAID,
         paymentDueAt: null,
         slotHeldUntil: null,
+        bookingHoldExpiresAt: null,
       },
       include: {
         clinic: { select: { id: true, name: true } },
@@ -83,7 +85,7 @@ export const confirmPayment = async (
     newValue: {
       appointmentId,
       amount: Number(amount),
-      status: 'SUCCESS',
+      status: 'PAID',
     },
     performedById,
   });
@@ -130,12 +132,12 @@ export const failPayment = async (
         appointmentId: appointment.id,
         patientId: appointment.patientId,
         amount,
-        status: 'FAILED',
+        status: PaymentStatus.FAILED,
       },
     }),
     prisma.appointment.update({
       where: { id: appointmentId },
-      data: { paymentStatus: 'FAILED' },
+      data: { paymentStatus: PaymentStatus.FAILED, updatedById: performedById },
       include: {
         clinic: { select: { id: true, name: true } },
         location: { select: { id: true, name: true } },
@@ -173,7 +175,7 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
   const expired = await prisma.appointment.findMany({
     where: {
       status: 'PENDING_PAYMENT',
-      slotHeldUntil: { lt: now },
+      bookingHoldExpiresAt: { lt: now },
     },
     select: {
       id: true,
@@ -200,18 +202,20 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
           appointmentId: apt.id,
           patientId: apt.patientId,
           amount: apt.priceAtBooking,
-          status: 'FAILED',
+          status: PaymentStatus.FAILED,
         },
       }),
       prisma.appointment.update({
         where: { id: apt.id },
         data: {
           status: 'CANCELLED',
-          paymentStatus: 'FAILED',
+          paymentStatus: PaymentStatus.FAILED,
           cancelledAt: now,
           cancellationReason: 'Payment not completed within slot hold window',
           slotHeldUntil: null,
+          bookingHoldExpiresAt: null,
           paymentDueAt: null,
+          updatedById: apt.patientId,
         },
       }),
     ]);
@@ -240,7 +244,7 @@ export const refundPayment = async (
   const payment = await prisma.payment.findFirst({
     where: {
       id: paymentId,
-      status: 'SUCCESS',
+      status: PaymentStatus.PAID,
       ...(where?.clinicId && { clinicId: where.clinicId }),
     },
     include: {
@@ -257,7 +261,7 @@ export const refundPayment = async (
   const existingRefund = await prisma.payment.findFirst({
     where: {
       refundForPaymentId: payment.id,
-      status: 'REFUNDED',
+      status: PaymentStatus.REFUNDED,
     },
   });
   if (existingRefund) {
@@ -281,7 +285,7 @@ export const refundPayment = async (
     }),
     prisma.appointment.update({
       where: { id: payment.appointmentId },
-      data: { paymentStatus: 'REFUNDED' },
+      data: { paymentStatus: PaymentStatus.REFUNDED, updatedById: performedById },
       include: {
         clinic: { select: { id: true, name: true } },
         location: { select: { id: true, name: true } },

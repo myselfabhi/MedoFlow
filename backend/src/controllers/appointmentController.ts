@@ -4,6 +4,7 @@ import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getClinicWhere } from '../middleware/clinicScope';
 import { ApiError } from '../types/errors';
+import { BookingSource } from '@prisma/client';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -15,10 +16,20 @@ export const create = asyncHandler(
     }
     const { patientId, slotHoldId, ...rest } = req.body;
     const resolvedPatientId = (patientId as string) || req.user!.id;
+    const bookingSource =
+      req.user!.role === 'FRONT_DESK'
+        ? BookingSource.FRONT_DESK
+        : req.user!.role === 'PATIENT'
+          ? BookingSource.PATIENT_PORTAL
+          : BookingSource.PUBLIC;
     const appointment = await appointmentService.createAppointment(
       { ...rest, patientId: resolvedPatientId },
       clinicId,
-      { performedById: req.user!.id, slotHoldId: slotHoldId as string | undefined }
+      {
+        performedById: req.user!.id,
+        slotHoldId: slotHoldId as string | undefined,
+        bookingSource,
+      }
     );
     successResponse(res, 201, 'Appointment created', { appointment });
   }
@@ -245,7 +256,12 @@ export const reschedule = asyncHandler(
     const where = await getCancelRescheduleWhere(req);
     const result = await appointmentService.rescheduleAppointment(
       id,
-      { newStartTime, newEndTime },
+      {
+        newStartTime,
+        newEndTime,
+        locationId: req.body.locationId as string | undefined,
+        slotHoldId: req.body.slotHoldId as string | undefined,
+      },
       req.user!.id,
       where
     );

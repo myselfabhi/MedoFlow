@@ -30,6 +30,16 @@ export const createSession = async (
   providerId: string,
   clinicId: string
 ) => {
+  const clinic = await prisma.clinic.findUnique({
+    where: { id: clinicId },
+    select: { aiEnabled: true },
+  });
+  if (clinic?.aiEnabled === false) {
+    const err = new Error('AI Scribe is not enabled for this clinic') as ApiError;
+    err.statusCode = 403;
+    err.code = 'ai_disabled';
+    throw err;
+  }
   const visitRecord = await visitService.getVisitRecordById(visitRecordId, {
     clinicId,
   });
@@ -397,6 +407,62 @@ export const getApprovedPatientSummary = async (
     orderBy: { updatedAt: 'desc' },
   });
   return session?.patientSummary as PatientSummary | null;
+};
+
+/** Patient sees summary only when explicitly published. */
+export const getPublishedPatientSummary = async (
+  visitRecordId: string,
+  patientId: string
+) => {
+  const session = await prisma.aIScribeSession.findFirst({
+    where: {
+      visitRecordId,
+      status: AIScribeStatus.APPROVED,
+      patientSummaryPublished: true,
+      visitRecord: { patientId },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return session?.patientSummary as PatientSummary | null;
+};
+
+export const publishPatientSummary = async (
+  sessionId: string,
+  providerId: string,
+  clinicId: string,
+  performedById: string
+) => {
+  const session = await getSessionById(sessionId, providerId, clinicId);
+  if (!session) {
+    const err = new Error('Session not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+  if (session.status !== AIScribeStatus.APPROVED) {
+    const err = new Error('Note must be approved before publishing summary to patient') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!session.patientSummary) {
+    const err = new Error('No patient summary to publish') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+  await prisma.aIScribeSession.update({
+    where: { id: sessionId },
+    data: { patientSummaryPublished: true },
+  });
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'AIScribeSession',
+    entityId: sessionId,
+    action: 'PATIENT_SUMMARY_PUBLISHED',
+    performedById,
+  });
+  return prisma.aIScribeSession.findUnique({
+    where: { id: sessionId },
+    include: { visitRecord: { select: { id: true } } },
+  });
 };
 
 export const getSessionByVisitRecordId = async (

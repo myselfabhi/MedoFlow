@@ -8,11 +8,11 @@ import { getAppointmentById, type PatientAppointmentDetail } from '@/lib/patient
 import { confirmPayment, failPayment } from '@/lib/paymentApi';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 
-type PaymentStatus = 'NONE' | 'PENDING' | 'PAID';
+type PaymentStatus = 'NONE' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
 
 type PaymentAppointment = PatientAppointmentDetail & {
   paymentStatus?: PaymentStatus;
-  slotHeldUntil?: string | null;
+  bookingHoldExpiresAt?: string | null;
   priceAtBooking: string;
   service: PatientAppointmentDetail['service'] & { defaultPrice?: string };
 };
@@ -52,10 +52,10 @@ export default function PaymentPage() {
   const appointment = rawAppointment;
 
   const slotExpiry = useMemo(() => {
-    if (!appointment?.slotHeldUntil) return null;
-    const d = new Date(appointment.slotHeldUntil);
+    if (!appointment?.bookingHoldExpiresAt) return null;
+    const d = new Date(appointment.bookingHoldExpiresAt);
     return Number.isNaN(d.getTime()) ? null : d;
-  }, [appointment?.slotHeldUntil]);
+  }, [appointment?.bookingHoldExpiresAt]);
 
   useEffect(() => {
     if (!slotExpiry) return;

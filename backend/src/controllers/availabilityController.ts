@@ -9,10 +9,12 @@ export const getProviderAvailability = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const providerId = req.params.id as string;
     const date = req.query.date as string;
+    const serviceId = req.query.serviceId as string | undefined;
+    const locationId = req.query.locationId as string | undefined;
     const serviceDuration = req.query.serviceDuration as string;
 
-    if (!date || !serviceDuration) {
-      const err = new Error('date and serviceDuration are required') as ApiError;
+    if (!date || !serviceDuration || !serviceId) {
+      const err = new Error('date, serviceId, and serviceDuration are required') as ApiError;
       err.statusCode = 400;
       throw err;
     }
@@ -38,6 +40,8 @@ export const getProviderAvailability = asyncHandler(
 
     const slots = await availabilityService.getAvailableSlots({
       providerId,
+      serviceId,
+      locationId: locationId ?? null,
       serviceDurationMinutes,
       date,
       clinicId: clinicId ?? undefined,

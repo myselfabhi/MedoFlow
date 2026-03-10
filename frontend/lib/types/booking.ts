@@ -20,6 +20,11 @@ export interface Provider {
   email: string | null;
   discipline?: { id: string; name: string };
   disciplines?: { discipline: { id: string; name: string } }[];
+  locationAssignments?: {
+    id: string;
+    isPrimary: boolean;
+    location: { id: string; name: string; timezone: string };
+  }[];
   providerServices: { serviceId: string }[];
 }
 
@@ -31,8 +36,13 @@ export interface Location {
 }
 
 export interface TimeSlot {
+  providerId: string;
+  locationId: string | null;
+  serviceId: string;
+  timezone: string;
   start: string;
   end: string;
+  holdable?: boolean;
 }
 
 export interface CreateAppointmentPayload {

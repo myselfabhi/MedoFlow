@@ -23,6 +23,8 @@ export const add = asyncHandler(
     const preferredEndTime = req.body.preferredEndTime as string;
     const providerId = req.body.providerId as string;
     const serviceId = req.body.serviceId as string;
+    const locationId = req.body.locationId as string | undefined;
+    const timezone = (req.body.timezone as string | undefined) ?? 'UTC';
 
     if (!providerId || !serviceId || !preferredDate || !preferredStartTime || !preferredEndTime) {
       const err = new Error(
@@ -38,6 +40,8 @@ export const add = asyncHandler(
         providerId,
         serviceId,
         patientId,
+        preferredLocationId: locationId ?? null,
+        timezone,
         preferredDate: new Date(preferredDate),
         preferredStartTime,
         preferredEndTime,

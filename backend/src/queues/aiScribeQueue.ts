@@ -9,6 +9,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import OpenAI from 'openai';
 import prisma from '../config/prisma';
 import * as aiScribeService from '../services/aiScribeService';
+import * as storageService from '../services/storageService';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
@@ -67,17 +68,20 @@ function logStructured(
   console.log(`[AI Scribe] ${event} ${parts}`);
 }
 
-async function fetchAudioBuffer(audioUrl: string): Promise<Buffer> {
-  if (audioUrl.startsWith('/uploads/') || audioUrl.startsWith('uploads/')) {
-    const normalized = audioUrl.startsWith('/') ? audioUrl.slice(1) : audioUrl;
+async function fetchAudioBuffer(audioRef: string): Promise<Buffer> {
+  if (audioRef.startsWith('s3:') || audioRef.startsWith('local:')) {
+    return storageService.getAudioBufferFromRef(audioRef);
+  }
+  if (audioRef.startsWith('/uploads/') || audioRef.startsWith('uploads/')) {
+    const normalized = audioRef.startsWith('/') ? audioRef.slice(1) : audioRef;
     const fullPath = path.join(process.cwd(), normalized);
     return fs.readFileSync(fullPath);
   }
-  if (audioUrl.startsWith('http')) {
+  if (audioRef.startsWith('http')) {
     return new Promise((resolve, reject) => {
-      const client = audioUrl.startsWith('https') ? https : http;
+      const client = audioRef.startsWith('https') ? https : http;
       client
-        .get(audioUrl, (res) => {
+        .get(audioRef, (res) => {
           const chunks: Buffer[] = [];
           res.on('data', (chunk) => chunks.push(chunk));
           res.on('end', () => resolve(Buffer.concat(chunks)));
@@ -86,7 +90,7 @@ async function fetchAudioBuffer(audioUrl: string): Promise<Buffer> {
         .on('error', reject);
     });
   }
-  throw new Error('Invalid audio URL');
+  throw new Error('Invalid audio reference');
 }
 
 async function transcribeWithWhisper(buffer: Buffer, mimeType: string): Promise<string> {

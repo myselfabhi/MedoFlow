@@ -30,11 +30,13 @@ export const getGoogleAuthUrl = async (
 
 export const connectGoogleCalendar = async (
   code: string,
-  redirectUri: string
+  redirectUri: string,
+  state?: string
 ) => {
   const { data } = await api.post('/integrations/google/connect', {
     code,
     redirectUri,
+    ...(state && { state }),
   });
   return data.data.connection;
 };

@@ -31,6 +31,7 @@ import {
   AppInput,
   AppFormField,
 } from '@/components/ui-system';
+import type { TimeSlot } from '@/lib/types/booking';
 
 const patientSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -51,11 +52,12 @@ export default function BookingPage() {
   const { login, isAuthenticated, user } = useAuth();
   const serviceId = params.serviceId as string;
   const clinicId = searchParams.get('clinicId') || '';
+  const providerShortcutId = searchParams.get('providerId');
 
   const [step, setStep] = useState(0);
   const [providerId, setProviderId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [patientExists, setPatientExists] = useState<boolean | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -98,14 +100,29 @@ export default function BookingPage() {
   });
 
   const service = services?.find((s) => s.id === serviceId);
+  const launchLocation = locations?.[0] ?? null;
   const providersForService = providers?.filter((p) =>
     p.providerServices.some((ps) => ps.serviceId === serviceId)
   );
 
+  React.useEffect(() => {
+    if (providerShortcutId && providersForService?.some((provider) => provider.id === providerShortcutId)) {
+      setProviderId(providerShortcutId);
+      setStep((current) => (current === 0 ? 1 : current));
+    }
+  }, [providerShortcutId, providersForService]);
+
   const { data: slots, isLoading: slotsLoading } = useQuery({
-    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any'],
-    queryFn: () => getAvailability(clinicId, serviceId, selectedDate, providerId || undefined),
-    enabled: !!clinicId && !!serviceId && !!selectedDate,
+    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any', launchLocation?.id || 'no-location'],
+    queryFn: () =>
+      getAvailability(
+        clinicId,
+        serviceId,
+        selectedDate,
+        providerId || undefined,
+        launchLocation?.id
+      ),
+    enabled: !!clinicId && !!serviceId && !!selectedDate && !!launchLocation?.id,
   });
 
   const {
@@ -176,8 +193,8 @@ export default function BookingPage() {
     async (patientId: string) => {
       const appointment = await createAppointment({
         clinicId,
-        ...(locations?.[0]?.id && { locationId: locations[0].id }),
-        providerId: providerId || providersForService?.[0]?.id!,
+        ...(selectedSlot?.locationId && { locationId: selectedSlot.locationId }),
+        providerId: selectedSlot!.providerId,
         serviceId,
         patientId,
         startTime: selectedSlot!.start,
@@ -206,8 +223,8 @@ export default function BookingPage() {
     async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
       const payload = {
         clinicId,
-        ...(locations?.[0]?.id && { locationId: locations[0].id }),
-        providerId: providerId || providersForService?.[0]?.id!,
+        ...(selectedSlot?.locationId && { locationId: selectedSlot.locationId }),
+        providerId: selectedSlot!.providerId,
         serviceId,
         patientId,
         startTime: selectedSlot!.start,
@@ -345,9 +362,14 @@ export default function BookingPage() {
       }
       handleBookingResult(result);
     } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const axErr = err as { response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
       const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
-      if (axErr.response?.status === 409) {
+      const code = axErr.response?.data?.code;
+      if ((axErr.response?.status === 409 || axErr.response?.status === 400) && code === 'expired_hold') {
+        setBookingError('Your slot hold expired. Please select the time again.');
+      } else if (axErr.response?.status === 400 && code === 'invalid_slot') {
+        setBookingError('This slot is no longer available. Please select another.');
+      } else if (axErr.response?.status === 409) {
         setBookingError('This slot was just booked. Please select another.');
       } else if (msg.includes('already registered') || msg.includes('log in with your existing')) {
         setBookingError(msg);
@@ -368,9 +390,14 @@ export default function BookingPage() {
       });
       handleBookingResult(result);
     } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const axErr = err as { response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
       const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
-      if (axErr.response?.status === 409) {
+      const code = axErr.response?.data?.code;
+      if ((axErr.response?.status === 409 || axErr.response?.status === 400) && code === 'expired_hold') {
+        setBookingError('Your slot hold expired. Please select the time again.');
+      } else if (axErr.response?.status === 400 && code === 'invalid_slot') {
+        setBookingError('This slot is no longer available. Please select another.');
+      } else if (axErr.response?.status === 409) {
         setBookingError('This slot was just booked. Please select another.');
       } else {
         setBookingError(msg);
@@ -389,6 +416,9 @@ export default function BookingPage() {
   const providerName = providerId
     ? `${providersForService?.find((p) => p.id === providerId)?.firstName || ''} ${providersForService?.find((p) => p.id === providerId)?.lastName || ''}`
     : 'Any Available';
+  const selectedSlotProvider = selectedSlot
+    ? providersForService?.find((provider) => provider.id === selectedSlot.providerId)
+    : null;
 
   if (!clinicId) {
     return (
@@ -518,29 +548,22 @@ export default function BookingPage() {
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {slots?.map((slot) => (
                     <button
-                      key={slot.start}
+                      key={`${slot.providerId}-${slot.locationId}-${slot.start}`}
                       type="button"
                       onClick={async () => {
                         if (holdingSlot) return;
-                        const resolvedProviderId =
-                          providerId || providersForService?.[0]?.id;
-                        if (!resolvedProviderId) {
-                          setBookingError(
-                            'No provider is currently available for this service.'
-                          );
-                          return;
-                        }
                         setHoldingSlot(true);
                         setBookingError(null);
                         try {
                           await releaseCurrentHold();
                           const hold = await createSlotHold({
                             clinicId,
-                            providerId: resolvedProviderId,
+                            providerId: slot.providerId,
                             serviceId,
-                            ...(locations?.[0]?.id && {
-                              locationId: locations[0].id,
+                            ...(slot.locationId && {
+                              locationId: slot.locationId,
                             }),
+                            timezone: slot.timezone,
                             startTime: slot.start,
                             endTime: slot.end,
                           });
@@ -561,7 +584,11 @@ export default function BookingPage() {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      {formatTime(slot.start)}
+                      <div>{formatTime(slot.start)}</div>
+                      <div className="mt-1 text-[11px] font-normal text-gray-500">
+                        {providersForService?.find((provider) => provider.id === slot.providerId)?.firstName}{' '}
+                        {providersForService?.find((provider) => provider.id === slot.providerId)?.lastName}
+                      </div>
                     </button>
                   ))}
                   {slots?.length === 0 && (
@@ -569,7 +596,7 @@ export default function BookingPage() {
                       <p className="text-sm text-gray-500">
                         No slots available. Try another date.
                       </p>
-                      {providersForService && providersForService.length > 0 && (
+                      {providerId && providersForService && providersForService.length > 0 ? (
                         <button
                           type="button"
                           onClick={() => setShowWaitlistModal(true)}
@@ -577,6 +604,10 @@ export default function BookingPage() {
                         >
                           Join waitlist
                         </button>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          Select a specific provider to join the waitlist.
+                        </p>
                       )}
                     </div>
                   )}
@@ -679,11 +710,20 @@ export default function BookingPage() {
                   <strong>Service:</strong> {service?.name}
                 </p>
                 <p>
-                  <strong>Provider:</strong> {providerName}
+                  <strong>Provider:</strong>{' '}
+                  {selectedSlotProvider
+                    ? `${selectedSlotProvider.firstName} ${selectedSlotProvider.lastName}`
+                    : providerName}
                 </p>
                 <p>
                   <strong>Date & Time:</strong> {selectedDate && formatDate(selectedDate)} at{' '}
                   {selectedSlot && formatTime(selectedSlot.start)}
+                </p>
+                <p>
+                  <strong>Location:</strong>{' '}
+                  {selectedSlot?.locationId && locations?.length
+                    ? locations.find((l) => l.id === selectedSlot.locationId)?.name ?? launchLocation?.name ?? 'Clinic location'
+                    : launchLocation?.name ?? 'Clinic location'}
                 </p>
                 <p>
                   <strong>Price:</strong> ${service?.defaultPrice}
@@ -848,8 +888,10 @@ export default function BookingPage() {
         isOpen={showWaitlistModal}
         onClose={() => setShowWaitlistModal(false)}
         clinicId={clinicId}
-        providerId={providerId || providersForService?.[0]?.id || ''}
+        providerId={providerId || ''}
         serviceId={serviceId}
+        locationId={launchLocation?.id}
+        timezone={launchLocation?.timezone}
         defaultPreferredDate={selectedDate}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['waitlist'] })}
       />

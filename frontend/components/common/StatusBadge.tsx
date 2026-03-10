@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 
 export type AppointmentStatus =
   | 'DRAFT'
+  | 'PENDING_PROVIDER_APPROVAL'
   | 'PENDING_PAYMENT'
   | 'CONFIRMED'
   | 'COMPLETED'
@@ -20,6 +21,7 @@ export type VisitRecordStatus = 'DRAFT' | 'FINAL';
 
 const APPOINTMENT_MAP: Record<AppointmentStatus, 'outline' | 'warning' | 'accent' | 'success' | 'destructive' | 'neutral'> = {
   DRAFT: 'outline',
+  PENDING_PROVIDER_APPROVAL: 'warning',
   PENDING_PAYMENT: 'warning',
   CONFIRMED: 'accent',
   COMPLETED: 'success',

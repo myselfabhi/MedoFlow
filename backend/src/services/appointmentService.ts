@@ -1,9 +1,18 @@
 import prisma from '../config/prisma';
 import { Request } from 'express';
 import { ApiError } from '../types/errors';
-import { AppointmentStatus, Prisma } from '@prisma/client';
+import {
+  AppointmentStatus,
+  ApprovalStatus,
+  BookingSource,
+  PaymentRequirementType,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import * as auditService from './auditService';
 import * as waitlistService from './waitlistService';
+import * as patientMembershipService from './patientMembershipService';
+import { buildSlotFingerprint, resolveAppointmentLifecycle } from './schedulingCore';
 
 const CANCELLED_STATUS = 'CANCELLED';
 
@@ -21,6 +30,9 @@ export interface CreateAppointmentContext {
   excludeAppointmentId?: string;
   /** Optional slot hold ID - when provided, validates and consumes hold to prevent race conditions */
   slotHoldId?: string;
+  bookingSource?: BookingSource;
+  recurringSeriesId?: string | null;
+  notes?: string | null;
 }
 
 const validateServiceBelongsToClinic = async (
@@ -130,6 +142,35 @@ const checkDoubleBooking = async (
 
 const RESCHEDULED_STATUS = 'RESCHEDULED';
 
+const ACTIVE_APPOINTMENT_STATUSES: AppointmentStatus[] = [
+  AppointmentStatus.DRAFT,
+  AppointmentStatus.PENDING_PROVIDER_APPROVAL,
+  AppointmentStatus.PENDING_PAYMENT,
+  AppointmentStatus.CONFIRMED,
+  AppointmentStatus.COMPLETED,
+  AppointmentStatus.NO_SHOW,
+];
+
+const createApiError = (
+  message: string,
+  statusCode: number,
+  code: string
+): ApiError => {
+  const err = new Error(message) as ApiError;
+  err.statusCode = statusCode;
+  err.code = code;
+  return err;
+};
+
+const lockBookingScope = async (
+  tx: Prisma.TransactionClient,
+  providerId: string,
+  patientId: string
+) => {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-provider:${providerId}`}))`;
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-patient:${patientId}`}))`;
+};
+
 const checkSamePatientOverlap = async (
   patientId: string,
   startTime: Date,
@@ -228,20 +269,37 @@ export const createAppointment = async (
   const performedById = context?.performedById;
   const excludeAppointmentId = context?.excludeAppointmentId ?? null;
   const slotHoldId = context?.slotHoldId;
+  const bookingSource = context?.bookingSource ?? BookingSource.PUBLIC;
   const startDate = new Date(startTime);
   const endDate = new Date(endTime);
 
   return prisma.$transaction(async (tx) => {
+    await lockBookingScope(tx, providerId, patientId);
+
     if (slotHoldId) {
       const hold = await tx.slotHold.findFirst({
-        where: { id: slotHoldId, clinicId },
+        where: { id: slotHoldId, clinicId, status: 'ACTIVE' },
       });
-      if (!hold || hold.expiresAt < new Date()) {
-        const err = new Error(
-          'Slot hold expired or invalid. Please select the slot again.'
-        ) as ApiError;
-        err.statusCode = 400;
-        throw err;
+      if (!hold) {
+        throw createApiError(
+          'Slot hold expired or invalid. Please select the slot again.',
+          400,
+          'expired_hold'
+        );
+      }
+      if (hold.expiresAt < new Date()) {
+        await tx.slotHold.update({
+          where: { id: hold.id },
+          data: {
+            status: 'EXPIRED',
+            expiredAt: new Date(),
+          },
+        });
+        throw createApiError(
+          'Slot hold expired or invalid. Please select the slot again.',
+          400,
+          'expired_hold'
+        );
       }
       if (
         hold.providerId !== providerId ||
@@ -250,11 +308,13 @@ export const createAppointment = async (
         hold.startTime.getTime() !== startDate.getTime() ||
         hold.endTime.getTime() !== endDate.getTime()
       ) {
-        const err = new Error('Slot hold does not match booking details') as ApiError;
-        err.statusCode = 400;
-        throw err;
+        throw createApiError('Slot hold does not match booking details', 400, 'invalid_slot');
       }
-      await tx.slotHold.delete({ where: { id: slotHoldId } });
+
+      await tx.slotHold.update({
+        where: { id: slotHoldId },
+        data: { status: 'CONVERTED' },
+      });
     }
 
     const service = await tx.service.findFirst({
@@ -262,18 +322,18 @@ export const createAppointment = async (
       include: { discipline: { select: { isArchived: true } } },
     });
     if (!service) {
-      const err = new Error(
-        'Service not found or does not belong to this clinic'
-      ) as ApiError;
-      err.statusCode = 404;
-      throw err;
+      throw createApiError(
+        'Service not found or does not belong to this clinic',
+        404,
+        'validation_error'
+      );
     }
     if (!service.isActive || service.isArchived || service.discipline?.isArchived) {
-      const err = new Error(
-        'This service is not currently available for booking.'
-      ) as ApiError;
-      err.statusCode = 400;
-      throw err;
+      throw createApiError(
+        'This service is not currently available for booking.',
+        400,
+        'validation_error'
+      );
     }
 
     const provider = await tx.provider.findFirst({
@@ -286,44 +346,57 @@ export const createAppointment = async (
       },
     });
     if (!provider) {
-      const err = new Error(
-        'Provider not found or does not belong to this clinic'
-      ) as ApiError;
-      err.statusCode = 404;
-      throw err;
+      throw createApiError(
+        'Provider not found or does not belong to this clinic',
+        404,
+        'validation_error'
+      );
     }
     const assignment = provider.providerServices[0];
     if (!assignment) {
-      const err = new Error('Provider does not offer this service') as ApiError;
-      err.statusCode = 400;
-      throw err;
+      throw createApiError('Provider does not offer this service', 400, 'validation_error');
     }
 
-    if (locationId) {
-      const location = await tx.location.findFirst({
-        where: { id: locationId, clinicId, isActive: true },
-      });
-      if (!location) {
-        const err = new Error(
-          'Location not found or does not belong to this clinic'
-        ) as ApiError;
-        err.statusCode = 404;
-        throw err;
-      }
+    const resolvedLocation =
+      (locationId
+        ? await tx.location.findFirst({
+            where: { id: locationId, clinicId, isActive: true },
+          })
+        : await tx.location.findFirst({
+            where: { clinicId, isActive: true },
+            orderBy: { createdAt: 'asc' },
+          })) ?? null;
+
+    if (!resolvedLocation) {
+      throw createApiError(
+        'Location not found or does not belong to this clinic',
+        404,
+        'validation_error'
+      );
+    }
+
+    const providerAtLocation = await tx.providerLocationAssignment.findFirst({
+      where: {
+        providerId,
+        locationId: resolvedLocation.id,
+      },
+    });
+    if (!providerAtLocation) {
+      throw createApiError(
+        'Provider is not assigned to the selected location',
+        400,
+        'validation_error'
+      );
     }
 
     const user = await tx.user.findUnique({
       where: { id: patientId },
     });
     if (!user) {
-      const err = new Error('Patient not found') as ApiError;
-      err.statusCode = 404;
-      throw err;
+      throw createApiError('Patient not found', 404, 'validation_error');
     }
     if (user.role !== 'PATIENT') {
-      const err = new Error('User is not a patient') as ApiError;
-      err.statusCode = 400;
-      throw err;
+      throw createApiError('User is not a patient', 400, 'validation_error');
     }
 
     await tx.patientClinicMembership.upsert({
@@ -336,19 +409,19 @@ export const createAppointment = async (
       create: {
         clinicId,
         patientId,
-        primaryLocationId: locationId ?? null,
+        primaryLocationId: resolvedLocation.id,
         isActive: true,
       },
       update: {
         isActive: true,
-        ...(locationId !== undefined && { primaryLocationId: locationId ?? null }),
+        primaryLocationId: resolvedLocation.id,
       },
     });
 
     const samePatientConflict = await tx.appointment.findFirst({
       where: {
         patientId,
-        status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
+        status: { in: ACTIVE_APPOINTMENT_STATUSES },
         startTime: { lt: endDate },
         endTime: { gt: startDate },
         ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
@@ -369,11 +442,11 @@ export const createAppointment = async (
           },
         });
       }
-      const err = new Error(
-        'You already have another appointment during this time.'
-      ) as ApiError;
-      err.statusCode = 409;
-      throw err;
+      throw createApiError(
+        'You already have another appointment during this time.',
+        409,
+        'conflict'
+      );
     }
 
     const minNotice = service.minimumNoticeMinutes ?? 0;
@@ -434,43 +507,86 @@ export const createAppointment = async (
     const doubleBookConflict = await tx.appointment.findFirst({
       where: {
         providerId,
-        status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
+        status: { in: ACTIVE_APPOINTMENT_STATUSES },
         startTime: { lt: endDate },
         endTime: { gt: startDate },
         ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
       },
     });
     if (doubleBookConflict) {
-      const err = new Error(
-        'Provider has a conflicting appointment in this time slot'
-      ) as ApiError;
-      err.statusCode = 409;
-      throw err;
+      throw createApiError(
+        'Provider has a conflicting appointment in this time slot',
+        409,
+        'conflict'
+      );
+    }
+
+    const activeHoldConflict = await tx.slotHold.findFirst({
+      where: {
+        providerId,
+        status: 'ACTIVE',
+        expiresAt: { gt: new Date() },
+        startTime: { lt: endDate },
+        endTime: { gt: startDate },
+        ...(slotHoldId ? { id: { not: slotHoldId } } : {}),
+      },
+    });
+    if (activeHoldConflict) {
+      throw createApiError(
+        'This slot is temporarily reserved. Please choose another slot.',
+        409,
+        'conflict'
+      );
     }
 
     const priceAtBooking =
       assignment.priceOverride ?? assignment.service.defaultPrice;
-    const requirePrepayment = Boolean(service.requirePrepayment);
+    const paymentRequirementType =
+      service.requirePrepayment && service.prepaymentType === 'DEPOSIT'
+        ? PaymentRequirementType.DEPOSIT
+        : service.requirePrepayment
+          ? PaymentRequirementType.FULL
+          : PaymentRequirementType.NONE;
+    const requirePrepayment = paymentRequirementType !== PaymentRequirementType.NONE;
     const now = new Date();
     const slotHoldMinutes = 10;
     const slotHeldUntil = requirePrepayment
       ? new Date(now.getTime() + slotHoldMinutes * 60 * 1000)
       : null;
+    const lifecycle = resolveAppointmentLifecycle({
+      requiresProviderApproval: service.requireProviderApproval,
+      paymentRequirementType,
+    });
 
     const appointmentData = {
       clinicId,
-      locationId: locationId ?? null,
+      locationId: resolvedLocation.id,
       providerId,
       serviceId,
       disciplineId: service.disciplineId ?? null,
       patientId,
+      timezone: resolvedLocation.timezone,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
-      status: requirePrepayment ? AppointmentStatus.PENDING_PAYMENT : AppointmentStatus.CONFIRMED,
+      status: lifecycle.status,
       priceAtBooking,
-      paymentStatus: requirePrepayment ? 'PENDING' : 'NONE',
+      paymentStatus: lifecycle.paymentStatus,
+      paymentRequirementType,
+      approvalStatus: lifecycle.approvalStatus,
+      bookingSource,
+      depositAmount:
+        paymentRequirementType === PaymentRequirementType.DEPOSIT
+          ? service.depositAmount
+          : paymentRequirementType === PaymentRequirementType.FULL
+            ? priceAtBooking
+            : null,
       paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
       slotHeldUntil,
+      bookingHoldExpiresAt: slotHeldUntil,
+      notes: context?.notes ?? null,
+      createdById: performedById ?? null,
+      updatedById: performedById ?? null,
+      recurringSeriesId: context?.recurringSeriesId ?? null,
     };
 
     const appointment = await tx.appointment.create({
@@ -506,6 +622,34 @@ export const createAppointment = async (
         },
       });
     }
+
+    if (slotHoldId) {
+      await tx.slotHold.update({
+        where: { id: slotHoldId },
+        data: {
+          convertedToAppointmentId: appointment.id,
+        },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        clinicId,
+        entityType: 'Appointment',
+        entityId: appointment.id,
+        action: 'APPOINTMENT_CREATED',
+        newValue: {
+          providerId,
+          patientId,
+          locationId: resolvedLocation.id,
+          status: appointment.status,
+          bookingSource,
+          timezone: resolvedLocation.timezone,
+        } as Prisma.InputJsonValue,
+        oldValue: Prisma.JsonNull,
+        performedById: performedById ?? patientId,
+      },
+    });
 
     return appointment;
   });
@@ -544,6 +688,36 @@ export const createRecurringSeries = async (
   const endDate = input.endDate ? new Date(input.endDate) : null;
   const maxSessions = input.numberOfSessions ?? 52;
 
+  const location =
+    (input.locationId
+      ? await prisma.location.findFirst({
+          where: { id: input.locationId, clinicId: input.clinicId, isActive: true },
+          select: { id: true, timezone: true },
+        })
+      : await prisma.location.findFirst({
+          where: { clinicId: input.clinicId, isActive: true },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, timezone: true },
+        })) ?? null;
+
+  if (!location) {
+    throw createApiError('Location not found', 404, 'validation_error');
+  }
+
+  const recurringSeries = await prisma.appointmentSeries.create({
+    data: {
+      clinicId: input.clinicId,
+      patientId: input.patientId,
+      providerId: input.providerId,
+      serviceId: input.serviceId,
+      locationId: location.id,
+      timezone: location.timezone,
+      frequency: input.frequency,
+      numberOfSessions: input.numberOfSessions ?? null,
+      endDate,
+    },
+  });
+
   for (let i = 0; i < maxSessions; i++) {
     const start = new Date(firstStart);
     start.setDate(start.getDate() + i * 7);
@@ -559,7 +733,7 @@ export const createRecurringSeries = async (
     try {
       const apt = await createAppointment(
         {
-          locationId: input.locationId ?? undefined,
+          locationId: location.id,
           providerId: input.providerId,
           serviceId: input.serviceId,
           patientId: input.patientId,
@@ -567,7 +741,11 @@ export const createRecurringSeries = async (
           endTime: end,
         },
         input.clinicId,
-        { performedById }
+        {
+          performedById,
+          bookingSource: BookingSource.PATIENT_PORTAL,
+          recurringSeriesId: recurringSeries.id,
+        }
       );
       appointments.push(apt);
     } catch (err) {
@@ -577,6 +755,19 @@ export const createRecurringSeries = async (
       });
     }
   }
+
+  await auditService.logAudit({
+    clinicId: input.clinicId,
+    entityType: 'AppointmentSeries',
+    entityId: recurringSeries.id,
+    action: 'RECURRING_SERIES_CREATED',
+    newValue: {
+      appointmentCount: appointments.length,
+      conflictCount: conflicts.length,
+      frequency: input.frequency,
+    },
+    performedById,
+  });
 
   return { appointments, conflicts };
 };
@@ -679,8 +870,10 @@ export const cancelAppointment = async (
 };
 
 export interface RescheduleAppointmentData {
+  locationId?: string | null;
   newStartTime: string | Date;
   newEndTime: string | Date;
+  slotHoldId?: string;
 }
 
 export const rescheduleAppointment = async (
@@ -710,7 +903,7 @@ export const rescheduleAppointment = async (
   }
   const { newStartTime, newEndTime } = data;
   const createData: CreateAppointmentData = {
-    locationId: oldAppointment.locationId,
+    locationId: data.locationId ?? oldAppointment.locationId,
     providerId: oldAppointment.providerId,
     serviceId: oldAppointment.serviceId,
     patientId: oldAppointment.patientId,
@@ -720,15 +913,21 @@ export const rescheduleAppointment = async (
   const newAppointment = await createAppointment(createData, oldAppointment.clinicId, {
     performedById,
     excludeAppointmentId: oldAppointmentId,
+    slotHoldId: data.slotHoldId,
+    bookingSource: BookingSource.PATIENT_PORTAL,
   });
   await prisma.$transaction([
     prisma.appointment.update({
       where: { id: oldAppointmentId },
-      data: { status: 'RESCHEDULED', rescheduledToId: newAppointment.id },
+      data: {
+        status: 'RESCHEDULED',
+        rescheduledToId: newAppointment.id,
+        updatedById: performedById,
+      },
     }),
     prisma.appointment.update({
       where: { id: newAppointment.id },
-      data: { rescheduledFromId: oldAppointmentId },
+      data: { rescheduledFromId: oldAppointmentId, updatedById: performedById },
     }),
   ]);
   const updatedOld = await prisma.appointment.findUnique({
@@ -937,10 +1136,10 @@ export const updateAppointmentStatus = async (
       err.statusCode = 403;
       throw err;
     }
-    const allowedStatuses = ['COMPLETED', 'NO_SHOW', 'CANCELLED'];
+    const allowedStatuses = ['CONFIRMED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'];
     if (!allowedStatuses.includes(status)) {
       const err = new Error(
-        'Provider can only update status to COMPLETED, NO_SHOW, or CANCELLED'
+        'Provider can only update status to CONFIRMED, COMPLETED, NO_SHOW, or CANCELLED'
       ) as ApiError;
       err.statusCode = 403;
       throw err;
@@ -986,7 +1185,14 @@ export const updateAppointmentStatus = async (
 
   return prisma.appointment.update({
     where: { id },
-    data: { status },
+    data: {
+      status,
+      ...(status === AppointmentStatus.CONFIRMED &&
+      appointment.status === AppointmentStatus.PENDING_PROVIDER_APPROVAL
+        ? { approvalStatus: ApprovalStatus.APPROVED }
+        : {}),
+      updatedById: req.user?.id ?? null,
+    },
     include: {
       location: { select: { id: true, name: true } },
       provider: {

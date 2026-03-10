@@ -2,6 +2,7 @@ import api from './api';
 
 export type AppointmentStatus =
   | 'DRAFT'
+  | 'PENDING_PROVIDER_APPROVAL'
   | 'PENDING_PAYMENT'
   | 'CONFIRMED'
   | 'COMPLETED'
@@ -140,13 +141,17 @@ export const cancelAppointment = async (
 
 export const rescheduleAppointment = async (
   appointmentId: string,
-  newStartTime: string,
-  newEndTime: string
+  payload: {
+    locationId?: string;
+    slotHoldId?: string;
+    newStartTime: string;
+    newEndTime: string;
+  }
 ): Promise<{ oldAppointment: PatientAppointment; newAppointment: PatientAppointment }> => {
   const { data } = await api.post<{
     success: boolean;
     data: { oldAppointment: PatientAppointment; newAppointment: PatientAppointment };
-  }>(`/appointments/${appointmentId}/reschedule`, { newStartTime, newEndTime });
+  }>(`/appointments/${appointmentId}/reschedule`, payload);
   return data.data;
 };
 

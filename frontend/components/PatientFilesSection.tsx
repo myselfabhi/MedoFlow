@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getPatientFiles,
+  getMyFiles,
   uploadPatientFile,
   deletePatientFile,
   downloadPatientFile,
+  downloadMyFile,
   type PatientFile,
 } from '@/lib/fileApi';
 import { useAppToast } from '@/hooks/useAppToast';
@@ -29,9 +31,11 @@ const PREVIEW_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'ap
 function FilePreview({
   file,
   clinicId,
+  asPatient = false,
 }: {
   file: PatientFile;
   clinicId?: string;
+  asPatient?: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -45,7 +49,10 @@ function FilePreview({
   const openPreview = async () => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const params = clinicId ? `?clinicId=${clinicId}` : '';
-    const url = `${base}/api/v1/files/${file.id}/download${params}`;
+    const path = asPatient
+      ? `/api/v1/files/patient/me/${file.id}/download`
+      : `/api/v1/files/${file.id}/download`;
+    const url = `${base}${path}${params}`;
     const token = typeof window !== 'undefined' ? (await import('@/lib/api')).getAccessToken() : null;
     const res = await fetch(url, {
       credentials: 'include',
@@ -112,11 +119,14 @@ export function PatientFilesSection({
   clinicId,
   canDelete = false,
   canUpload = true,
+  asPatient = false,
 }: {
   patientId: string;
   clinicId?: string;
   canDelete?: boolean;
   canUpload?: boolean;
+  /** When true, uses /patient/me endpoints for patient self-access */
+  asPatient?: boolean;
 }) {
   const queryClient = useQueryClient();
   const toast = useAppToast();
@@ -124,15 +134,17 @@ export function PatientFilesSection({
   const [uploading, setUploading] = useState(false);
 
   const { data: files = [], isLoading } = useQuery({
-    queryKey: ['files', 'patient', patientId, clinicId],
-    queryFn: () => getPatientFiles(patientId, clinicId),
-    enabled: !!patientId,
+    queryKey: ['files', asPatient ? 'me' : 'patient', patientId, clinicId],
+    queryFn: () =>
+      asPatient ? getMyFiles(clinicId) : getPatientFiles(patientId, clinicId),
+    enabled: !!patientId || asPatient,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (fileId: string) => deletePatientFile(fileId, clinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['files', 'patient', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['files', 'me'] });
     },
   });
 
@@ -143,6 +155,7 @@ export function PatientFilesSection({
     try {
       await uploadPatientFile(file, { patientId, clinicId });
       queryClient.invalidateQueries({ queryKey: ['files', 'patient', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['files', 'me'] });
       toast.success('File uploaded');
     } catch {
       toast.error('Failed to upload file');
@@ -251,10 +264,14 @@ export function PatientFilesSection({
                 )}
               </div>
               <div className="ml-4 flex shrink-0 items-center gap-2">
-                <FilePreview file={file} clinicId={clinicId} />
+                <FilePreview file={file} clinicId={clinicId} asPatient={asPatient} />
                 <button
                   type="button"
-                  onClick={() => downloadPatientFile(file.id, file.originalName, clinicId)}
+                  onClick={() =>
+                    asPatient
+                      ? downloadMyFile(file.id, file.originalName, clinicId)
+                      : downloadPatientFile(file.id, file.originalName, clinicId)
+                  }
                   className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Download

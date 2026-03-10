@@ -12,6 +12,7 @@ import {
   Save,
   CheckCircle,
   Loader2,
+  Share2,
 } from 'lucide-react';
 import {
   getSessionByVisitRecord,
@@ -22,6 +23,7 @@ import {
   updateDraft,
   regenerateDraft,
   approveSession,
+  publishPatientSummary,
   type AIScribeSession,
   type SoapDraft,
 } from '@/lib/aiScribeApi';
@@ -349,6 +351,7 @@ export default function ProviderAIScribePage() {
     onError: () => toast.error('Failed to retry processing'),
   });
 
+  const aptId = appointmentId || session?.visitRecord?.appointmentId;
   const approveMutation = useMutation({
     mutationFn: (sessionId: string) => approveSession(sessionId),
     onSuccess: () => {
@@ -356,9 +359,28 @@ export default function ProviderAIScribePage() {
         queryKey: ['ai-scribe', 'session', visitRecordId],
       });
       queryClient.invalidateQueries({ queryKey: ['visit', visitRecordId] });
+      if (aptId) {
+        queryClient.invalidateQueries({ queryKey: ['visit', aptId] });
+        queryClient.invalidateQueries({ queryKey: ['appointment', aptId] });
+      }
       toast.success('Note approved and finalized');
     },
     onError: () => toast.error('Failed to approve'),
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: (sessionId: string) => publishPatientSummary(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['ai-scribe', 'session', visitRecordId],
+      });
+      if (aptId) {
+        queryClient.invalidateQueries({ queryKey: ['visit', aptId] });
+        queryClient.invalidateQueries({ queryKey: ['patient', 'visit', aptId] });
+      }
+      toast.success('Visit summary published to patient');
+    },
+    onError: () => toast.error('Failed to publish to patient'),
   });
 
   const handleStartRecording = useCallback(async () => {
@@ -621,6 +643,30 @@ export default function ProviderAIScribePage() {
                     canEdit && !session.visitRecord?.isFinalized
                   }
                 />
+                {session.status === 'APPROVED' &&
+                  session.patientSummary &&
+                  !session.patientSummaryPublished && (
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                      <AppButton
+                        variant="outline"
+                        size="sm"
+                        onClick={() => publishMutation.mutate(session.id)}
+                        disabled={publishMutation.isPending}
+                      >
+                        {publishMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Share2 className="mr-2 h-4 w-4" />
+                        )}
+                        Publish Summary to Patient
+                      </AppButton>
+                    </div>
+                  )}
+                {session.status === 'APPROVED' && session.patientSummaryPublished && (
+                  <p className="mt-4 text-sm text-slate-600">
+                    Visit summary has been published to the patient.
+                  </p>
+                )}
               </AppCardContent>
             </AppCard>
           )}

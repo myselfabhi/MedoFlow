@@ -8,18 +8,13 @@ import {
   getAppointmentById,
   getVisitByAppointment,
   getMyPrescriptions,
-  type VisitRecordStatus,
 } from '@/lib/patientApi';
 import { getPatientForms } from '@/lib/formsApi';
 import { PatientFilesSection } from '@/components/PatientFilesSection';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { IntakeFormsSection } from '@/components/intake/IntakeFormsSection';
-
-const visitStatusColors: Record<VisitRecordStatus, string> = {
-  DRAFT: 'bg-amber-100 text-amber-800',
-  FINAL: 'bg-green-100 text-green-800',
-};
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -63,9 +58,9 @@ export default function PatientAppointmentDetailPage() {
   ) ?? [];
 
   const { data: formResponses = [], isLoading: formsLoading } = useQuery({
-    queryKey: ['forms', 'patient', appointment?.patientId],
-    queryFn: () => getPatientForms(appointment!.patientId),
-    enabled: !!appointment?.patientId,
+    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
+    queryFn: () => getPatientForms(appointment!.patientId, appointment!.clinicId),
+    enabled: !!appointment?.patientId && !!appointment?.clinicId,
   });
 
   if (appointmentLoading || !appointment) {
@@ -177,15 +172,7 @@ export default function PatientAppointmentDetailPage() {
           {visitRecord ? (
             <div className="mt-4 space-y-6">
               <div>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    visitStatusColors[visitRecord.status]
-                  }`}
-                >
-                  {visitRecord.status === 'DRAFT'
-                    ? 'Awaiting provider finalization'
-                    : 'Finalized'}
-                </span>
+                <StatusBadge status={visitRecord.status} variant="visitRecord" />
               </div>
               <div className="space-y-4">
                 {visitRecord.subjective && (
@@ -231,7 +218,9 @@ export default function PatientAppointmentDetailPage() {
                   !visitRecord.assessment &&
                   !visitRecord.plan && (
                     <p className="text-sm text-gray-500">
-                      No visit notes recorded yet.
+                      {visitRecord.status === 'FINAL'
+                        ? 'Your provider has finalized the visit. A summary will appear here when they share it with you.'
+                        : 'No visit notes recorded yet.'}
                     </p>
                   )}
               </div>
@@ -255,6 +244,7 @@ export default function PatientAppointmentDetailPage() {
           clinicId={appointment.clinicId}
           canDelete={false}
           canUpload={false}
+          asPatient
         />
 
         <Card>

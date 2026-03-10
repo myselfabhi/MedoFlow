@@ -28,7 +28,7 @@ export interface CreateAppointmentPayload {
 export interface CreatedAppointment {
   id: string;
   status: AppointmentStatus;
-  slotHeldUntil?: string | null;
+  bookingHoldExpiresAt?: string | null;
 }
 
 export const getClinicLocations = async (clinicId: string): Promise<Location[]> => {
@@ -60,6 +60,7 @@ export interface SlotHoldPayload {
   providerId: string;
   serviceId: string;
   locationId?: string;
+  timezone: string;
   startTime: string;
   endTime: string;
 }
@@ -70,9 +71,11 @@ export interface CreatedSlotHold {
   providerId: string;
   serviceId: string;
   locationId?: string | null;
+  timezone: string;
   startTime: string;
   endTime: string;
   expiresAt: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CONVERTED' | 'RELEASED';
 }
 
 export const createSlotHold = async (

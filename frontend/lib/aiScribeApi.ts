@@ -39,6 +39,7 @@ export interface AIScribeSession {
   aiDraft: SoapDraft | null;
   patientSummary: PatientSummary | null;
   status: AIScribeStatus;
+  patientSummaryPublished?: boolean;
   aiModel?: string | null;
   errorMessage?: string | null;
   processingStartedAt?: string | null;
@@ -179,5 +180,17 @@ export const approveSession = async (
     success: boolean;
     data: { session: AIScribeSession };
   }>(`/ai-scribe/session/${sessionId}/approve`, body);
+  return data.data.session;
+};
+
+export const publishPatientSummary = async (
+  sessionId: string,
+  clinicId?: string
+): Promise<AIScribeSession> => {
+  const body = clinicId ? { clinicId } : {};
+  const { data } = await api.post<{
+    success: boolean;
+    data: { session: AIScribeSession };
+  }>(`/ai-scribe/session/${sessionId}/publish-summary`, body);
   return data.data.session;
 };

@@ -12,17 +12,25 @@ const app = express();
 
 app.use(helmet());
 const corsOrigin = process.env.CORS_ORIGIN;
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(
   cors({
     origin: (origin, cb) => {
       const allowed = corsOrigin
-        ? corsOrigin.split(',').map((o) => o.trim())
+        ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
         : [];
-      const allowAll = allowed.length === 0;
-      const isVercelPreview = origin?.endsWith('.vercel.app');
+      // In production, require CORS_ORIGIN to be set; fail closed if not
+      if (isProduction && allowed.length === 0) {
+        cb(null, false);
+        return;
+      }
+      // Same-origin / server-side requests (no origin) are allowed
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      const isVercelPreview = origin.endsWith('.vercel.app');
       const isAllowed =
-        allowAll ||
-        !origin ||
         allowed.includes(origin) ||
         (isVercelPreview && allowed.some((o) => o.includes('vercel.app')));
       cb(null, isAllowed);

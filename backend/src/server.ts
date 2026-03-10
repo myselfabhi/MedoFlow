@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { validateProductionEnv } from './config/envValidation';
 import app from './app';
 import prisma from './config/prisma';
 import { startCronJobs } from './scheduler/cronJobs';
@@ -67,6 +68,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 let aiScribeWorker: ReturnType<typeof createAiScribeWorker> | null = null;
 
 const bootstrap = async (): Promise<void> => {
+  validateProductionEnv();
   await connectDatabase();
   startCronJobs();
   if (process.env.REDIS_URL || process.env.REDIS_HOST) {

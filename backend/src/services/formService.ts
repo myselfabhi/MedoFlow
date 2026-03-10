@@ -325,6 +325,14 @@ export const getTemplatesForAppointment = async (
   return templates;
 };
 
+export const getPatientPrimaryClinic = async (patientId: string) => {
+  return prisma.patientClinicMembership.findFirst({
+    where: { patientId, isActive: true },
+    select: { clinicId: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+};
+
 export const getResponsesByPatient = async (
   clinicId: string,
   patientId: string

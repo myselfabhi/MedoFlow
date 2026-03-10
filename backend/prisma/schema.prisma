@@ -16,12 +16,57 @@ enum Role {
 
 enum AppointmentStatus {
   DRAFT
+  PENDING_PROVIDER_APPROVAL
   PENDING_PAYMENT
   CONFIRMED
   COMPLETED
   CANCELLED
   NO_SHOW
   RESCHEDULED
+}
+
+enum PaymentStatus {
+  NONE
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentRequirementType {
+  NONE
+  DEPOSIT
+  FULL
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingSource {
+  PUBLIC
+  PATIENT_PORTAL
+  FRONT_DESK
+  PROVIDER
+  WAITLIST
+}
+
+enum SlotHoldStatus {
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  RELEASED
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  BOOKED
+  EXPIRED
 }
 
 enum VisitRecordStatus {
@@ -63,6 +108,7 @@ model Clinic {
   email            String
   subscriptionPlan String   @default("free")
   isActive         Boolean  @default(true)
+  aiEnabled        Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -84,6 +130,7 @@ model Clinic {
   formResponses   FormResponse[]
   invoices        Invoice[]
   aiScribeSessions AIScribeSession[]
+  appointmentSeries AppointmentSeries[]
   products        Product[]
   inventoryItems  InventoryItem[]
   packages        Package[]
@@ -109,6 +156,7 @@ model User {
   passwordSetupTokens PasswordSetupToken[]
   refreshTokens       RefreshToken[]
   appointments    Appointment[]
+  appointmentSeries AppointmentSeries[]
   visitRecords    VisitRecord[]
   prescriptions   Prescription[]
   auditLogs       AuditLog[]
@@ -182,6 +230,7 @@ model Provider {
   treatmentPlans          TreatmentPlan[]
   invoices               Invoice[]
   aiScribeSessions       AIScribeSession[]
+  appointmentSeries      AppointmentSeries[]
   slotHolds              SlotHold[]
   locationAssignments    ProviderLocationAssignment[]
   googleCalendarEvents   GoogleCalendarEvent[]
@@ -278,10 +327,16 @@ model SlotHold {
   providerId String
   serviceId  String
   locationId String?
+  timezone   String   @default("UTC")
   startTime  DateTime
   endTime    DateTime
   patientId  String?
   expiresAt  DateTime
+  status     SlotHoldStatus @default(ACTIVE)
+  bookingSource BookingSource @default(PUBLIC)
+  releasedAt DateTime?
+  expiredAt  DateTime?
+  convertedToAppointmentId String?
   createdAt  DateTime @default(now())
 
   clinic   Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -310,6 +365,7 @@ model Service {
   prepaymentType        String    @default("NONE") // NONE, DEPOSIT, FULL
   depositAmount         Decimal?  @db.Decimal(10, 2)
   requirePrepayment     Boolean   @default(false)
+  requireProviderApproval Boolean @default(false)
   isActive              Boolean   @default(true)
   isArchived            Boolean   @default(false)
   createdAt             DateTime  @default(now())
@@ -319,6 +375,7 @@ model Service {
   discipline        Discipline        @relation(fields: [disciplineId], references: [id], onDelete: Restrict)
   providerServices  ProviderService[]
   appointments      Appointment[]
+  appointmentSeries AppointmentSeries[]
   waitlistEntries   WaitlistEntry[]
   slotHolds         SlotHold[]
   formTemplates     FormTemplate[]
@@ -397,15 +454,25 @@ model Appointment {
   serviceId           String
   disciplineId        String?
   patientId           String
+  timezone            String            @default("UTC")
   startTime           DateTime
   endTime             DateTime
   status              AppointmentStatus @default(CONFIRMED)
   priceAtBooking      Decimal            @db.Decimal(10, 2)
-  paymentStatus       String?            // NONE, PENDING, PAID
+  paymentStatus       PaymentStatus      @default(NONE)
+  paymentRequirementType PaymentRequirementType @default(NONE)
+  approvalStatus      ApprovalStatus     @default(NOT_REQUIRED)
+  bookingSource       BookingSource      @default(PUBLIC)
+  depositAmount       Decimal?           @db.Decimal(10, 2)
   paymentDueAt       DateTime?
   slotHeldUntil       DateTime?
+  bookingHoldExpiresAt DateTime?
   cancelledAt         DateTime?
   cancellationReason String?
+  notes              String?             @db.Text
+  createdById        String?
+  updatedById        String?
+  recurringSeriesId  String?
   rescheduledFromId   String?    @unique
   rescheduledToId     String?
   createdAt          DateTime   @default(now())
@@ -416,6 +483,7 @@ model Appointment {
   provider Provider  @relation(fields: [providerId], references: [id], onDelete: Restrict)
   service  Service   @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   patient  User      @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  recurringSeries AppointmentSeries? @relation(fields: [recurringSeriesId], references: [id], onDelete: SetNull)
 
   rescheduledFrom Appointment? @relation("RescheduleFrom", fields: [rescheduledFromId], references: [id])
   rescheduledTo   Appointment? @relation("RescheduleFrom")
@@ -435,6 +503,7 @@ model Appointment {
   @@index([providerId, startTime])
   @@index([clinicId, startTime])
   @@index([patientId, startTime])
+  @@index([recurringSeriesId])
 }
 
 model Payment {
@@ -446,7 +515,7 @@ model Payment {
   patientId     String
   refundForPaymentId String?
   amount        Decimal  @db.Decimal(10, 2)
-  status        String   // PENDING, SUCCESS, FAILED, REFUNDED
+  status        PaymentStatus
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -621,6 +690,7 @@ model AIScribeSession {
   patientSummary Json?
 
   status         AIScribeStatus @default(RECORDING)
+  patientSummaryPublished Boolean  @default(false)
 
   aiModel                String?
   errorMessage           String?
@@ -722,10 +792,12 @@ model WaitlistEntry {
   providerId         String
   serviceId         String
   patientId         String
+  preferredLocationId String?
+  timezone          String    @default("UTC")
   preferredDate     DateTime
   preferredStartTime String
   preferredEndTime   String
-  status            String // WAITING, OFFERED, BOOKED, EXPIRED
+  status            WaitlistStatus @default(WAITING)
   offeredAt         DateTime?
   expiresAt         DateTime?
   offeredStartTime  DateTime?
@@ -743,6 +815,31 @@ model WaitlistEntry {
   @@index([status])
   @@index([patientId])
   @@index([clinicId])
+}
+
+model AppointmentSeries {
+  id               String   @id @default(cuid())
+  clinicId         String
+  patientId        String
+  providerId       String
+  serviceId        String
+  locationId       String?
+  timezone         String
+  frequency        String
+  numberOfSessions Int?
+  endDate          DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient      User         @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  provider     Provider     @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+
+  @@index([clinicId])
+  @@index([patientId])
+  @@index([providerId])
 }
 
 model TreatmentPlan {

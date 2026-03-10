@@ -90,6 +90,15 @@ export const uploadAudio = asyncHandler(
       await aiScribeQueue.add('process', { sessionId });
     } catch (err) {
       console.error('[AI Scribe] Failed to queue job:', err);
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { status: 'FAILED', errorMessage: 'Failed to start processing. Please try again.' },
+      });
+      const updated = await aiScribeService.getSessionForProvider(sessionId, providerId, clinicId);
+      const apiErr = new Error('Processing could not be started. Please try again.') as ApiError;
+      apiErr.statusCode = 503;
+      apiErr.code = 'integration_failed';
+      throw apiErr;
     }
 
     successResponse(res, 200, 'Audio uploaded, processing started', { session });
@@ -133,6 +142,14 @@ export const process = asyncHandler(
       await aiScribeQueue.add('process', { sessionId });
     } catch (err) {
       console.error('[AI Scribe] Failed to queue job:', err);
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { status: 'FAILED', errorMessage: 'Failed to start processing. Please try again.' },
+      });
+      const apiErr = new Error('Processing could not be started. Please try again.') as ApiError;
+      apiErr.statusCode = 503;
+      apiErr.code = 'integration_failed';
+      throw apiErr;
     }
 
     const updated = session.status === 'FAILED'
@@ -253,6 +270,14 @@ export const regenerateDraft = asyncHandler(
       });
     } catch (err) {
       console.error('[AI Scribe] Failed to queue job:', err);
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { status: 'FAILED', errorMessage: 'Failed to start regeneration. Please try again.' },
+      });
+      const apiErr = new Error('Regeneration could not be started. Please try again.') as ApiError;
+      apiErr.statusCode = 503;
+      apiErr.code = 'integration_failed';
+      throw apiErr;
     }
 
     const updated = await aiScribeService.getSessionForProvider(
@@ -276,6 +301,21 @@ export const approve = asyncHandler(
       req.user!.id
     );
     successResponse(res, 200, 'Note approved and finalized', { session });
+  }
+);
+
+export const publishPatientSummary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const sessionId = req.params.id as string;
+    const { providerId, clinicId } = await providerScope(req);
+
+    const session = await aiScribeService.publishPatientSummary(
+      sessionId,
+      providerId,
+      clinicId,
+      req.user!.id
+    );
+    successResponse(res, 200, 'Patient summary published', { session });
   }
 );
 

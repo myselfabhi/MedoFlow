@@ -29,7 +29,11 @@ export const getAuthUrl = asyncHandler(
 
 export const connect = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const { code, redirectUri } = req.body as { code?: string; redirectUri?: string };
+    const { code, redirectUri, state } = req.body as {
+      code?: string;
+      redirectUri?: string;
+      state?: string;
+    };
     if (!code || !redirectUri) {
       const err = new Error('code and redirectUri are required') as ApiError;
       err.statusCode = 400;
@@ -39,6 +43,30 @@ export const connect = asyncHandler(
     if (!clinicId) {
       const err = new Error('Clinic ID is required') as ApiError;
       err.statusCode = 400;
+      throw err;
+    }
+    // Validate OAuth state to prevent CSRF (state must match current user/clinic)
+    if (!state) {
+      const err = new Error('OAuth state is required') as ApiError;
+      err.statusCode = 400;
+      err.code = 'validation_error';
+      throw err;
+    }
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(state, 'base64').toString('utf8')
+      ) as { userId?: string; clinicId?: string };
+      if (decoded.userId !== req.user!.id || decoded.clinicId !== clinicId) {
+        const err = new Error('Invalid OAuth state') as ApiError;
+        err.statusCode = 400;
+        err.code = 'validation_error';
+        throw err;
+      }
+    } catch (e) {
+      if ((e as ApiError).statusCode === 400) throw e;
+      const err = new Error('Invalid OAuth state') as ApiError;
+      err.statusCode = 400;
+      err.code = 'validation_error';
       throw err;
     }
     const connection = await googleCalendarService.connectGoogleCalendar(

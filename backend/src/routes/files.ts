@@ -8,29 +8,44 @@ import { Role } from '@prisma/client';
 const router = Router();
 
 router.use(protect);
-router.use(requireClinic);
 
 router.post(
   '/upload',
+  requireClinic,
   authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
   patientFileUpload.single('file'),
   fileController.upload
 );
 
 router.get(
+  '/patient/me',
+  authorize(Role.PATIENT),
+  fileController.listMyFiles
+);
+
+router.get(
+  '/patient/me/:id/download',
+  authorize(Role.PATIENT),
+  fileController.downloadMyFile
+);
+
+router.get(
   '/patient/:patientId',
+  requireClinic,
   authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
   fileController.listByPatient
 );
 
 router.get(
   '/:id/download',
+  requireClinic,
   authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
   fileController.download
 );
 
 router.delete(
   '/:id',
+  requireClinic,
   authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
   fileController.remove
 );

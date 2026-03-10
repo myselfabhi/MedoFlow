@@ -10,9 +10,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useQuery } from '@tanstack/react-query';
+import { getAvailability } from '@/lib/providerApi';
+import { createSlotHold, releaseSlotHold } from '@/lib/appointmentApi';
 import { rescheduleAppointment, type ProviderAppointment } from '@/lib/patientApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { format, addMinutes } from 'date-fns';
+import { format } from 'date-fns';
+import type { TimeSlot } from '@/lib/types/booking';
 
 interface RescheduleDialogProps {
   appointment: ProviderAppointment;
@@ -29,23 +33,63 @@ export function RescheduleDialog({
 }: RescheduleDialogProps) {
   const toast = useAppToast();
   const start = new Date(appointment.startTime);
-  const end = new Date(appointment.endTime);
-  const duration = (end.getTime() - start.getTime()) / 60000;
-
   const [date, setDate] = useState(format(start, 'yyyy-MM-dd'));
-  const [time, setTime] = useState(format(start, 'HH:mm'));
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [slotHoldId, setSlotHoldId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: slots = [], isLoading } = useQuery({
+    queryKey: [
+      'reschedule-availability',
+      appointment.id,
+      date,
+      appointment.providerId,
+      appointment.locationId,
+      appointment.serviceId,
+    ],
+    queryFn: () =>
+      getAvailability(
+        appointment.clinicId,
+        appointment.serviceId,
+        date,
+        appointment.providerId,
+        appointment.locationId
+      ),
+    enabled: open && !!date,
+  });
+
+  React.useEffect(() => {
+    return () => {
+      if (slotHoldId) {
+        void releaseSlotHold(slotHoldId, appointment.clinicId);
+      }
+    };
+  }, [slotHoldId, appointment.clinicId]);
+
+  React.useEffect(() => {
+    setSelectedSlot(null);
+    if (slotHoldId) {
+      void releaseSlotHold(slotHoldId, appointment.clinicId);
+      setSlotHoldId(null);
+    }
+  }, [date, appointment.clinicId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newStart = new Date(`${date}T${time}`);
-    const newEnd = addMinutes(newStart, duration);
+    if (!selectedSlot) {
+      toast.error('Select an available slot first');
+      return;
+    }
     setIsSubmitting(true);
     try {
       await rescheduleAppointment(
         appointment.id,
-        newStart.toISOString(),
-        newEnd.toISOString()
+        {
+          locationId: selectedSlot.locationId ?? undefined,
+          slotHoldId: slotHoldId ?? undefined,
+          newStartTime: selectedSlot.start,
+          newEndTime: selectedSlot.end,
+        }
       );
       onSuccess();
       onOpenChange(false);
@@ -73,19 +117,55 @@ export function RescheduleDialog({
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">Time</label>
-            <Input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-            />
+            <label className="mb-2 block text-sm font-medium">Available slots</label>
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading slots...</p>
+            ) : slots.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No valid slots are available for this date.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {slots.map((slot) => (
+                  <button
+                    key={`${slot.providerId}-${slot.start}`}
+                    type="button"
+                    onClick={async () => {
+                      if (slotHoldId) {
+                        await releaseSlotHold(slotHoldId, appointment.clinicId);
+                      }
+                      const hold = await createSlotHold({
+                        clinicId: appointment.clinicId,
+                        providerId: slot.providerId,
+                        serviceId: slot.serviceId,
+                        locationId: slot.locationId ?? undefined,
+                        timezone: slot.timezone,
+                        startTime: slot.start,
+                        endTime: slot.end,
+                      });
+                      setSlotHoldId(hold.id);
+                      setSelectedSlot(slot);
+                    }}
+                    className={`rounded-md border px-3 py-2 text-sm ${
+                      selectedSlot?.start === slot.start
+                        ? 'border-primary-600 bg-primary-50 text-primary-700'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    {new Date(slot.start).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !selectedSlot}>
               {isSubmitting ? 'Rescheduling...' : 'Reschedule'}
             </Button>
           </DialogFooter>

@@ -151,6 +151,51 @@ export const validatePatientBelongsToClinic = async (
   return !!membership;
 };
 
+export const getPatientPrimaryClinicId = async (patientId: string): Promise<string | null> => {
+  const membership = await prisma.patientClinicMembership.findFirst({
+    where: { patientId, isActive: true },
+    select: { clinicId: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return membership?.clinicId ?? null;
+};
+
+export const assertPatientCanAccessClinicFiles = async (
+  patientId: string,
+  clinicId: string
+): Promise<void> => {
+  await patientMembershipService.assertPatientBelongsToClinic(patientId, clinicId);
+};
+
+export const getFileForPatientDownload = async (
+  fileId: string,
+  patientId: string,
+  clinicId: string,
+  performedById: string
+): Promise<{ filePath: string; originalName: string; mimeType: string } | null> => {
+  await patientMembershipService.assertPatientBelongsToClinic(patientId, clinicId);
+  const file = await prisma.patientFile.findFirst({
+    where: {
+      id: fileId,
+      clinicId,
+      patientId,
+      isDeleted: false,
+    },
+  });
+  if (!file) return null;
+  const downloadInfo = await getFileForDownload(fileId, clinicId);
+  if (!downloadInfo) return null;
+  await logAudit({
+    clinicId,
+    entityType: 'PatientFile',
+    entityId: fileId,
+    action: 'FILE_DOWNLOADED',
+    newValue: { originalName: file.originalName },
+    performedById,
+  });
+  return downloadInfo;
+};
+
 export const getFileById = async (
   fileId: string,
   clinicId: string

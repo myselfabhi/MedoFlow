@@ -1,14 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as waitlistController from '../controllers/waitlistController';
 import { protect, authorize } from '../middleware/auth';
+import { validateRequest } from '../middleware/validateRequest';
 import { Role } from '@prisma/client';
+import { waitlistCreateSchema } from '../validation/module2Schemas';
 
 const router = Router();
 
 router.use(protect);
 router.use(authorize(Role.PATIENT));
 
-router.post('/', (req: Request, _res: Response, next: NextFunction): void => {
+router.post('/', validateRequest(waitlistCreateSchema), (req: Request, _res: Response, next: NextFunction): void => {
   req.clinicId = req.user?.clinicId ?? (req.body?.clinicId as string) ?? null;
   next();
 }, waitlistController.add);

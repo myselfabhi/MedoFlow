@@ -65,4 +65,10 @@ router.post(
   aiScribeController.approve
 );
 
+router.post(
+  '/session/:id/publish-summary',
+  authorize(Role.PROVIDER),
+  aiScribeController.publishPatientSummary
+);
+
 export default router;

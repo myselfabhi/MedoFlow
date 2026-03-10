@@ -3,21 +3,8 @@ import * as visitService from '../services/visitService';
 import * as aiScribeService from '../services/aiScribeService';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
+import { sanitizeVisitRecordForPatient } from '../utils/visitSanitize';
 import { ApiError } from '../types/errors';
-
-const sanitizeVisitRecordForPatient = <T extends Record<string, unknown>>(visitRecord: T): T => {
-  if (visitRecord.isFinalized) return visitRecord;
-  return {
-    ...visitRecord,
-    subjective: null,
-    objective: null,
-    assessment: null,
-    plan: null,
-    note: null,
-    currentVersion: null,
-    versions: [],
-  };
-};
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -79,7 +66,7 @@ export const getById = asyncHandler(
       visitRecord: safeVisitRecord,
     };
     if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
-      const patientSummary = await aiScribeService.getApprovedPatientSummary(
+      const patientSummary = await aiScribeService.getPublishedPatientSummary(
         visitRecord.id,
         visitRecord.patientId
       );
@@ -144,7 +131,7 @@ export const getByAppointment = asyncHandler(
       visitRecord: safeVisitRecord,
     };
     if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
-      const patientSummary = await aiScribeService.getApprovedPatientSummary(
+      const patientSummary = await aiScribeService.getPublishedPatientSummary(
         visitRecord.id,
         visitRecord.patientId
       );

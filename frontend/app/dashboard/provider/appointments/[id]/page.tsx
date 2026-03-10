@@ -170,8 +170,9 @@ export default function ProviderAppointmentDetailPage() {
   });
 
   const { data: formResponses = [], isLoading: formsLoading } = useQuery({
-    queryKey: ['forms', 'patient', appointment?.patientId],
-    queryFn: () => getPatientForms(appointment!.patientId),
+    queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
+    queryFn: () =>
+      getPatientForms(appointment!.patientId, appointment?.clinicId),
     enabled: !!appointment?.patientId,
   });
 

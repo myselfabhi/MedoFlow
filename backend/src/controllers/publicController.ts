@@ -74,6 +74,13 @@ export const getClinicProviders = asyncHandler(
         lastName: true,
         email: true,
         disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+        locationAssignments: {
+          where: { location: { isActive: true } },
+          include: {
+            location: { select: { id: true, name: true, timezone: true } },
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
         providerServices: {
           select: { serviceId: true },
         },
@@ -116,11 +123,13 @@ export const getAvailability = asyncHandler(
       clinicId,
       serviceId,
       providerId,
+      locationId,
       date,
     } = req.query as {
       clinicId?: string;
       serviceId?: string;
       providerId?: string;
+      locationId?: string;
       date?: string;
     };
 
@@ -129,6 +138,7 @@ export const getAvailability = asyncHandler(
         'clinicId, serviceId, and date are required'
       ) as ApiError;
       err.statusCode = 400;
+      err.code = 'validation_error';
       throw err;
     }
 
@@ -144,13 +154,39 @@ export const getAvailability = asyncHandler(
     if (!service) {
       const err = new Error('Service not found') as ApiError;
       err.statusCode = 404;
+      err.code = 'validation_error';
+      throw err;
+    }
+
+    const resolvedLocation =
+      (locationId
+        ? await prisma.location.findFirst({
+            where: { id: locationId, clinicId, isActive: true },
+            select: { id: true, timezone: true },
+          })
+        : await prisma.location.findFirst({
+            where: { clinicId, isActive: true },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, timezone: true },
+          })) ?? null;
+
+    if (!resolvedLocation) {
+      const err = new Error('Location not found') as ApiError;
+      err.statusCode = 404;
+      err.code = 'validation_error';
       throw err;
     }
 
     let providerIds: string[] = [];
     if (providerId) {
       const p = await prisma.provider.findFirst({
-        where: { id: providerId, clinicId, isActive: true },
+        where: {
+          id: providerId,
+          clinicId,
+          isActive: true,
+          providerServices: { some: { serviceId } },
+          locationAssignments: { some: { locationId: resolvedLocation.id } },
+        },
       });
       if (p) providerIds = [p.id];
     } else {
@@ -159,32 +195,27 @@ export const getAvailability = asyncHandler(
           clinicId,
           isActive: true,
           providerServices: { some: { serviceId } },
+          locationAssignments: { some: { locationId: resolvedLocation.id } },
         },
         select: { id: true },
       });
       providerIds = providers.map((p) => p.id);
     }
 
-    const startTimes = new Set<string>();
+    const slots: Awaited<ReturnType<typeof availabilityService.getAvailableSlots>> = [];
     for (const pid of providerIds) {
       const providerSlots = await availabilityService.getAvailableSlots({
         providerId: pid,
+        serviceId,
+        locationId: resolvedLocation.id,
         serviceDurationMinutes: service.duration,
         date,
         clinicId,
       });
-      for (const slotStart of providerSlots) {
-        startTimes.add(slotStart);
-      }
+      slots.push(...providerSlots);
     }
-    const slots = Array.from(startTimes)
-      .sort()
-      .map((startIso) => {
-        const start = new Date(startIso);
-        const end = new Date(start);
-        end.setMinutes(end.getMinutes() + service.duration);
-        return { start: start.toISOString(), end: end.toISOString() };
-      });
+
+    slots.sort((left, right) => left.start.localeCompare(right.start));
 
     successResponse(res, 200, 'Availability retrieved', { slots });
   }
@@ -197,6 +228,7 @@ export const createSlotHold = asyncHandler(
       providerId,
       serviceId,
       locationId,
+      timezone,
       startTime,
       endTime,
       patientId,
@@ -205,15 +237,17 @@ export const createSlotHold = asyncHandler(
       providerId: string;
       serviceId: string;
       locationId?: string | null;
+      timezone: string;
       startTime: string;
       endTime: string;
       patientId?: string;
     };
-    if (!clinicId || !providerId || !serviceId || !startTime || !endTime) {
+    if (!clinicId || !providerId || !serviceId || !startTime || !endTime || !timezone) {
       const err = new Error(
-        'clinicId, providerId, serviceId, startTime, endTime are required'
+        'clinicId, providerId, serviceId, timezone, startTime, and endTime are required'
       ) as ApiError;
       err.statusCode = 400;
+      err.code = 'validation_error';
       throw err;
     }
     const hold = await slotHoldService.createSlotHold({
@@ -221,9 +255,11 @@ export const createSlotHold = asyncHandler(
       providerId,
       serviceId,
       locationId: locationId ?? null,
+      timezone,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
       patientId,
+      performedById: patientId,
     });
     successResponse(res, 201, 'Slot hold created', { hold });
   }
@@ -236,6 +272,7 @@ export const releaseSlotHold = asyncHandler(
     if (!clinicId) {
       const err = new Error('clinicId is required') as ApiError;
       err.statusCode = 400;
+      err.code = 'validation_error';
       throw err;
     }
     const released = await slotHoldService.releaseSlotHold(holdId, clinicId);

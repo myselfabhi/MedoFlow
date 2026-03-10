@@ -2,6 +2,8 @@
 
 Deploy MedoFlow with **Vercel** (frontend) and **Render** (backend).
 
+**Before deploying:** See [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) for production requirements.
+
 ## Architecture
 
 - **Frontend**: Next.js 14 → Vercel
@@ -39,7 +41,7 @@ Deploy MedoFlow with **Vercel** (frontend) and **Render** (backend).
 | `DATABASE_URL` | Yes | Internal Database URL from your PostgreSQL instance |
 | `JWT_SECRET` | Yes | Strong random string, e.g. `openssl rand -base64 32` |
 | `NODE_ENV` | Yes | `production` |
-| `CORS_ORIGIN` | Yes* | Your Vercel frontend URL, e.g. `https://medoflow.vercel.app` |
+| `CORS_ORIGIN` | Yes (prod) | Your Vercel frontend URL. **Required in production**—API rejects cross-origin requests if unset. |
 | `STRIPE_SECRET` | No | If using Stripe payments |
 | `FILE_SIZE_LIMIT_MB` | No | Default `10` |
 | `OPENAI_API_KEY` | Yes* | For AI Scribe (transcription + SOAP notes) |

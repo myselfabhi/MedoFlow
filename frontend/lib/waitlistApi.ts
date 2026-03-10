@@ -31,6 +31,8 @@ export interface AddToWaitlistPayload {
   clinicId: string;
   providerId: string;
   serviceId: string;
+  locationId?: string;
+  timezone?: string;
   preferredDate: string;
   preferredStartTime: string;
   preferredEndTime: string;

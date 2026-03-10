@@ -5,7 +5,10 @@ import { ApiError } from '../types/errors';
 import * as aiScribeService from './aiScribeService';
 import * as visitService from './visitService';
 
-const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+];
 const TOKEN_PREFIX = 'enc:v1:';
 
 const getTokenEncryptionKey = (): Buffer | null => {

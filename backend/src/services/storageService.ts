@@ -49,12 +49,15 @@ function ensureLocalDir(sessionId: string): string {
   return dir;
 }
 
+/** Durable storage reference: s3:bucket:key or local:path */
+export type AudioStorageRef = string;
+
 export async function uploadAudio(params: {
   sessionId: string;
   buffer: Buffer;
   mimeType: string;
   originalName?: string;
-}): Promise<string> {
+}): Promise<AudioStorageRef> {
   const { sessionId, buffer, mimeType, originalName } = params;
   const ext = path.extname(originalName || 'audio.webm') || '.webm';
   const filename = `audio${ext}`;
@@ -69,22 +72,39 @@ export async function uploadAudio(params: {
         ContentType: mimeType,
       })
     );
-    const baseUrl = process.env.S3_PUBLIC_URL || ENDPOINT;
-    if (baseUrl) {
-      return `${baseUrl}/${BUCKET}/${key}`;
-    }
-    const signedUrl = await getSignedUrl(
-      s3Client,
-      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-      { expiresIn: 86400 * 7 }
-    );
-    return signedUrl;
+    return `s3:${BUCKET}:${key}`;
   }
 
   const dir = ensureLocalDir(sessionId);
   const filePath = path.join(dir, filename);
   fs.writeFileSync(filePath, buffer);
-  return path.join('uploads', 'ai-scribe', sessionId, filename).replace(/\\/g, '/');
+  const localPath = path.join('uploads', 'ai-scribe', sessionId, filename).replace(/\\/g, '/');
+  return `local:${localPath}`;
+}
+
+/** Resolve durable storage ref to buffer for worker processing. Do not use expiring URLs. */
+export async function getAudioBufferFromRef(storageRef: AudioStorageRef): Promise<Buffer> {
+  if (storageRef.startsWith('s3:')) {
+    if (!s3Client) throw new Error('S3 not configured');
+    const rest = storageRef.slice(3);
+    const firstColon = rest.indexOf(':');
+    const bucket = firstColon >= 0 ? rest.slice(0, firstColon) : BUCKET;
+    const key = firstColon >= 0 ? rest.slice(firstColon + 1) : rest;
+    const response = await s3Client.send(
+      new GetObjectCommand({ Bucket: bucket || BUCKET, Key: key })
+    );
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  }
+  if (storageRef.startsWith('local:') || storageRef.startsWith('/uploads/') || storageRef.startsWith('uploads/')) {
+    const localPath = storageRef.startsWith('local:') ? storageRef.slice(6) : storageRef.replace(/^\//, '');
+    const fullPath = path.join(process.cwd(), localPath);
+    return fs.readFileSync(fullPath);
+  }
+  throw new Error('Invalid audio storage reference');
 }
 
 export async function getAudioUrl(storagePath: string): Promise<string> {

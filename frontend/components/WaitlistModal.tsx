@@ -26,6 +26,8 @@ interface WaitlistModalProps {
   clinicId: string;
   providerId: string;
   serviceId: string;
+  locationId?: string;
+  timezone?: string;
   defaultPreferredDate?: string;
   onSuccess?: () => void;
 }
@@ -36,6 +38,8 @@ export function WaitlistModal({
   clinicId,
   providerId,
   serviceId,
+  locationId,
+  timezone,
   defaultPreferredDate = '',
   onSuccess,
 }: WaitlistModalProps) {
@@ -69,6 +73,8 @@ export function WaitlistModal({
         clinicId,
         providerId,
         serviceId,
+        locationId,
+        timezone,
         preferredDate: data.preferredDate,
         preferredStartTime: data.preferredStartTime,
         preferredEndTime: data.preferredEndTime,

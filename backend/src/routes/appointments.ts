@@ -2,7 +2,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import * as appointmentController from '../controllers/appointmentController';
 import { protect, authorize } from '../middleware/auth';
 import { requireClinic } from '../middleware/requireClinic';
+import { validateRequest } from '../middleware/validateRequest';
 import { Role } from '@prisma/client';
+import {
+  appointmentCreateSchema,
+  appointmentRecurringSchema,
+  appointmentRescheduleSchema,
+} from '../validation/module2Schemas';
 
 const router = Router();
 
@@ -21,6 +27,7 @@ router.post(
   '/',
   authorize(Role.PATIENT, Role.SUPER_ADMIN, Role.FRONT_DESK),
   setClinicFromUser,
+  validateRequest(appointmentCreateSchema),
   appointmentController.create
 );
 
@@ -28,6 +35,7 @@ router.post(
   '/recurring',
   authorize(Role.PATIENT, Role.SUPER_ADMIN, Role.FRONT_DESK),
   setClinicFromUser,
+  validateRequest(appointmentRecurringSchema),
   appointmentController.createRecurring
 );
 
@@ -91,6 +99,7 @@ router.post(
   '/:id/reschedule',
   authorize(Role.PATIENT, Role.PROVIDER, Role.FRONT_DESK),
   setClinicFromUser,
+  validateRequest(appointmentRescheduleSchema),
   appointmentController.reschedule
 );
 

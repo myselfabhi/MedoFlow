@@ -1,6 +1,12 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
+import {
+  BlockedInterval,
+  buildCandidateSlots,
+  getDateWindow,
+  SchedulingSlot,
+} from './schedulingCore';
 
 const CANCELLED_STATUS = 'CANCELLED';
 const RESCHEDULED_STATUS = 'RESCHEDULED';
@@ -27,6 +33,8 @@ function addMinutes(date: Date, minutes: number): Date {
 
 export interface GetAvailableSlotsParams {
   providerId: string;
+  serviceId: string;
+  locationId?: string | null;
   serviceDurationMinutes: number;
   date: string;
   clinicId?: string;
@@ -34,41 +42,71 @@ export interface GetAvailableSlotsParams {
 
 export const getAvailableSlots = async (
   params: GetAvailableSlotsParams
-): Promise<string[]> => {
-  const { providerId, serviceDurationMinutes, date, clinicId } = params;
+): Promise<SchedulingSlot[]> => {
+  const { providerId, serviceId, serviceDurationMinutes, date, clinicId } = params;
 
   const provider = await prisma.provider.findFirst({
     where: { id: providerId, isActive: true, ...(clinicId && { clinicId }) },
-    include: { providerAvailability: true },
+    include: {
+      providerAvailability: true,
+      locationAssignments: {
+        where: { location: { isActive: true } },
+        include: {
+          location: true,
+        },
+        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+      },
+      providerServices: {
+        where: { serviceId },
+        include: { service: true },
+      },
+    },
   });
 
   if (!provider) return [];
   if (!provider.isActive) return [];
+  if (provider.providerServices.length === 0) return [];
 
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-  const weekday = targetDate.getDay();
+  const assignedLocation = params.locationId
+    ? provider.locationAssignments.find(
+        (assignment) => assignment.locationId === params.locationId
+      )
+    : provider.locationAssignments[0];
 
-  const schedule = provider.providerAvailability.find(
-    (a) => a.weekday === weekday
+  const timezone =
+    assignedLocation?.location.timezone ||
+    provider.locationAssignments[0]?.location.timezone ||
+    'UTC';
+  const locationId = assignedLocation?.locationId ?? params.locationId ?? null;
+
+  const { start, end, weekday } = getDateWindow(date, timezone);
+  const schedules = provider.providerAvailability.filter(
+    (availability) =>
+      availability.weekday === weekday &&
+      ((availability.locationId ?? null) === (locationId ?? null) ||
+        availability.locationId == null)
   );
-  if (!schedule) return [];
+  if (schedules.length === 0) return [];
 
   const bufferMinutes = provider.bufferMinutes ?? 0;
-
-  const dayStart = new Date(targetDate);
-  const dayEnd = new Date(targetDate);
-  const { hours: startH, minutes: startM } = parseTime(schedule.startTime);
-  const { hours: endH, minutes: endM } = parseTime(schedule.endTime);
-  dayStart.setHours(startH, startM, 0, 0);
-  dayEnd.setHours(endH, endM, 0, 0);
 
   const appointments = await prisma.appointment.findMany({
     where: {
       providerId,
       status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
-      startTime: { lt: dayEnd },
-      endTime: { gt: dayStart },
+      startTime: { lt: end.toJSDate() },
+      endTime: { gt: start.toJSDate() },
+    },
+    select: { startTime: true, endTime: true },
+  });
+
+  const activeHolds = await prisma.slotHold.findMany({
+    where: {
+      providerId,
+      status: 'ACTIVE',
+      expiresAt: { gt: new Date() },
+      startTime: { lt: end.toJSDate() },
+      endTime: { gt: start.toJSDate() },
     },
     select: { startTime: true, endTime: true },
   });
@@ -77,18 +115,25 @@ export const getAvailableSlots = async (
     where: {
       providerId,
       date: {
-        gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
-        lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1),
+        gte: start.toJSDate(),
+        lt: end.plus({ milliseconds: 1 }).toJSDate(),
       },
     },
   });
 
-  const blockedRanges: { start: Date; end: Date }[] = [];
+  const blockedRanges: BlockedInterval[] = [];
 
   for (const apt of appointments) {
     const start = new Date(apt.startTime);
     const end = addMinutes(new Date(apt.endTime), bufferMinutes);
     blockedRanges.push({ start, end });
+  }
+
+  for (const hold of activeHolds) {
+    blockedRanges.push({
+      start: new Date(hold.startTime),
+      end: new Date(hold.endTime),
+    });
   }
 
   for (const unav of unavailabilities) {
@@ -114,24 +159,19 @@ export const getAvailableSlots = async (
     blockedRanges.push({ start: unavStart, end: unavEnd });
   }
 
-  const slots: string[] = [];
-  let slotStart = new Date(dayStart);
-
-  while (slotStart < dayEnd) {
-    const slotEnd = addMinutes(slotStart, serviceDurationMinutes);
-    if (slotEnd > dayEnd) break;
-
-    const overlaps = blockedRanges.some(
-      (b) => slotStart < b.end && slotEnd > b.start
-    );
-    if (!overlaps) {
-      slots.push(slotStart.toISOString());
-    }
-
-    slotStart = addMinutes(slotStart, 15);
-  }
-
-  return slots;
+  return buildCandidateSlots({
+    date,
+    timezone,
+    locationId,
+    providerId,
+    serviceId,
+    durationMinutes: serviceDurationMinutes,
+    schedules: schedules.map((schedule) => ({
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+    })),
+    blocked: blockedRanges,
+  });
 };
 
 export interface PreviewAvailabilityUpdateParams {
@@ -183,6 +223,7 @@ export const previewAvailabilityUpdate = async (
 
 export interface CreateAvailabilityData {
   providerId: string;
+  locationId?: string | null;
   weekday: number;
   startTime: string;
   endTime: string;
@@ -204,6 +245,7 @@ export const createAvailability = async (
   const created = await prisma.providerAvailability.create({
     data: {
       providerId: data.providerId,
+      locationId: data.locationId ?? null,
       weekday: data.weekday,
       startTime: data.startTime,
       endTime: data.endTime,

@@ -111,10 +111,15 @@ export const getResponsesByPatient = asyncHandler(
       err.statusCode = 403;
       throw err;
     }
-    const clinicId = req.clinicId!;
+    let clinicId = req.clinicId ?? (req.query.clinicId as string | undefined);
+    if (req.user!.role === 'PATIENT' && !clinicId) {
+      const membership = await formService.getPatientPrimaryClinic(patientId);
+      clinicId = membership?.clinicId ?? undefined;
+    }
     if (!clinicId) {
-      const err = new Error('Clinic scope required') as ApiError;
+      const err = new Error('Clinic scope required. Provide clinicId or ensure patient has clinic membership.') as ApiError;
       err.statusCode = 400;
+      err.code = 'validation_error';
       throw err;
     }
     const responses = await formService.getResponsesByPatient(

@@ -2,7 +2,7 @@ import api from './api';
 
 export interface PaymentResponse {
   id: string;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
   amount: string;
 }
 

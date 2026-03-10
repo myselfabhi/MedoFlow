@@ -101,12 +101,13 @@ export default function ProviderMeetingsPage() {
   React.useEffect(() => {
     const code = searchParams.get('code');
     const scope = searchParams.get('scope');
+    const state = searchParams.get('state');
     if (!code || !scope || user?.role !== 'PROVIDER') return;
 
     let cancelled = false;
     const run = async () => {
       try {
-        await connectGoogleCalendar(code, redirectUri);
+        await connectGoogleCalendar(code, redirectUri, state ?? undefined);
         await syncGoogleMeetings(redirectUri, 7);
         if (!cancelled) {
           queryClient.invalidateQueries({ queryKey: ['google-meetings'] });
