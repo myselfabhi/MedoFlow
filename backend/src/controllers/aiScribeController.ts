@@ -149,10 +149,22 @@ export const getSessionStatus = asyncHandler(
       err.statusCode = 404;
       throw err;
     }
+    const processingStartedAt = session.processingStartedAt;
+    const processingCompletedAt = session.processingCompletedAt;
+    const processingDuration =
+      processingStartedAt && processingCompletedAt
+        ? Math.round(
+            (new Date(processingCompletedAt).getTime() -
+              new Date(processingStartedAt).getTime()) /
+              1000
+          )
+        : null;
+
     successResponse(res, 200, 'Status retrieved', {
       status: session.status,
-      processingStartedAt: session.processingStartedAt,
-      processingCompletedAt: session.processingCompletedAt,
+      processingStartedAt,
+      processingCompletedAt,
+      processingDuration,
       errorMessage: session.errorMessage,
     });
   }
@@ -227,7 +239,10 @@ export const regenerateDraft = asyncHandler(
     });
 
     try {
-      await aiScribeQueue.add('process', { sessionId });
+      await aiScribeQueue.add('regenerate-soap', {
+        sessionId,
+        regenerateSoapOnly: true,
+      });
     } catch (err) {
       console.error('[AI Scribe] Failed to queue job:', err);
     }

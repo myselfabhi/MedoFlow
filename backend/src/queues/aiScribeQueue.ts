@@ -8,7 +8,6 @@ import { Queue, Worker, Job } from 'bullmq';
 import OpenAI from 'openai';
 import prisma from '../config/prisma';
 import * as aiScribeService from '../services/aiScribeService';
-import * as openaiService from '../services/openaiService';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
@@ -45,13 +44,15 @@ export const aiScribeQueue = new Queue(AI_SCRIBE_QUEUE_NAME, {
   connection: redisConfig,
   defaultJobOptions: {
     attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
+    backoff: { type: 'exponential', delay: 5000 },
     removeOnComplete: 100,
   },
 });
 
 export interface AiScribeJobData {
   sessionId: string;
+  /** When true, skip Whisper and regenerate SOAP from existing transcript only */
+  regenerateSoapOnly?: boolean;
 }
 
 function logStructured(
@@ -111,7 +112,29 @@ async function transcribeWithWhisper(buffer: Buffer, mimeType: string): Promise<
   }
 }
 
+function cleanTranscript(transcript: string): string {
+  const fillerPhrases = [
+    /\bhello doctor\b/gi,
+    /\bgood morning\b/gi,
+    /\bgood afternoon\b/gi,
+    /\bgood evening\b/gi,
+    /\bthank you\b/gi,
+    /\bthanks\b/gi,
+    /\bokay\b/gi,
+    /\bok\b/gi,
+    /\buh\b/gi,
+    /\bum\b/gi,
+    /\buhm\b/gi,
+  ];
+  let cleaned = transcript;
+  for (const pattern of fillerPhrases) {
+    cleaned = cleaned.replace(pattern, ' ');
+  }
+  return cleaned.replace(/\s+/g, ' ').trim();
+}
+
 async function generateSoapDraft(transcript: string): Promise<aiScribeService.SoapDraft> {
+  const cleaned = cleanTranscript(transcript);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured');
@@ -133,7 +156,7 @@ Return valid JSON only, no markdown or extra text:
       },
       {
         role: 'user',
-        content: transcript,
+        content: cleaned,
       },
     ],
     response_format: { type: 'json_object' },
@@ -150,14 +173,17 @@ Return valid JSON only, no markdown or extra text:
 }
 
 async function processAiScribeJob(job: Job<AiScribeJobData>) {
-  const { sessionId } = job.data;
+  const { sessionId, regenerateSoapOnly } = job.data;
   const startTime = Date.now();
 
   const session = await prisma.aIScribeSession.findUnique({
     where: { id: sessionId },
     include: { provider: { select: { userId: true } } },
   });
-  if (!session || !session.audioUrl) {
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  if (!regenerateSoapOnly && !session.audioUrl) {
     throw new Error('Session or audio not found');
   }
 
@@ -185,25 +211,40 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
 
   await job.updateProgress(10);
 
-  try {
+  let transcript: string;
+
+  if (regenerateSoapOnly && session.transcript) {
+    transcript = session.transcript;
+    try {
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { status: 'TRANSCRIBING' },
+      });
+    } catch {
+      // non-fatal
+    }
+    await job.updateProgress(40);
+  } else {
+    try {
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { status: 'TRANSCRIBING' },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    const buffer = await fetchAudioBuffer(session.audioUrl!);
+    const mimeType = 'audio/webm';
+    await job.updateProgress(30);
+
+    transcript = await transcribeWithWhisper(buffer, mimeType);
     await prisma.aIScribeSession.update({
       where: { id: sessionId },
-      data: { status: 'TRANSCRIBING' },
+      data: { transcript },
     });
-  } catch {
-    // non-fatal
+    await job.updateProgress(50);
   }
-
-  const buffer = await fetchAudioBuffer(session.audioUrl);
-  const mimeType = 'audio/webm';
-  await job.updateProgress(30);
-
-  const transcript = await transcribeWithWhisper(buffer, mimeType);
-  await prisma.aIScribeSession.update({
-    where: { id: sessionId },
-    data: { transcript },
-  });
-  await job.updateProgress(50);
 
   const soapDraft = await generateSoapDraft(transcript);
   await prisma.aIScribeSession.update({
@@ -217,12 +258,6 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
     },
   });
   await job.updateProgress(80);
-
-  const patientSummary = await openaiService.generatePatientSummary(soapDraft);
-  await prisma.aIScribeSession.update({
-    where: { id: sessionId },
-    data: { patientSummary: patientSummary as object },
-  });
 
   await aiScribeService.saveDraftAsVisitNoteVersion(sessionId, soapDraft);
   await job.updateProgress(100);

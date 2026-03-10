@@ -64,6 +64,7 @@ export const getSessionStatus = async (
   status: AIScribeStatus;
   processingStartedAt?: string | null;
   processingCompletedAt?: string | null;
+  processingDuration?: number | null;
   errorMessage?: string | null;
 }> => {
   const params = clinicId ? `?clinicId=${clinicId}` : '';
@@ -73,6 +74,7 @@ export const getSessionStatus = async (
       status: AIScribeStatus;
       processingStartedAt?: string | null;
       processingCompletedAt?: string | null;
+      processingDuration?: number | null;
       errorMessage?: string | null;
     };
   }>(`/ai-scribe/session/${sessionId}/status${params}`);

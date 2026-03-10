@@ -29,6 +29,7 @@ import { getVisitByAppointment } from '@/lib/patientApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppToast } from '@/hooks/useAppToast';
@@ -39,7 +40,7 @@ const STATUS_BADGES: Record<string, { label: string; variant: 'default' | 'secon
   DRAFT_GENERATED: { label: 'Draft Ready', variant: 'default', className: 'bg-blue-100 text-blue-800 border-blue-200' },
   EDITED: { label: 'Edited', variant: 'outline', className: 'bg-purple-100 text-purple-800 border-purple-200' },
   APPROVED: { label: 'Approved', variant: 'default', className: 'bg-green-100 text-green-800 border-green-200' },
-  FAILED: { label: 'Failed', variant: 'destructive' },
+  FAILED: { label: 'Failed', variant: 'destructive', className: 'bg-red-100 text-red-800 border-red-200' },
 };
 
 function SoapEditor({
@@ -399,6 +400,21 @@ export default function ProviderAIScribePage() {
                   </div>
                 )}
               </div>
+
+              {session.transcript && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Transcript</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[180px] w-full rounded-md border border-gray-200 p-4">
+                      <p className="whitespace-pre-wrap text-sm text-gray-700">
+                        {session.transcript}
+                      </p>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              )}
 
               {(session.status === 'DRAFT_GENERATED' ||
                 session.status === 'EDITED' ||
