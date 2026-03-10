@@ -19,7 +19,7 @@ import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices, type DashboardService } from '@/lib/serviceApi';
 import { addProvider, type AddProviderPayload } from '@/lib/availabilityApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -42,7 +42,7 @@ interface AddProviderDialogProps {
 
 export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps) {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
+  const { clinicId, ensureClinicSelected } = useClinicGuard();
   const effectiveClinicId = (clinicId ?? user?.clinicId)?.trim() || undefined;
   const queryClient = useQueryClient();
   const toast = useAppToast();
@@ -133,10 +133,7 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
   });
 
   const onSubmit = (data: AddProviderFormData) => {
-    if (!effectiveClinicId) {
-      toast.error('Please select a clinic first.');
-      return;
-    }
+    if (!ensureClinicSelected()) return;
     const services = data.serviceIds.map((serviceId) => {
       const override = data.priceOverrides?.[serviceId];
       return {

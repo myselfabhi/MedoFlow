@@ -12,6 +12,8 @@ import {
   type CreateLocationPayload,
 } from '@/lib/locationApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
+import { useAppToast } from '@/hooks/useAppToast';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 
@@ -133,23 +135,25 @@ function TableSkeleton() {
 export default function LocationsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { clinicId } = useClinicGuard();
+  const toast = useAppToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const clinicId =
-    user?.role === 'SUPER_ADMIN' ? (user?.clinicId ?? undefined) : undefined;
+  const effectiveClinicId =
+    user?.role === 'SUPER_ADMIN' ? (clinicId ?? user?.clinicId ?? undefined) : user?.clinicId ?? undefined;
 
   const { data: locations, isLoading, error } = useQuery({
-    queryKey: ['locations', clinicId],
-    queryFn: () => getLocations(clinicId ?? undefined),
+    queryKey: ['locations', effectiveClinicId],
+    queryFn: () => getLocations(effectiveClinicId ?? undefined),
     enabled: !!user,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CreateLocationPayload) =>
-      createLocation(data, user?.role === 'SUPER_ADMIN' ? clinicId : undefined),
+      createLocation(data, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['locations'] });
       setAddModalOpen(false);
-      alert('Location created successfully');
+      toast.success('Location created successfully');
     },
   });
 

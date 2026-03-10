@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   Select,
   SelectContent,
@@ -7,13 +8,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { useClinic } from '@/contexts/ClinicContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Building2 } from 'lucide-react';
 
 export function ClinicSwitcher() {
+  const { user } = useAuth();
   const { selectedClinicId, setSelectedClinicId, clinics, isLoading } = useClinic();
 
-  if (isLoading || clinics.length === 0) return null;
+  if (isLoading) return null;
+
+  if (clinics.length === 0) {
+    return (
+      <Link href="/dashboard/clinics/new">
+        <Button variant="outline" size="sm">
+          <Building2 className="mr-2 h-4 w-4" />
+          Create Clinic
+        </Button>
+      </Link>
+    );
+  }
 
   return (
     <Select

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
+import { useClinic } from '@/contexts/ClinicContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
 import {
   getInvoices,
   payInvoice,
@@ -68,23 +69,24 @@ function formatAppointmentDate(inv: Invoice) {
 
 export default function FrontDeskInvoicesPage() {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
+  const { clinicId } = useClinicGuard();
   const router = useRouter();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
+  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
+  const { clinics } = useClinic();
+  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
 
   const isAllowed =
     user?.role === 'STAFF' ||
     user?.role === 'CLINIC_ADMIN' ||
     user?.role === 'SUPER_ADMIN';
 
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
-
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['invoices', 'clinic', effectiveClinicId, statusFilter],
     queryFn: () => getInvoices(effectiveClinicId, statusFilter === 'ALL' ? undefined : statusFilter),
-    enabled: !!effectiveClinicId || user?.role === 'SUPER_ADMIN',
+    enabled: !!effectiveClinicId,
   });
 
   const payMutation = useMutation({
@@ -95,6 +97,32 @@ export default function FrontDeskInvoicesPage() {
     },
     onError: () => toast.error('Failed to mark invoice as paid'),
   });
+
+  if (!effectiveClinicId && isAllowed) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
+        <EmptyState
+          title={
+            hasNoClinics
+              ? 'Oops! No Clinics Found'
+              : user?.role === 'SUPER_ADMIN'
+                ? 'No clinic selected'
+                : 'No clinic assigned'
+          }
+          description={
+            hasNoClinics
+              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
+              : user?.role === 'SUPER_ADMIN'
+                ? 'Select a clinic from the top-right to manage invoices.'
+                : 'You are not assigned to a clinic.'
+          }
+          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
+          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+        />
+      </div>
+    );
+  }
 
   if (!isAllowed) {
     return (

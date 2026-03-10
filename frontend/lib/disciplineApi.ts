@@ -33,8 +33,9 @@ interface DisciplineResponse {
 }
 
 export const getDisciplines = async (clinicId?: string): Promise<Discipline[]> => {
-  const params = clinicId ? { clinicId } : {};
-  const { data } = await api.get<DisciplinesResponse>('/disciplines', { params });
+  const { data } = await api.get<DisciplinesResponse>('/disciplines', {
+    params: clinicId ? { clinicId } : undefined,
+  });
   return data.data.disciplines;
 };
 
@@ -49,12 +50,17 @@ export const createDiscipline = async (
 
 export const updateDiscipline = async (
   id: string,
-  payload: DisciplineUpdatePayload
+  payload: DisciplineUpdatePayload,
+  clinicId?: string
 ): Promise<Discipline> => {
-  const { data } = await api.put<DisciplineResponse>(`/disciplines/${id}`, payload);
+  const { data } = await api.put<DisciplineResponse>(`/disciplines/${id}`, payload, {
+    params: clinicId ? { clinicId } : undefined,
+  });
   return data.data.discipline;
 };
 
-export const deleteDiscipline = async (id: string): Promise<void> => {
-  await api.delete(`/disciplines/${id}`);
+export const deleteDiscipline = async (id: string, clinicId?: string): Promise<void> => {
+  await api.delete(`/disciplines/${id}`, {
+    params: clinicId ? { clinicId } : undefined,
+  });
 };

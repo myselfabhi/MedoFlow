@@ -30,8 +30,9 @@ interface LocationResponse {
 }
 
 export const getLocations = async (clinicId?: string): Promise<Location[]> => {
-  const params = clinicId ? { clinicId } : {};
-  const { data } = await api.get<LocationsResponse>('/locations', { params });
+  const { data } = await api.get<LocationsResponse>('/locations', {
+    params: clinicId ? { clinicId } : undefined,
+  });
   return data.data.locations;
 };
 

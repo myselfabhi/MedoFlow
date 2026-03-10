@@ -31,11 +31,10 @@ export interface DashboardService {
 export const getDashboardServices = async (
   clinicId?: string
 ): Promise<DashboardService[]> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
   const { data } = await api.get<{
     success: boolean;
     data: { services: DashboardService[] };
-  }>(`/services${params}`);
+  }>('/services', { params: clinicId ? { clinicId } : undefined });
   return data.data.services;
 };
 
@@ -76,10 +75,10 @@ export const updateService = async (
   payload: UpdateServicePayload,
   clinicId?: string
 ): Promise<ServiceWithCount> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
   const { data } = await api.put<{ success: boolean; data: { service: ServiceWithCount } }>(
-    `/services/${id}${params}`,
-    payload
+    `/services/${id}`,
+    payload,
+    { params: clinicId ? { clinicId } : undefined }
   );
   return data.data.service;
 };
@@ -88,6 +87,7 @@ export const archiveService = async (
   id: string,
   clinicId?: string
 ): Promise<void> => {
-  const params = clinicId ? `?clinicId=${clinicId}` : '';
-  await api.delete(`/services/${id}${params}`);
+  await api.delete(`/services/${id}`, {
+    params: clinicId ? { clinicId } : undefined,
+  });
 };

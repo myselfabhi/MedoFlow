@@ -15,8 +15,10 @@ import {
 } from '@/lib/serviceApi';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
+import { useClinic } from '@/contexts/ClinicContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { useAppToast } from '@/hooks/useAppToast';
+import { useSystemModal } from '@/hooks/useSystemModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -154,26 +156,17 @@ function ServiceForm({
 
 export default function ServicesPage() {
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
-
-  if (user?.role === 'PATIENT') {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
-        <p className="text-gray-500">
-          Service management is available to clinic staff. Contact your clinic for
-          more information.
-        </p>
-      </div>
-    );
-  }
-  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
+  const { clinicId, ensureClinicSelected } = useClinicGuard();
+  const { showModal } = useSystemModal();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<DashboardService | null>(null);
 
+  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
+  const { clinics } = useClinic();
+  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
   const canEdit =
     user?.role === 'CLINIC_ADMIN' || user?.role === 'SUPER_ADMIN';
 
@@ -191,7 +184,7 @@ export default function ServicesPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: CreateServicePayload) =>
-      createService(data, user?.role === 'SUPER_ADMIN' ? effectiveClinicId : undefined),
+      createService(data, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setAddOpen(false);
@@ -210,11 +203,7 @@ export default function ServicesPage() {
       id: string;
       data: { name?: string; duration?: number; defaultPrice?: string; disciplineId?: string };
     }) =>
-      updateService(
-        id,
-        data,
-        user?.role === 'SUPER_ADMIN' ? effectiveClinicId : undefined
-      ),
+      updateService(id, data, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditOpen(false);
@@ -228,7 +217,7 @@ export default function ServicesPage() {
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) =>
-      archiveService(id, user?.role === 'SUPER_ADMIN' ? effectiveClinicId : undefined),
+      archiveService(id, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service archived');
@@ -239,6 +228,7 @@ export default function ServicesPage() {
   });
 
   const handleAddSubmit = (data: ServiceFormData) => {
+    if (!ensureClinicSelected()) return;
     createMutation.mutate({
       name: data.name,
       duration: data.duration,
@@ -260,10 +250,55 @@ export default function ServicesPage() {
     });
   };
 
+  if (user?.role === 'PATIENT') {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
+        <p className="text-gray-500">
+          Service management is available to clinic staff. Contact your clinic for
+          more information.
+        </p>
+      </div>
+    );
+  }
+
+  if (!effectiveClinicId && (user?.role === 'SUPER_ADMIN' || user?.role === 'CLINIC_ADMIN')) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
+        <EmptyState
+          title={hasNoClinics ? 'Oops! No Clinics Found' : 'No clinic selected'}
+          description={
+            hasNoClinics
+              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
+              : 'Select a clinic from the top-right to manage disciplines and services.'
+          }
+          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
+          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+        />
+      </div>
+    );
+  }
+
+  if (!effectiveClinicId) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
+        <EmptyState
+          title="No clinic assigned"
+          description="You are not assigned to a clinic. Contact your administrator."
+        />
+      </div>
+    );
+  }
+
   const handleArchive = (id: string) => {
-    if (confirm('Archive this service? It will no longer be available for booking.')) {
-      archiveMutation.mutate(id);
-    }
+    showModal({
+      title: 'Archive Service',
+      description: 'Archive this service? It will no longer be available for booking.',
+      actionLabel: 'Archive',
+      onAction: () => archiveMutation.mutate(id),
+    });
   };
 
   return (
@@ -274,7 +309,7 @@ export default function ServicesPage() {
           <p className="mt-1 text-sm text-gray-500">Manage clinic services</p>
         </div>
         {canEdit && (
-          <Button onClick={() => setAddOpen(true)}>Add Service</Button>
+          <Button onClick={() => ensureClinicSelected() && setAddOpen(true)}>Add Service</Button>
         )}
       </div>
 
@@ -300,7 +335,7 @@ export default function ServicesPage() {
           {!isLoading && !error && services.length === 0 && (
             <EmptyState
               title="No services yet"
-              description="Add services to offer to patients."
+              description="Create services under disciplines."
               actionLabel={canEdit ? 'Add Service' : undefined}
               onAction={canEdit ? () => setAddOpen(true) : undefined}
             />

@@ -14,8 +14,13 @@ import {
   type DisciplineCreatePayload,
 } from '@/lib/disciplineApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { useClinic } from '@/contexts/ClinicContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
+import { useAppToast } from '@/hooks/useAppToast';
+import { useSystemModal } from '@/hooks/useSystemModal';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
+import { EmptyState } from '@/components/common/EmptyState';
 
 const disciplineSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -102,53 +107,60 @@ function TableSkeleton() {
 export default function DisciplinesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { clinicId, ensureClinicSelected } = useClinicGuard();
+  const toast = useAppToast();
+  const { showModal } = useSystemModal();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingDiscipline, setEditingDiscipline] = useState<Discipline | null>(null);
-  const clinicId =
-    user?.role === 'SUPER_ADMIN' ? (user?.clinicId ?? undefined) : undefined;
+
+  const effectiveClinicId = clinicId ?? user?.clinicId ?? undefined;
+  const { clinics } = useClinic();
+  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
 
   const { data: disciplines, isLoading, error } = useQuery({
-    queryKey: ['disciplines', clinicId],
-    queryFn: () => getDisciplines(clinicId ?? undefined),
-    enabled: !!user,
+    queryKey: ['disciplines', effectiveClinicId],
+    queryFn: () => getDisciplines(effectiveClinicId ?? undefined),
+    enabled: !!effectiveClinicId,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: DisciplineCreatePayload) =>
-      createDiscipline(data, user?.role === 'SUPER_ADMIN' ? clinicId : undefined),
+      createDiscipline(data, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disciplines'] });
       setAddModalOpen(false);
-      alert('Discipline created successfully');
+      toast.success('Discipline created successfully');
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: { name?: string; description?: string } }) =>
-      updateDiscipline(id, data),
+      updateDiscipline(id, data, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disciplines'] });
       setEditModalOpen(false);
       setEditingDiscipline(null);
-      alert('Discipline updated successfully');
+      toast.success('Discipline updated successfully');
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteDiscipline,
+    mutationFn: (id: string) => deleteDiscipline(id, effectiveClinicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disciplines'] });
-      alert('Discipline deleted successfully');
+      toast.success('Discipline deleted successfully');
     },
   });
 
   const handleAddSubmit = (data: DisciplineFormData) => {
+    if (!ensureClinicSelected()) return;
     createMutation.mutate({ name: data.name, description: data.description });
   };
 
   const handleEditSubmit = (data: DisciplineFormData) => {
     if (!editingDiscipline) return;
+    if (!ensureClinicSelected()) return;
     updateMutation.mutate({
       id: editingDiscipline.id,
       data: { name: data.name, description: data.description },
@@ -161,9 +173,12 @@ export default function DisciplinesPage() {
   };
 
   const handleDeleteClick = (id: string) => {
-    if (confirm('Are you sure you want to delete this discipline?')) {
-      deleteMutation.mutate(id);
-    }
+    showModal({
+      title: 'Delete Discipline',
+      description: 'Are you sure you want to delete this discipline?',
+      actionLabel: 'Delete',
+      onAction: () => deleteMutation.mutate(id),
+    });
   };
 
   const formatDate = (dateStr: string) => {
@@ -174,6 +189,36 @@ export default function DisciplinesPage() {
     });
   };
 
+  if (!effectiveClinicId && user?.role === 'SUPER_ADMIN') {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Disciplines</h1>
+        <EmptyState
+          title={hasNoClinics ? 'Oops! No Clinics Found' : 'No clinic selected'}
+          description={
+            hasNoClinics
+              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
+              : 'Select a clinic from the top-right to manage disciplines and services.'
+          }
+          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
+          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+        />
+      </div>
+    );
+  }
+
+  if (!effectiveClinicId) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Disciplines</h1>
+        <EmptyState
+          title="No clinic assigned"
+          description="You are not assigned to a clinic. Contact your administrator."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -183,7 +228,10 @@ export default function DisciplinesPage() {
         </div>
         <button
           type="button"
-          onClick={() => setAddModalOpen(true)}
+          onClick={() => {
+            if (!ensureClinicSelected()) return;
+            setAddModalOpen(true);
+          }}
           className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           Add Discipline
@@ -204,10 +252,12 @@ export default function DisciplinesPage() {
           )}
 
           {!isLoading && !error && (!disciplines || disciplines.length === 0) && (
-            <div className="py-12 text-center">
-              <p className="text-gray-500">No disciplines yet.</p>
-              <p className="mt-1 text-sm text-gray-400">Click &quot;Add Discipline&quot; to create one.</p>
-            </div>
+            <EmptyState
+              title="No disciplines created yet"
+              description="Add disciplines to organize your services."
+              actionLabel="Add Discipline"
+              onAction={() => setAddModalOpen(true)}
+            />
           )}
 
           {!isLoading && !error && disciplines && disciplines.length > 0 && (

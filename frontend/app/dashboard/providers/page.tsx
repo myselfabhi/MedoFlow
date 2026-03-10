@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSelectedClinicId } from '@/contexts/ClinicContext';
+import { useClinic } from '@/contexts/ClinicContext';
+import { useClinicGuard } from '@/hooks/useClinicGuard';
 import { listProviders } from '@/lib/availabilityApi';
 import {
   Card,
@@ -16,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AddProviderDialog } from '@/components/providers/AddProviderDialog';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Plus } from 'lucide-react';
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN'] as const;
@@ -23,8 +25,10 @@ const ALLOWED_ROLES = ['SUPER_ADMIN', 'CLINIC_ADMIN'] as const;
 export default function ProvidersPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const clinicId = useSelectedClinicId();
+  const { clinicId, ensureClinicSelected } = useClinicGuard();
   const effectiveClinicId = (clinicId ?? user?.clinicId)?.trim() || undefined;
+  const { clinics } = useClinic();
+  const hasNoClinics = user?.role === 'SUPER_ADMIN' && clinics.length === 0;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const canAddProvider = user?.role && ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number]);
@@ -44,11 +48,24 @@ export default function ProvidersPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-gray-900">Providers</h1>
-        <p className="text-gray-500">
-          {user?.role === 'SUPER_ADMIN'
-            ? 'Select a clinic from the dropdown above to view providers.'
-            : 'You are not assigned to a clinic.'}
-        </p>
+        <EmptyState
+          title={
+            hasNoClinics
+              ? 'Oops! No Clinics Found'
+              : user?.role === 'SUPER_ADMIN'
+                ? 'No clinic selected'
+                : 'No clinic assigned'
+          }
+          description={
+            hasNoClinics
+              ? "You haven't created any clinics yet. Create a clinic to begin setting up providers and services."
+              : user?.role === 'SUPER_ADMIN'
+                ? 'Select a clinic from the top-right to manage providers and their availability.'
+                : 'You are not assigned to a clinic.'
+          }
+          actionLabel={hasNoClinics ? 'Create Clinic' : undefined}
+          onAction={hasNoClinics ? () => (window.location.href = '/dashboard/clinics/new') : undefined}
+        />
       </div>
     );
   }
@@ -71,7 +88,7 @@ export default function ProvidersPage() {
           </p>
         </div>
         {canAddProvider && (
-          <Button onClick={() => setAddDialogOpen(true)}>
+          <Button onClick={() => ensureClinicSelected() && setAddDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Add Provider
           </Button>
@@ -89,21 +106,12 @@ export default function ProvidersPage() {
             </div>
           )}
           {providers?.length === 0 && !error && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-gray-500">No providers yet.</p>
-              <p className="mt-1 text-sm text-gray-500">
-                Add your first provider to start scheduling appointments.
-              </p>
-              {canAddProvider && (
-                <Button
-                  className="mt-4"
-                  onClick={() => setAddDialogOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Provider
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              title="No providers yet"
+              description="Add your first provider to start scheduling appointments."
+              actionLabel={canAddProvider ? 'Add Provider' : undefined}
+              onAction={canAddProvider ? () => ensureClinicSelected() && setAddDialogOpen(true) : undefined}
+            />
           )}
           {providers && providers.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
