@@ -34,6 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppToast } from '@/hooks/useAppToast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SYMPTOM_PATTERN = /\b(pain|swelling|fever|headache|nausea|fatigue|dizziness|cough|soreness|stiffness)\b/gi;
 const BODY_PART_PATTERN = /\b(knee|back|shoulder|neck|arm|leg|wrist|ankle|hip|chest|abdomen|head)\b/gi;
@@ -210,9 +211,29 @@ function SoapEditor({
 export default function ProviderAIScribePage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const visitRecordId = params.id as string;
   const appointmentId = searchParams.get('appointmentId');
   const toast = useAppToast();
+
+  if (user?.role !== 'PROVIDER') {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-medium">Access restricted</p>
+          <p className="mt-1 text-sm">
+            AI Scribe is only available to providers. Please contact a provider to document the consultation.
+          </p>
+        </div>
+        <Link
+          href={appointmentId ? `/dashboard/provider/appointments/${appointmentId}` : '/dashboard'}
+          className="inline-block text-sm text-primary-600 hover:underline"
+        >
+          ← Back
+        </Link>
+      </div>
+    );
+  }
   const queryClient = useQueryClient();
   const [localDraft, setLocalDraft] = useState<SoapDraft | null>(null);
   const [audioInputRef, setAudioInputRef] = useState<HTMLInputElement | null>(null);

@@ -38,6 +38,7 @@ import { PatientRecordSheet } from '@/components/patient/PatientRecordSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPatientForms } from '@/lib/formsApi';
 import { useAppToast } from '@/hooks/useAppToast';
+import { useAuth } from '@/contexts/AuthContext';
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -205,6 +206,8 @@ export default function ProviderAppointmentDetailPage() {
     onError: () => toast.error('Failed to mark invoice as paid'),
   });
 
+  const { user } = useAuth();
+  const isProvider = user?.role === 'PROVIDER';
   const invoice = invoices[0] ?? null;
   const isDraft = invoice?.status === 'DRAFT';
   const isFinalized = invoice?.status === 'FINALIZED';
@@ -310,7 +313,7 @@ export default function ProviderAppointmentDetailPage() {
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <CardTitle>Visit Record</CardTitle>
-                {visitRecord && !visitRecord.isFinalized && (
+                {isProvider && visitRecord && !visitRecord.isFinalized && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -370,27 +373,31 @@ export default function ProviderAppointmentDetailPage() {
             </CardHeader>
             <CardContent className="p-6">
               <p className="mb-4 text-sm text-gray-500">
-                Start a visit to document the consultation. Use AI Scribe to record or upload audio and generate clinical notes.
+                {isProvider
+                  ? 'Start a visit to document the consultation. Use AI Scribe to record or upload audio and generate clinical notes.'
+                  : 'Visit record will be created when the provider starts the consultation.'}
               </p>
-              <Button
-                onClick={async () => {
-                  setCreatingVisit(true);
-                  try {
-                    const vr = await createVisitRecord(id, {
-                      patientId: appointment.patientId,
-                    });
-                    queryClient.invalidateQueries({ queryKey: ['visit', id] });
-                    window.location.href = `/dashboard/provider/visits/${vr.id}/scribe?appointmentId=${id}`;
-                  } catch {
-                    toast.error('Failed to create visit');
-                  } finally {
-                    setCreatingVisit(false);
-                  }
-                }}
-                disabled={creatingVisit}
-              >
-                {creatingVisit ? 'Creating...' : 'Start Visit with AI Scribe'}
-              </Button>
+              {isProvider && (
+                <Button
+                  onClick={async () => {
+                    setCreatingVisit(true);
+                    try {
+                      const vr = await createVisitRecord(id, {
+                        patientId: appointment.patientId,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['visit', id] });
+                      window.location.href = `/dashboard/provider/visits/${vr.id}/scribe?appointmentId=${id}`;
+                    } catch {
+                      toast.error('Failed to create visit');
+                    } finally {
+                      setCreatingVisit(false);
+                    }
+                  }}
+                  disabled={creatingVisit}
+                >
+                  {creatingVisit ? 'Creating...' : 'Start Visit with AI Scribe'}
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
