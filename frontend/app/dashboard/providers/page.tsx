@@ -7,15 +7,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { listProviders } from '@/lib/availabilityApi';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  AppBadge,
+  AppPageHeader,
+  AppEmptyState,
+} from '@/components/ui-system';
 import { AddProviderDialog } from '@/components/providers/AddProviderDialog';
-import { EmptyState } from '@/components/common/EmptyState';
 import { Plus } from 'lucide-react';
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FRONT_DESK'] as const;
@@ -26,7 +27,8 @@ export default function ProvidersPage() {
   const clinicId = user?.clinicId?.trim() || undefined;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  const canAddProvider = user?.role && ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number]);
+  const canAddProvider =
+    user?.role && ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number]);
 
   const { data: providers, isLoading, error } = useQuery({
     queryKey: ['providers'],
@@ -34,7 +36,10 @@ export default function ProvidersPage() {
     enabled: !!clinicId,
   });
 
-  if (!user?.role || !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])) {
+  if (
+    !user?.role ||
+    !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])
+  ) {
     router.replace('/dashboard');
     return null;
   }
@@ -42,8 +47,8 @@ export default function ProvidersPage() {
   if (!clinicId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Providers</h1>
-        <EmptyState
+        <AppPageHeader title="Providers" description="Manage clinic providers and their services." />
+        <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
         />
@@ -54,40 +59,38 @@ export default function ProvidersPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Providers</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage providers and their availability
-          </p>
-        </div>
-        {canAddProvider && (
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Provider
-          </Button>
-        )}
-      </div>
+      <AppPageHeader
+        title="Providers"
+        description="Manage clinic providers and their services."
+        actions={
+          canAddProvider ? (
+            <AppButton onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Provider
+            </AppButton>
+          ) : undefined
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Providers</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>Providers</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent>
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
               Failed to load providers.
             </div>
           )}
           {providers?.length === 0 && !error && (
-            <EmptyState
+            <AppEmptyState
               title="No providers yet"
               description="Add your first provider to start scheduling appointments."
               actionLabel={canAddProvider ? 'Add Provider' : undefined}
@@ -97,10 +100,10 @@ export default function ProvidersPage() {
           {providers && providers.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {providers.map((p) => (
-                <Card key={p.id} className="flex flex-col">
-                  <CardContent className="flex flex-1 flex-col p-6">
+                <AppCard key={p.id} className="flex flex-col">
+                  <AppCardContent className="flex flex-1 flex-col">
                     <div className="flex min-w-0 flex-col gap-3">
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-slate-900">
                         {p.firstName} {p.lastName}
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -110,25 +113,25 @@ export default function ProvidersPage() {
                             ? [p.discipline.name]
                             : []
                         ).map((name) => (
-                          <Badge key={name} variant="secondary">
+                          <AppBadge key={name} variant="secondary">
                             {name}
-                          </Badge>
+                          </AppBadge>
                         ))}
                       </div>
                       {p.providerServices && p.providerServices.length > 0 && (
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-gray-500">
+                          <p className="text-xs font-medium text-slate-500">
                             Services offered
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {p.providerServices.map((ps) => (
-                              <Badge
+                              <AppBadge
                                 key={ps.service.id}
                                 variant="outline"
                                 className="text-xs"
                               >
                                 {ps.service.name}
-                              </Badge>
+                              </AppBadge>
                             ))}
                           </div>
                         </div>
@@ -137,18 +140,18 @@ export default function ProvidersPage() {
                         href={`/dashboard/providers/${p.id}/availability`}
                         className="mt-auto pt-2"
                       >
-                        <Button variant="outline" size="sm" className="w-full">
+                        <AppButton variant="outline" size="sm" className="w-full">
                           Edit Availability
-                        </Button>
+                        </AppButton>
                       </Link>
                     </div>
-                  </CardContent>
-                </Card>
+                  </AppCardContent>
+                </AppCard>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
       <AddProviderDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>

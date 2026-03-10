@@ -16,9 +16,19 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useSystemModal } from '@/hooks/useSystemModal';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Modal } from '@/components/ui/Modal';
-import { EmptyState } from '@/components/common/EmptyState';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardContent,
+  AppButton,
+  AppInput,
+  AppPageHeader,
+  AppEmptyState,
+  AppModal,
+  AppTable,
+  type AppTableColumn,
+} from '@/components/ui-system';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const disciplineSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -50,55 +60,41 @@ function DisciplineForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="name" className="block text-sm font-medium text-slate-700">
           Name
         </label>
-        <input
+        <AppInput
           id="name"
           type="text"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="mt-1"
           {...register('name')}
         />
-        {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+        {errors.name && (
+          <p className="mt-1 text-sm text-danger">{errors.name.message}</p>
+        )}
       </div>
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="description" className="block text-sm font-medium text-slate-700">
           Description
         </label>
         <textarea
           id="description"
           rows={3}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           {...register('description')}
         />
         {errors.description && (
-          <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+          <p className="mt-1 text-sm text-danger">
+            {errors.description.message}
+          </p>
         )}
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-        >
+        <AppButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : submitLabel}
-        </button>
+        </AppButton>
       </div>
     </form>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="animate-pulse space-y-3">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex gap-4 border-b border-gray-200 pb-3">
-          <div className="h-4 flex-1 rounded bg-gray-200" />
-          <div className="h-4 flex-1 rounded bg-gray-200" />
-          <div className="h-4 w-24 rounded bg-gray-200" />
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -129,8 +125,13 @@ export default function DisciplinesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name?: string; description?: string } }) =>
-      updateDiscipline(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; description?: string };
+    }) => updateDiscipline(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disciplines'] });
       setEditModalOpen(false);
@@ -184,8 +185,8 @@ export default function DisciplinesPage() {
   if (!clinicId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Disciplines</h1>
-        <EmptyState
+        <AppPageHeader title="Disciplines" description="Manage disciplines" />
+        <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
         />
@@ -195,35 +196,37 @@ export default function DisciplinesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Disciplines</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage disciplines</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAddModalOpen(true)}
-          className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-        >
-          Add Discipline
-        </button>
-      </div>
+      <AppPageHeader
+        title="Disciplines"
+        description="Manage disciplines"
+        actions={
+          <AppButton onClick={() => setAddModalOpen(true)}>
+            Add Discipline
+          </AppButton>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">All Disciplines</h2>
-        </CardHeader>
-        <CardContent>
-          {isLoading && <TableSkeleton />}
+      <AppCard>
+        <AppCardHeader>
+          <h2 className="text-lg font-semibold text-slate-900">All Disciplines</h2>
+        </AppCardHeader>
+        <AppCardContent>
+          {isLoading && (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          )}
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
               Failed to load disciplines. Please try again.
             </div>
           )}
 
           {!isLoading && !error && (!disciplines || disciplines.length === 0) && (
-            <EmptyState
+            <AppEmptyState
               title="No disciplines created yet"
               description="Add disciplines to organize your services."
               actionLabel="Add Discipline"
@@ -232,94 +235,98 @@ export default function DisciplinesPage() {
           )}
 
           {!isLoading && !error && disciplines && disciplines.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Created
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {disciplines.map((d) => (
-                    <tr key={d.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                        {d.name}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {d.description || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                        {formatDate(d.createdAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                        <button
-                          type="button"
-                          onClick={() => handleEditClick(d)}
-                          className="rounded-md px-2 py-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(d.id)}
-                          disabled={deleteMutation.isPending}
-                          className="ml-2 rounded-md px-2 py-1 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <AppTable<Discipline>
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Name',
+                  render: (d) => (
+                    <span className="font-medium text-slate-900">{d.name}</span>
+                  ),
+                },
+                {
+                  key: 'description',
+                  header: 'Description',
+                  render: (d) => (
+                    <span className="text-slate-600">{d.description || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'created',
+                  header: 'Created',
+                  render: (d) => (
+                    <span className="text-slate-600">
+                      {formatDate(d.createdAt)}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: 'Actions',
+                  className: 'text-right',
+                  render: (d) => (
+                    <div className="flex justify-end gap-2">
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditClick(d)}
+                      >
+                        Edit
+                      </AppButton>
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger hover:bg-danger/10"
+                        onClick={() => handleDeleteClick(d.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        Delete
+                      </AppButton>
+                    </div>
+                  ),
+                },
+              ]}
+              data={disciplines}
+              keyExtractor={(d) => d.id}
+            />
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
-      <Modal
-        isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+      <AppModal
+        open={addModalOpen}
+        onOpenChange={setAddModalOpen}
         title="Add Discipline"
-      >
-        <DisciplineForm
-          onSubmit={handleAddSubmit}
-          isSubmitting={createMutation.isPending}
-          submitLabel="Create"
-        />
-      </Modal>
+        content={
+          <DisciplineForm
+            onSubmit={handleAddSubmit}
+            isSubmitting={createMutation.isPending}
+            submitLabel="Create"
+          />
+        }
+      />
 
-      <Modal
-        isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setEditingDiscipline(null);
+      <AppModal
+        open={editModalOpen}
+        onOpenChange={(open) => {
+          setEditModalOpen(open);
+          if (!open) setEditingDiscipline(null);
         }}
         title="Edit Discipline"
-      >
-        {editingDiscipline && (
-          <DisciplineForm
-            defaultValues={{
-              name: editingDiscipline.name,
-              description: editingDiscipline.description ?? '',
-            }}
-            onSubmit={handleEditSubmit}
-            isSubmitting={updateMutation.isPending}
-            submitLabel="Save"
-          />
-        )}
-      </Modal>
+        content={
+          editingDiscipline ? (
+            <DisciplineForm
+              defaultValues={{
+                name: editingDiscipline.name,
+                description: editingDiscipline.description ?? '',
+              }}
+              onSubmit={handleEditSubmit}
+              isSubmitting={updateMutation.isPending}
+              submitLabel="Save"
+            />
+          ) : null
+        }
+      />
     </div>
   );
 }

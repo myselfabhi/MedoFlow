@@ -6,8 +6,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getProviderAppointments } from '@/lib/patientApi';
 import { getInvoices } from '@/lib/invoiceApi';
 import { getTreatmentPlans } from '@/lib/treatmentPlanApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  AppPageHeader,
+} from '@/components/ui-system';
 import { Calendar, CreditCard, FileText, CalendarDays } from 'lucide-react';
 
 function formatTime(iso: string) {
@@ -28,8 +34,7 @@ export function ProviderDashboard() {
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ['provider-appointments', today.toISOString()],
-    queryFn: () =>
-      getProviderAppointments(today, todayEnd),
+    queryFn: () => getProviderAppointments(today, todayEnd),
     enabled: !!clinicId,
   });
 
@@ -58,96 +63,96 @@ export function ProviderDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Welcome back</p>
-      </div>
+      <AppPageHeader
+        title="Dashboard"
+        description="Welcome back"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <AppCard>
+          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
+            <AppCardTitle className="text-sm font-medium text-slate-500">
               Today&apos;s Appointments
-            </CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+            </AppCardTitle>
+            <CalendarDays className="h-4 w-4 text-slate-500" />
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-semibold text-slate-900">
               {isLoading ? '—' : todayAppointments.length}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
+            <AppCardTitle className="text-sm font-medium text-slate-500">
               Pending Payments
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+            </AppCardTitle>
+            <CreditCard className="h-4 w-4 text-slate-500" />
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-semibold text-slate-900">
               {isLoading ? '—' : invoices.length}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader className="flex flex-row items-center justify-between pb-2">
+            <AppCardTitle className="text-sm font-medium text-slate-500">
               Active Treatment Plans
-            </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+            </AppCardTitle>
+            <FileText className="h-4 w-4 text-slate-500" />
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-semibold text-slate-900">
               {isLoading ? '—' : plans.length}
             </div>
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Today&apos;s Schedule</CardTitle>
-          <Button asChild size="sm">
+      <AppCard>
+        <AppCardHeader className="flex flex-row items-center justify-between">
+          <AppCardTitle>Today&apos;s Schedule</AppCardTitle>
+          <AppButton asChild size="sm">
             <Link href="/dashboard/provider/calendar">
               <Calendar className="mr-2 h-4 w-4" />
               Open Calendar
             </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
+          </AppButton>
+        </AppCardHeader>
+        <AppCardContent>
           {isLoading ? (
             <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
             </div>
           ) : nextFive.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No appointments today</p>
+            <p className="text-sm text-slate-600">No appointments today</p>
           ) : (
             <ul className="space-y-3">
               {nextFive.map((apt) => (
                 <li
                   key={apt.id}
-                  className="flex items-center justify-between rounded-md border border-gray-100 px-4 py-3"
+                  className="flex items-center justify-between rounded-xl border border-slate-200/80 px-4 py-3"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-slate-900">
                       {apt.patient?.name ?? 'Patient'}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-slate-600">
                       {apt.service?.name ?? '—'} · {formatTime(apt.startTime)}
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
+                  <AppButton variant="ghost" size="sm" asChild>
                     <Link href={`/dashboard/provider/appointments/${apt.id}`}>
                       View
                     </Link>
-                  </Button>
+                  </AppButton>
                 </li>
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
+import { AppBadge } from '@/components/ui-system';
 import { cn } from '@/lib/utils';
 
 export type AppointmentStatus =
@@ -76,11 +76,11 @@ export function StatusBadge({ status, variant = 'auto', className }: StatusBadge
             : ALL_MAP[status] ?? 'bg-gray-100 text-gray-600';
 
   return (
-    <Badge
+    <AppBadge
       variant="outline"
-      className={cn('font-medium', colorClass, 'border-0', className)}
+      className={cn('font-medium border-0', colorClass, className)}
     >
       {formatLabel(status)}
-    </Badge>
+    </AppBadge>
   );
 }

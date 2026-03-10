@@ -2,10 +2,15 @@
 
 import React, { useCallback } from 'react';
 import { Stethoscope, Clock, Brain, Pill, Copy } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppBadge,
+  AppButton,
+} from '@/components/ui-system';
 import { useAppToast } from '@/hooks/useAppToast';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import type { ClinicalTimeline } from '@/lib/aiScribeApi';
 
 interface ClinicalTimelineCardProps {
@@ -69,15 +74,15 @@ export function ClinicalTimelineCard({ timeline }: ClinicalTimelineCardProps) {
   if (!hasContent) return null;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base">Clinical Timeline</CardTitle>
-        <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
+    <AppCard>
+      <AppCardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <AppCardTitle className="text-base">Clinical Timeline</AppCardTitle>
+        <AppButton variant="ghost" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
           <Copy className="h-3.5 w-3.5" />
           Copy Timeline
-        </Button>
-      </CardHeader>
-      <CardContent>
+        </AppButton>
+      </AppCardHeader>
+      <AppCardContent>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {timeline.symptoms && timeline.symptoms.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -87,9 +92,9 @@ export function ClinicalTimelineCard({ timeline }: ClinicalTimelineCardProps) {
               </h4>
               <div className="flex flex-wrap gap-1.5">
                 {timeline.symptoms.map((s, i) => (
-                  <Badge key={i} variant="secondary">
+                  <AppBadge key={i} variant="secondary">
                     {s}
-                  </Badge>
+                  </AppBadge>
                 ))}
               </div>
             </div>
@@ -120,15 +125,15 @@ export function ClinicalTimelineCard({ timeline }: ClinicalTimelineCardProps) {
               </h4>
               <div className="flex flex-wrap gap-1.5">
                 {timeline.plan.map((p, i) => (
-                  <Badge key={i} variant="secondary">
+                  <AppBadge key={i} variant="secondary">
                     {p}
-                  </Badge>
+                  </AppBadge>
                 ))}
               </div>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </AppCardContent>
+    </AppCard>
   );
 }

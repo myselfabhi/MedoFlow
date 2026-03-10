@@ -10,9 +10,15 @@ import {
   type PatientAppointment,
   type ProviderAppointment,
 } from '@/lib/patientApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { EmptyState } from '@/components/common/EmptyState';
-import { Button } from '@/components/ui/button';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  AppPageHeader,
+  AppEmptyState,
+} from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
 
 function formatDateTime(iso: string) {
@@ -27,8 +33,7 @@ export default function AppointmentsPage() {
   const isProvider = user?.role === 'PROVIDER';
   const isPatient = user?.role === 'PATIENT';
   const isStaffOrAdmin =
-    user?.role === 'FRONT_DESK' ||
-    user?.role === 'SUPER_ADMIN';
+    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: appointments = [], isLoading, error } = useQuery({
     queryKey: ['appointments', user?.role],
@@ -55,23 +60,24 @@ export default function AppointmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Appointments</h1>
-        <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointments</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
+      <AppPageHeader
+        title="Appointments"
+        description={subtitle}
+      />
+
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>Appointments</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent>
           {isLoading ? (
             <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
             </div>
           ) : error ? (
-            <p className="text-sm text-red-600">Failed to load appointments.</p>
+            <p className="text-sm text-danger">Failed to load appointments.</p>
           ) : !appointments.length ? (
-            <EmptyState
+            <AppEmptyState
               title="No appointments yet"
               description={
                 isPatient
@@ -87,20 +93,20 @@ export default function AppointmentsPage() {
                 (apt: PatientAppointment | ProviderAppointment) => (
                   <div
                     key={apt.id}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gray-200 p-4"
+                    className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200/80 p-4"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-slate-900">
                         {apt.service.name}
                         {(isProvider || showClinicView) &&
                           'patient' in apt &&
                           apt.patient && (
-                            <span className="ml-2 text-sm font-normal text-gray-500">
+                            <span className="ml-2 text-sm font-normal text-slate-600">
                               · {apt.patient.name}
                             </span>
                           )}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                         {isPatient && 'provider' in apt && apt.provider && (
                           <span>
                             {apt.provider.firstName} {apt.provider.lastName} ·{' '}
@@ -117,7 +123,7 @@ export default function AppointmentsPage() {
                         )}
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
+                    <AppButton variant="outline" size="sm" asChild>
                       <Link
                         href={
                           isPatient
@@ -127,14 +133,14 @@ export default function AppointmentsPage() {
                       >
                         View
                       </Link>
-                    </Button>
+                    </AppButton>
                   </div>
                 )
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
     </div>
   );
 }

@@ -6,7 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getClinic } from '@/lib/clinicApi';
 import { getClinicServices } from '@/lib/serviceApi';
 import type { Service } from '@/lib/types/booking';
-import { Card, CardContent } from '@/components/ui/Card';
+import {
+  AppCard,
+  AppCardContent,
+  AppButton,
+} from '@/components/ui-system';
 
 export default function ClinicDetailPage() {
   const params = useParams();
@@ -70,38 +74,35 @@ export default function ClinicDetailPage() {
 
       <div className="space-y-4">
         {serviceList.length > 0 ? (
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="divide-y divide-gray-100">
-                {serviceList.map((svc) => (
-                  <div
-                    key={svc.id}
-                    className="flex flex-col items-start justify-between gap-4 border-gray-100 p-6 sm:flex-row sm:items-center"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{svc.name}</p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {svc.duration} min · ${svc.defaultPrice}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/book/${svc.id}?clinicId=${id}`)}
-                      className="shrink-0 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-                    >
-                      Book Now
-                    </button>
+          <AppCard className="overflow-hidden p-0">
+            <div className="divide-y divide-slate-200">
+              {serviceList.map((svc) => (
+                <div
+                  key={svc.id}
+                  className="flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center"
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">{svc.name}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {svc.duration} min · ${svc.defaultPrice}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <AppButton
+                    type="button"
+                    onClick={() => router.push(`/book/${svc.id}?clinicId=${id}`)}
+                  >
+                    Book Now
+                  </AppButton>
+                </div>
+              ))}
+            </div>
+          </AppCard>
         ) : (
-          <Card>
-            <CardContent className="py-16 text-center text-gray-500">
+          <AppCard>
+            <AppCardContent className="py-16 text-center text-slate-600">
               No services available at this clinic.
-            </CardContent>
-          </Card>
+            </AppCardContent>
+          </AppCard>
         )}
       </div>
     </div>

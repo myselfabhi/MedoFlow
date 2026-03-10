@@ -17,16 +17,17 @@ import { getDisciplines } from '@/lib/disciplineApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useSystemModal } from '@/hooks/useSystemModal';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  AppCard,
+  AppCardHeader,
+  AppCardContent,
+  AppButton,
+  AppInput,
+  AppPageHeader,
+  AppEmptyState,
+  AppTable,
+  type AppTableColumn,
+} from '@/components/ui-system';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { EmptyState } from '@/components/common/EmptyState';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const serviceSchema = z.object({
@@ -80,23 +87,25 @@ function ServiceForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700">Name</label>
-        <Input
+        <label className="block text-sm font-medium text-slate-700">Name</label>
+        <AppInput
           className="mt-1"
           {...register('name')}
           placeholder="e.g. Initial Consultation"
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+          <p className="mt-1 text-sm text-danger">{errors.name.message}</p>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-slate-700">
           Discipline
         </label>
         <Select
           value={disciplineId}
-          onValueChange={(v) => setValue('disciplineId', v, { shouldValidate: true })}
+          onValueChange={(v) =>
+            setValue('disciplineId', v, { shouldValidate: true })
+          }
         >
           <SelectTrigger className="mt-1">
             <SelectValue placeholder="Select discipline" />
@@ -110,43 +119,49 @@ function ServiceForm({
           </SelectContent>
         </Select>
         {errors.disciplineId && (
-          <p className="mt-1 text-sm text-red-600">{errors.disciplineId.message}</p>
+          <p className="mt-1 text-sm text-danger">
+            {errors.disciplineId.message}
+          </p>
         )}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-slate-700">
             Duration (min)
           </label>
-          <Input
+          <AppInput
             type="number"
             min={1}
             className="mt-1"
             {...register('duration')}
           />
           {errors.duration && (
-            <p className="mt-1 text-sm text-red-600">{errors.duration.message}</p>
+            <p className="mt-1 text-sm text-danger">
+              {errors.duration.message}
+            </p>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-slate-700">
             Default Price
           </label>
-          <Input
+          <AppInput
             type="text"
             className="mt-1"
             placeholder="0.00"
             {...register('defaultPrice')}
           />
           {errors.defaultPrice && (
-            <p className="mt-1 text-sm text-red-600">{errors.defaultPrice.message}</p>
+            <p className="mt-1 text-sm text-danger">
+              {errors.defaultPrice.message}
+            </p>
           )}
         </div>
       </div>
       <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
+        <AppButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : submitLabel}
-        </Button>
+        </AppButton>
       </DialogFooter>
     </form>
   );
@@ -178,8 +193,7 @@ export default function ServicesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateServicePayload) =>
-      createService(data),
+    mutationFn: (data: CreateServicePayload) => createService(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setAddOpen(false);
@@ -196,9 +210,13 @@ export default function ServicesPage() {
       data,
     }: {
       id: string;
-      data: { name?: string; duration?: number; defaultPrice?: string; disciplineId?: string };
-    }) =>
-      updateService(id, data),
+      data: {
+        name?: string;
+        duration?: number;
+        defaultPrice?: string;
+        disciplineId?: string;
+      };
+    }) => updateService(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditOpen(false);
@@ -211,8 +229,7 @@ export default function ServicesPage() {
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (id: string) =>
-      archiveService(id),
+    mutationFn: (id: string) => archiveService(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service archived');
@@ -244,13 +261,23 @@ export default function ServicesPage() {
     });
   };
 
+  const handleArchive = (id: string) => {
+    showModal({
+      title: 'Archive Service',
+      description:
+        'Archive this service? It will no longer be available for booking.',
+      actionLabel: 'Archive',
+      onAction: () => archiveMutation.mutate(id),
+    });
+  };
+
   if (user?.role === 'PATIENT') {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
-        <p className="text-gray-500">
-          Service management is available to clinic staff. Contact your clinic for
-          more information.
+        <AppPageHeader title="Services" description="Manage clinic services" />
+        <p className="text-sm text-slate-600">
+          Service management is available to clinic staff. Contact your clinic
+          for more information.
         </p>
       </div>
     );
@@ -259,8 +286,8 @@ export default function ServicesPage() {
   if (!clinicId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
-        <EmptyState
+        <AppPageHeader title="Services" description="Manage clinic services" />
+        <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
         />
@@ -268,32 +295,23 @@ export default function ServicesPage() {
     );
   }
 
-  const handleArchive = (id: string) => {
-    showModal({
-      title: 'Archive Service',
-      description: 'Archive this service? It will no longer be available for booking.',
-      actionLabel: 'Archive',
-      onAction: () => archiveMutation.mutate(id),
-    });
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Services</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage clinic services</p>
-        </div>
-        {canEdit && (
-          <Button onClick={() => setAddOpen(true)}>Add Service</Button>
-        )}
-      </div>
+      <AppPageHeader
+        title="Services"
+        description="Manage clinic services"
+        actions={
+          canEdit ? (
+            <AppButton onClick={() => setAddOpen(true)}>Add Service</AppButton>
+          ) : undefined
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">All Services</h2>
-        </CardHeader>
-        <CardContent>
+      <AppCard>
+        <AppCardHeader>
+          <h2 className="text-lg font-semibold text-slate-900">All Services</h2>
+        </AppCardHeader>
+        <AppCardContent>
           {isLoading && (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
@@ -303,13 +321,13 @@ export default function ServicesPage() {
           )}
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
               Failed to load services.
             </div>
           )}
 
           {!isLoading && !error && services.length === 0 && (
-            <EmptyState
+            <AppEmptyState
               title="No services yet"
               description="Create services under disciplines."
               actionLabel={canEdit ? 'Add Service' : undefined}
@@ -318,78 +336,78 @@ export default function ServicesPage() {
           )}
 
           {!isLoading && !error && services.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Discipline
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Duration
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Price
-                    </th>
-                    {canEdit && (
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Actions
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {services.map((s) => (
-                    <tr key={s.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                        {s.name}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                        {s.discipline.name}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                        {s.duration} min
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                        ${s.defaultPrice}
-                      </td>
-                      {canEdit && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditing(s);
-                              setEditOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => handleArchive(s.id)}
-                            disabled={archiveMutation.isPending}
-                          >
-                            Archive
-                          </Button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <AppTable<DashboardService>
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Name',
+                  render: (s) => (
+                    <span className="font-medium text-slate-900">{s.name}</span>
+                  ),
+                },
+                {
+                  key: 'discipline',
+                  header: 'Discipline',
+                  render: (s) => (
+                    <span className="text-slate-600">{s.discipline.name}</span>
+                  ),
+                },
+                {
+                  key: 'duration',
+                  header: 'Duration',
+                  render: (s) => (
+                    <span className="text-slate-600">{s.duration} min</span>
+                  ),
+                },
+                {
+                  key: 'price',
+                  header: 'Price',
+                  render: (s) => (
+                    <span className="text-slate-600">${s.defaultPrice}</span>
+                  ),
+                },
+                ...(canEdit
+                  ? [
+                      {
+                        key: 'actions',
+                        header: 'Actions',
+                        className: 'text-right',
+                        render: (s: DashboardService) => (
+                          <div className="flex justify-end gap-2">
+                            <AppButton
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditing(s);
+                                setEditOpen(true);
+                              }}
+                            >
+                              Edit
+                            </AppButton>
+                            <AppButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-danger hover:bg-danger/10"
+                              onClick={() => handleArchive(s.id)}
+                              disabled={archiveMutation.isPending}
+                            >
+                              Archive
+                            </AppButton>
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+              data={services}
+              keyExtractor={(s) => s.id}
+            />
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[var(--radius)]">
           <DialogHeader>
             <DialogTitle>Add Service</DialogTitle>
           </DialogHeader>
@@ -402,8 +420,11 @@ export default function ServicesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editOpen} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => !open && setEditing(null)}
+      >
+        <DialogContent className="rounded-[var(--radius)]">
           <DialogHeader>
             <DialogTitle>Edit Service</DialogTitle>
           </DialogHeader>

@@ -12,8 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { AppButton, AppInput } from '@/components/ui-system';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices, type DashboardService } from '@/lib/serviceApi';
@@ -167,10 +166,10 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
                 <label className="text-sm font-medium text-gray-700">
                   First Name
                 </label>
-                <Input
+                <AppInput
                   {...register('firstName')}
                   placeholder="John"
-                  className={cn(errors.firstName && 'border-red-500')}
+                  className={cn(errors.firstName && 'border-danger')}
                 />
                 {errors.firstName && (
                   <p className="text-xs text-red-600">{errors.firstName.message}</p>
@@ -180,10 +179,10 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
                 <label className="text-sm font-medium text-gray-700">
                   Last Name
                 </label>
-                <Input
+                <AppInput
                   {...register('lastName')}
                   placeholder="Doe"
-                  className={cn(errors.lastName && 'border-red-500')}
+                  className={cn(errors.lastName && 'border-danger')}
                 />
                 {errors.lastName && (
                   <p className="text-xs text-red-600">{errors.lastName.message}</p>
@@ -194,11 +193,11 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
               <label className="text-sm font-medium text-gray-700">
                 Email (required)
               </label>
-              <Input
+              <AppInput
                 {...register('email')}
                 type="email"
                 placeholder="john@example.com"
-                className={cn(errors.email && 'border-red-500')}
+                className={cn(errors.email && 'border-danger')}
               />
               <p className="text-xs text-gray-500">
                 This email will be used for provider login.
@@ -280,17 +279,17 @@ export function AddProviderDialog({ open, onOpenChange }: AddProviderDialogProps
           </div>
 
           <DialogFooter>
-            <Button
+            <AppButton
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmittingForm}
             >
               Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmittingForm}>
+            </AppButton>
+            <AppButton type="submit" disabled={isSubmittingForm}>
               {isSubmittingForm ? 'Creating...' : 'Create Provider'}
-            </Button>
+            </AppButton>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -330,7 +329,7 @@ function ServiceRow({
         </p>
       </div>
       <div className="w-24 shrink-0">
-        <Input
+        <AppInput
           type="number"
           step="0.01"
           min="0"

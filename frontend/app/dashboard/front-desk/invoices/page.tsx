@@ -10,10 +10,16 @@ import {
   payInvoice,
   type Invoice,
 } from '@/lib/invoiceApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  AppPageHeader,
+  AppEmptyState,
+} from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { EmptyState } from '@/components/common/EmptyState';
 import {
   Table,
   TableBody,
@@ -74,12 +80,12 @@ export default function FrontDeskInvoicesPage() {
   const clinicId = user?.clinicId ?? undefined;
 
   const isAllowed =
-    user?.role === 'FRONT_DESK' ||
-    user?.role === 'SUPER_ADMIN';
+    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['invoices', statusFilter],
-    queryFn: () => getInvoices(statusFilter === 'ALL' ? undefined : statusFilter),
+    queryFn: () =>
+      getInvoices(statusFilter === 'ALL' ? undefined : statusFilter),
     enabled: !!clinicId,
   });
 
@@ -95,8 +101,11 @@ export default function FrontDeskInvoicesPage() {
   if (!clinicId && isAllowed) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
-        <EmptyState
+        <AppPageHeader
+          title="Invoices"
+          description="Manage clinic invoices and billing"
+        />
+        <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
         />
@@ -107,28 +116,40 @@ export default function FrontDeskInvoicesPage() {
   if (!isAllowed) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">Access denied. This page is for front desk staff only.</p>
-          <Link href="/dashboard" className="mt-3 inline-block text-sm text-primary-600 hover:text-primary-700">
-            ← Back to dashboard
-          </Link>
-        </div>
+        <AppPageHeader
+          title="Invoices"
+          description="Manage clinic invoices and billing"
+        />
+        <AppCard>
+          <AppCardContent>
+            <div className="rounded-lg border border-danger/20 bg-danger/5 p-6 text-center">
+              <p className="text-sm text-danger">
+                Access denied. This page is for front desk staff only.
+              </p>
+              <Link
+                href="/dashboard"
+                className="mt-3 inline-block text-sm text-accent hover:underline"
+              >
+                ← Back to dashboard
+              </Link>
+            </div>
+          </AppCardContent>
+        </AppCard>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage clinic invoices and billing</p>
-      </div>
+      <AppPageHeader
+        title="Invoices"
+        description="Manage clinic invoices and billing"
+      />
 
-      <Card>
-        <CardHeader>
+      <AppCard>
+        <AppCardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Invoices</CardTitle>
+            <AppCardTitle>Invoices</AppCardTitle>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
@@ -142,67 +163,93 @@ export default function FrontDeskInvoicesPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardHeader>
-        <CardContent className="p-6">
+        </AppCardHeader>
+        <AppCardContent>
           {isLoading ? (
             <div className="flex min-h-[200px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Appointment Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-48 p-0 align-top">
-                      <EmptyState
-                        title="No invoices found"
-                        description="Create an invoice from an appointment to get started."
-                        actionLabel="View appointments"
-                        onAction={() => router.push('/dashboard/appointments')}
-                      />
-                    </TableCell>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-200/80 hover:bg-transparent">
+                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Patient
+                    </TableHead>
+                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Provider
+                    </TableHead>
+                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Appointment Date
+                    </TableHead>
+                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Status
+                    </TableHead>
+                    <TableHead className="h-12 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Total
+                    </TableHead>
+                    <TableHead className="h-12 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Actions
+                    </TableHead>
                   </TableRow>
-                ) : (
-                  invoices.map((inv: Invoice) => (
-                      <TableRow key={inv.id}>
-                        <TableCell className="font-medium">{formatPatient(inv)}</TableCell>
-                        <TableCell>{formatProvider(inv)}</TableCell>
-                        <TableCell>{formatAppointmentDate(inv)}</TableCell>
-                        <TableCell>
+                </TableHeader>
+                <TableBody>
+                  {invoices.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
+                        colSpan={6}
+                        className="h-48 p-0 align-top"
+                      >
+                        <AppEmptyState
+                          title="No invoices found"
+                          description="Create an invoice from an appointment to get started."
+                          actionLabel="View appointments"
+                          onAction={() =>
+                            router.push('/dashboard/appointments')
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    invoices.map((inv: Invoice) => (
+                      <TableRow
+                        key={inv.id}
+                        className="border-slate-200/60 hover:bg-slate-50/50"
+                      >
+                        <TableCell className="px-4 py-3 font-medium text-slate-900">
+                          {formatPatient(inv)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-slate-600">
+                          {formatProvider(inv)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-slate-600">
+                          {formatAppointmentDate(inv)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <StatusBadge status={inv.status} variant="invoice" />
                         </TableCell>
-                        <TableCell className="text-right">{inv.totalAmount ?? '0.00'}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          {inv.totalAmount ?? '0.00'}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
                           {inv.status === 'FINALIZED' && (
-                            <Button
+                            <AppButton
                               size="sm"
                               onClick={() => payMutation.mutate(inv.id)}
                               disabled={payMutation.isPending}
                             >
                               Mark Paid
-                            </Button>
+                            </AppButton>
                           )}
                           {inv.status === 'DRAFT' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              asChild
-                            >
-                              <Link href={`/dashboard/provider/appointments/${inv.appointmentId}`}>
+                            <AppButton size="sm" variant="outline" asChild>
+                              <Link
+                                href={`/dashboard/provider/appointments/${inv.appointmentId}`}
+                              >
                                 Open
                               </Link>
-                            </Button>
+                            </AppButton>
                           )}
                           {inv.status === 'PAID' && (
                             <StatusBadge status="PAID" variant="invoice" />
@@ -210,13 +257,13 @@ export default function FrontDeskInvoicesPage() {
                         </TableCell>
                       </TableRow>
                     ))
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
     </div>
   );
 }

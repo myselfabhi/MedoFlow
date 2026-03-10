@@ -9,8 +9,13 @@ import {
   getRevenueByProvider,
   getAppointmentsByDiscipline,
 } from '@/lib/analyticsApi';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { EmptyState } from '@/components/common/EmptyState';
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardContent,
+  AppPageHeader,
+  AppEmptyState,
+} from '@/components/ui-system';
 import {
   BarChart,
   Bar,
@@ -24,7 +29,7 @@ import {
   Cell,
 } from 'recharts';
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const CHART_COLORS = ['#2563EB', '#16A34A', '#F59E0B', '#DC2626', '#64748B'];
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
@@ -64,8 +69,11 @@ export default function AnalyticsPage() {
   if (!clinicId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-        <EmptyState
+        <AppPageHeader
+          title="Analytics"
+          description="Clinic performance overview"
+        />
+        <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
         />
@@ -76,118 +84,166 @@ export default function AnalyticsPage() {
   if (overviewLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-        <p className="mt-1 text-sm text-gray-500">Clinic performance overview</p>
-      </div>
+      <AppPageHeader
+        title="Analytics"
+        description="Clinic performance overview"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-gray-500">Total Revenue</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-900">
+        <AppCard>
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-slate-500">
+              Total Revenue
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-slate-900">
               ${overview?.totalRevenue?.toFixed(2) ?? '0.00'}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-gray-500">Total Appointments</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-900">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-slate-500">
+              Total Appointments
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-slate-900">
               {overview?.totalAppointments ?? 0}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-gray-500">Active Treatment Plans</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-900">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-slate-500">
+              Active Treatment Plans
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-slate-900">
               {overview?.activeTreatmentPlans ?? 0}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <h3 className="text-sm font-medium text-gray-500">Completed Visits</h3>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-900">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-slate-500">
+              Completed Visits
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-slate-900">
               {overview?.completedVisits ?? 0}
             </p>
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-medium text-gray-900">Revenue by Service</h2>
-          </CardHeader>
-          <CardContent>
+        <AppCard>
+          <AppCardHeader>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Revenue by Service
+            </h2>
+          </AppCardHeader>
+          <AppCardContent>
             <div className="h-64">
               {revenueByService && revenueByService.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueByService} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="serviceName" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Revenue']} />
-                    <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <BarChart
+                    data={revenueByService}
+                    margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="serviceName"
+                      tick={{ fontSize: 12, fill: '#64748B' }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: '#64748B' }}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [
+                        `$${v.toFixed(2)}`,
+                        'Revenue',
+                      ]}
+                    />
+                    <Bar
+                      dataKey="total"
+                      fill="#2563EB"
+                      radius={[8, 8, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                <div className="flex h-full items-center justify-center text-sm text-slate-600">
                   No revenue data
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-medium text-gray-900">Revenue by Provider</h2>
-          </CardHeader>
-          <CardContent>
+        <AppCard>
+          <AppCardHeader>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Revenue by Provider
+            </h2>
+          </AppCardHeader>
+          <AppCardContent>
             <div className="h-64">
               {revenueByProvider && revenueByProvider.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueByProvider} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="providerName" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Revenue']} />
-                    <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <BarChart
+                    data={revenueByProvider}
+                    margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="providerName"
+                      tick={{ fontSize: 12, fill: '#64748B' }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: '#64748B' }}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [
+                        `$${v.toFixed(2)}`,
+                        'Revenue',
+                      ]}
+                    />
+                    <Bar
+                      dataKey="total"
+                      fill="#16A34A"
+                      radius={[8, 8, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                <div className="flex h-full items-center justify-center text-sm text-slate-600">
                   No revenue data
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
       </div>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Appointments by Discipline</h2>
-        </CardHeader>
-        <CardContent>
+      <AppCard>
+        <AppCardHeader>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Appointments by Discipline
+          </h2>
+        </AppCardHeader>
+        <AppCardContent>
           <div className="h-64">
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -200,7 +256,9 @@ export default function AnalyticsPage() {
                     outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={index} fill={entry.fill} />
@@ -210,13 +268,13 @@ export default function AnalyticsPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-gray-500">
+              <div className="flex h-full items-center justify-center text-sm text-slate-600">
                 No appointment data
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
     </div>
   );
 }
