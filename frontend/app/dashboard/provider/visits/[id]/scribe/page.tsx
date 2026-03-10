@@ -27,6 +27,7 @@ import {
 } from '@/lib/aiScribeApi';
 import { getVisitByAppointment } from '@/lib/patientApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ClinicalTimelineCard } from '@/components/aiScribe/ClinicalTimelineCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -487,6 +488,10 @@ export default function ProviderAIScribePage() {
                     </ScrollArea>
                   </CardContent>
                 </Card>
+              )}
+
+              {session.timeline && (
+                <ClinicalTimelineCard timeline={session.timeline} />
               )}
 
               {(session.status === 'DRAFT_GENERATED' ||

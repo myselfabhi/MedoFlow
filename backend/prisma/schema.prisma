@@ -448,6 +448,7 @@ model AIScribeSession {
 
   audioUrl       String?
   transcript     String?
+  timeline       Json?
   aiDraft        Json?
   patientSummary Json?
 

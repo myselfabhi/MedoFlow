@@ -133,7 +133,19 @@ function cleanTranscript(transcript: string): string {
   return cleaned.replace(/\s+/g, ' ').trim();
 }
 
-async function generateSoapDraft(transcript: string): Promise<aiScribeService.SoapDraft> {
+export interface ClinicalTimeline {
+  symptoms: string[];
+  duration: string | null;
+  assessment: string | null;
+  plan: string[];
+}
+
+export interface ClinicalAnalysisResult {
+  timeline: ClinicalTimeline;
+  soap: aiScribeService.SoapDraft;
+}
+
+async function generateClinicalAnalysis(transcript: string): Promise<ClinicalAnalysisResult> {
   const cleaned = cleanTranscript(transcript);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -145,13 +157,21 @@ async function generateSoapDraft(transcript: string): Promise<aiScribeService.So
     messages: [
       {
         role: 'system',
-        content: `Convert this medical conversation into a structured SOAP note.
+        content: `Convert this medical conversation into a clinical timeline and a structured SOAP note.
 Return valid JSON only, no markdown or extra text:
 {
-  "subjective": "",
-  "objective": "",
-  "assessment": "",
-  "plan": ""
+  "timeline": {
+    "symptoms": ["symptom1", "symptom2"],
+    "duration": "e.g. 3 days or null if unknown",
+    "assessment": "brief clinical impression or null",
+    "plan": ["plan item 1", "plan item 2"]
+  },
+  "soap": {
+    "subjective": "",
+    "objective": "",
+    "assessment": "",
+    "plan": ""
+  }
 }`,
       },
       {
@@ -163,12 +183,25 @@ Return valid JSON only, no markdown or extra text:
   });
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error('No response from GPT');
-  const parsed = JSON.parse(text) as aiScribeService.SoapDraft;
+  const parsed = JSON.parse(text) as {
+    timeline?: { symptoms?: string[]; duration?: string | null; assessment?: string | null; plan?: string[] };
+    soap?: aiScribeService.SoapDraft;
+  };
+  const timeline = parsed.timeline ?? {};
+  const soap = (parsed.soap ?? {}) as Partial<aiScribeService.SoapDraft>;
   return {
-    subjective: String(parsed.subjective ?? ''),
-    objective: String(parsed.objective ?? ''),
-    assessment: String(parsed.assessment ?? ''),
-    plan: String(parsed.plan ?? ''),
+    timeline: {
+      symptoms: Array.isArray(timeline.symptoms) ? timeline.symptoms.map(String) : [],
+      duration: timeline.duration != null ? String(timeline.duration) : null,
+      assessment: timeline.assessment != null ? String(timeline.assessment) : null,
+      plan: Array.isArray(timeline.plan) ? timeline.plan.map(String) : [],
+    },
+    soap: {
+      subjective: String(soap.subjective ?? ''),
+      objective: String(soap.objective ?? ''),
+      assessment: String(soap.assessment ?? ''),
+      plan: String(soap.plan ?? ''),
+    },
   };
 }
 
@@ -246,10 +279,11 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
     await job.updateProgress(50);
   }
 
-  const soapDraft = await generateSoapDraft(transcript);
+  const { timeline, soap: soapDraft } = await generateClinicalAnalysis(transcript);
   await prisma.aIScribeSession.update({
     where: { id: sessionId },
     data: {
+      timeline: timeline as object,
       aiDraft: soapDraft as object,
       status: 'DRAFT_GENERATED',
       processingCompletedAt: new Date(),

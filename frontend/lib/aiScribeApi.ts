@@ -21,6 +21,13 @@ export interface PatientSummary {
   nextSteps?: string;
 }
 
+export interface ClinicalTimeline {
+  symptoms: string[];
+  duration: string | null;
+  assessment: string | null;
+  plan: string[];
+}
+
 export interface AIScribeSession {
   id: string;
   visitRecordId: string;
@@ -28,6 +35,7 @@ export interface AIScribeSession {
   clinicId: string;
   audioUrl: string | null;
   transcript: string | null;
+  timeline: ClinicalTimeline | null;
   aiDraft: SoapDraft | null;
   patientSummary: PatientSummary | null;
   status: AIScribeStatus;
