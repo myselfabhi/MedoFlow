@@ -19,6 +19,8 @@ export interface CreateAppointmentData {
 export interface CreateAppointmentContext {
   performedById?: string;
   excludeAppointmentId?: string;
+  /** Optional slot hold ID - when provided, validates and consumes hold to prevent race conditions */
+  slotHoldId?: string;
 }
 
 const validateServiceBelongsToClinic = async (
@@ -233,10 +235,36 @@ export const createAppointment = async (
 
   const performedById = context?.performedById;
   const excludeAppointmentId = context?.excludeAppointmentId ?? null;
+  const slotHoldId = context?.slotHoldId;
   const startDate = new Date(startTime);
   const endDate = new Date(endTime);
 
   return prisma.$transaction(async (tx) => {
+    if (slotHoldId) {
+      const hold = await tx.slotHold.findFirst({
+        where: { id: slotHoldId, clinicId },
+      });
+      if (!hold || hold.expiresAt < new Date()) {
+        const err = new Error(
+          'Slot hold expired or invalid. Please select the slot again.'
+        ) as ApiError;
+        err.statusCode = 400;
+        throw err;
+      }
+      if (
+        hold.providerId !== providerId ||
+        hold.serviceId !== serviceId ||
+        hold.locationId !== locationId ||
+        hold.startTime.getTime() !== startDate.getTime() ||
+        hold.endTime.getTime() !== endDate.getTime()
+      ) {
+        const err = new Error('Slot hold does not match booking details') as ApiError;
+        err.statusCode = 400;
+        throw err;
+      }
+      await tx.slotHold.delete({ where: { id: slotHoldId } });
+    }
+
     const service = await tx.service.findFirst({
       where: { id: serviceId, clinicId },
       include: { discipline: { select: { isArchived: true } } },

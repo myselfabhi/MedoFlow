@@ -3,6 +3,7 @@ import prisma from '../config/prisma';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../types/errors';
+import * as slotHoldService from '../services/slotHoldService';
 
 export const listClinics = asyncHandler(
   async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -211,5 +212,60 @@ export const getAvailability = asyncHandler(
     }
 
     successResponse(res, 200, 'Availability retrieved', { slots });
+  }
+);
+
+export const createSlotHold = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const {
+      clinicId,
+      providerId,
+      serviceId,
+      locationId,
+      startTime,
+      endTime,
+      patientId,
+    } = req.body as {
+      clinicId: string;
+      providerId: string;
+      serviceId: string;
+      locationId: string;
+      startTime: string;
+      endTime: string;
+      patientId?: string;
+    };
+    if (!clinicId || !providerId || !serviceId || !locationId || !startTime || !endTime) {
+      const err = new Error(
+        'clinicId, providerId, serviceId, locationId, startTime, endTime are required'
+      ) as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const hold = await slotHoldService.createSlotHold({
+      clinicId,
+      providerId,
+      serviceId,
+      locationId,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      patientId,
+    });
+    successResponse(res, 201, 'Slot hold created', { hold });
+  }
+);
+
+export const releaseSlotHold = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const holdId = req.params.holdId as string;
+    const clinicId = (req.query.clinicId as string) || (req.body?.clinicId as string);
+    if (!clinicId) {
+      const err = new Error('clinicId is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const released = await slotHoldService.releaseSlotHold(holdId, clinicId);
+    successResponse(res, 200, released ? 'Slot hold released' : 'Slot hold not found', {
+      released,
+    });
   }
 );

@@ -13,12 +13,12 @@ export const create = asyncHandler(
       err.statusCode = 400;
       throw err;
     }
-    const { patientId, ...rest } = req.body;
+    const { patientId, slotHoldId, ...rest } = req.body;
     const resolvedPatientId = (patientId as string) || req.user!.id;
     const appointment = await appointmentService.createAppointment(
       { ...rest, patientId: resolvedPatientId },
       clinicId,
-      { performedById: req.user!.id }
+      { performedById: req.user!.id, slotHoldId: slotHoldId as string | undefined }
     );
     successResponse(res, 201, 'Appointment created', { appointment });
   }

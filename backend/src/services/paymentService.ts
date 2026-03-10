@@ -121,22 +121,35 @@ export const failPayment = async (
     select: { id: true },
   });
 
-  const payment = await prisma.payment.create({
-    data: {
-      clinicId: appointment.clinicId,
-      providerId: appointment.providerId,
-      invoiceId: invoice?.id ?? null,
-      appointmentId: appointment.id,
-      patientId: appointment.patientId,
-      amount,
-      status: 'FAILED',
-    },
-  });
-
-  await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: { paymentStatus: 'FAILED' },
-  });
+  const [payment, updatedAppointment] = await prisma.$transaction([
+    prisma.payment.create({
+      data: {
+        clinicId: appointment.clinicId,
+        providerId: appointment.providerId,
+        invoiceId: invoice?.id ?? null,
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        amount,
+        status: 'FAILED',
+      },
+    }),
+    prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { paymentStatus: 'FAILED' },
+      include: {
+        clinic: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+        provider: {
+          include: {
+            disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+            user: { select: { id: true, name: true } },
+          },
+        },
+        service: { select: { id: true, name: true, duration: true } },
+        patient: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
 
   await auditService.logAudit({
     clinicId: appointment.clinicId,
@@ -151,7 +164,7 @@ export const failPayment = async (
     performedById,
   });
 
-  return { payment, appointment };
+  return { payment, appointment: updatedAppointment };
 };
 
 export const releaseExpiredPendingPayments = async (): Promise<number> => {

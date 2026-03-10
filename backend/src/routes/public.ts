@@ -10,5 +10,7 @@ router.get('/clinics/:id/providers', publicController.getClinicProviders);
 router.get('/clinics/:id/locations', publicController.getClinicLocations);
 router.get('/patients/check', publicController.checkPatientExists);
 router.get('/availability', publicController.getAvailability);
+router.post('/slots/hold', publicController.createSlotHold);
+router.delete('/slots/hold/:holdId', publicController.releaseSlotHold);
 
 export default router;

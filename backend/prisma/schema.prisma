@@ -76,6 +76,7 @@ model Clinic {
   prescriptions   Prescription[]
   auditLogs       AuditLog[]
   waitlistEntries WaitlistEntry[]
+  slotHolds      SlotHold[]
   payments        Payment[]
   treatmentPlans  TreatmentPlan[]
   patientFiles    PatientFile[]
@@ -172,6 +173,7 @@ model Provider {
   treatmentPlans          TreatmentPlan[]
   invoices               Invoice[]
   aiScribeSessions       AIScribeSession[]
+  slotHolds              SlotHold[]
 
   @@index([clinicId])
 }
@@ -218,6 +220,29 @@ model Location {
 
   clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointments  Appointment[]
+  slotHolds     SlotHold[]
+}
+
+model SlotHold {
+  id         String   @id @default(cuid())
+  clinicId   String
+  providerId String
+  serviceId  String
+  locationId String
+  startTime  DateTime
+  endTime    DateTime
+  patientId  String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  clinic   Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@index([expiresAt])
+  @@index([providerId, startTime])
 }
 
 model Service {
@@ -246,6 +271,7 @@ model Service {
   providerServices  ProviderService[]
   appointments      Appointment[]
   waitlistEntries   WaitlistEntry[]
+  slotHolds         SlotHold[]
   formTemplates     FormTemplate[]
   invoiceItems     InvoiceItem[]
 
@@ -359,6 +385,7 @@ model Appointment {
   @@index([status])
   @@index([providerId, startTime])
   @@index([clinicId, startTime])
+  @@index([patientId, startTime])
 }
 
 model Payment {
