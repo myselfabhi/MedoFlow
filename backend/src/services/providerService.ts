@@ -256,20 +256,31 @@ export const updateProvider = async (
     }
   }
 
-  // PRD: Block booking when provider inactive. If deactivating with future appointments, require reassignment first.
+  // PRD: Block booking when provider inactive. Return affected appointments for admin reassignment UI.
   if (data.isActive === false && provider.isActive) {
-    const futureCount = await prisma.appointment.count({
+    const affected = await prisma.appointment.findMany({
       where: {
         providerId: id,
         startTime: { gt: new Date() },
         status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
       },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        status: true,
+        patientId: true,
+        serviceId: true,
+        locationId: true,
+      },
+      orderBy: { startTime: 'asc' },
     });
-    if (futureCount > 0) {
+    if (affected.length > 0) {
       const err = new Error(
         'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
       ) as ApiError;
       err.statusCode = 400;
+      err.affectedAppointments = affected;
       throw err;
     }
   }
@@ -312,18 +323,29 @@ export const softDeleteProvider = async (
     throw err;
   }
 
-  const futureCount = await prisma.appointment.count({
+  const affected = await prisma.appointment.findMany({
     where: {
       providerId: id,
       startTime: { gt: new Date() },
       status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
     },
+    select: {
+      id: true,
+      startTime: true,
+      endTime: true,
+      status: true,
+      patientId: true,
+      serviceId: true,
+      locationId: true,
+    },
+    orderBy: { startTime: 'asc' },
   });
-  if (futureCount > 0) {
+  if (affected.length > 0) {
     const err = new Error(
       'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
     ) as ApiError;
     err.statusCode = 400;
+    err.affectedAppointments = affected;
     throw err;
   }
 

@@ -150,6 +150,20 @@ export interface OfferSlotToWaitlistInput {
 export const offerSlotToWaitlist = async (
   input: OfferSlotToWaitlistInput
 ) => {
+  // PRD: Skip waitlist offer if service is archived, inactive, or discipline is archived
+  const service = await prisma.service.findFirst({
+    where: { id: input.serviceId, clinicId: input.clinicId },
+    include: { discipline: { select: { isArchived: true } } },
+  });
+  if (
+    !service ||
+    service.isArchived ||
+    !service.isActive ||
+    service.discipline?.isArchived
+  ) {
+    return null;
+  }
+
   const slotDate = input.slotStartTime;
   const dayStart = startOfDay(slotDate);
   const dayEnd = endOfDay(slotDate);

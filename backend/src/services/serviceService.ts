@@ -165,19 +165,19 @@ export const archiveService = async (
     where: {
       serviceId: id,
       startTime: { gt: new Date() },
-      status: { notIn: ['CANCELLED'] },
+      status: { notIn: ['CANCELLED', 'RESCHEDULED'] },
     },
   });
   if (futureBookings > 0) {
     const err = new Error(
-      'Cannot archive service with future bookings. Cancel or reschedule them first.'
+      'Cannot archive a service with upcoming appointments.'
     ) as ApiError;
     err.statusCode = 400;
     throw err;
   }
   const updated = await prisma.service.update({
     where: { id },
-    data: { isActive: false },
+    data: { isActive: false, isArchived: true },
     include: {
       discipline: { select: { id: true, name: true } },
     },

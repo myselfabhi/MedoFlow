@@ -32,6 +32,10 @@ export const errorHandler = (
     message,
   };
   if (stack) response.stack = stack;
+  const apiErr = err as ApiError;
+  if (apiErr.affectedAppointments && Array.isArray(apiErr.affectedAppointments)) {
+    response.affectedAppointments = apiErr.affectedAppointments;
+  }
 
   return res.status(statusCode).json(response);
 };
