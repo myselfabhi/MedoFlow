@@ -106,6 +106,21 @@ export const deleteDiscipline = async (
     err.statusCode = 404;
     throw err;
   }
+  const activeServicesCount = await prisma.service.count({
+    where: {
+      clinicId: discipline.clinicId,
+      disciplineId: id,
+      isActive: true,
+      isArchived: false,
+    },
+  });
+  if (activeServicesCount > 0) {
+    const err = new Error(
+      'Cannot archive discipline while active services exist. Archive services first.'
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
   const updateWhere = Object.keys(where).length === 0 ? { id } : { id, ...where };
   const updated = await prisma.discipline.update({
     where: updateWhere as { id: string; clinicId?: string },

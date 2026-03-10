@@ -460,6 +460,7 @@ export default function ProviderAIScribePage() {
           <AppCardContent className="flex flex-col items-center gap-4 py-8">
             <p className="text-sm text-muted-foreground">
               Start an AI Scribe session to record or upload consultation audio.
+              If you started a Google Meet, record your microphone here—it will capture your voice and the patient&apos;s voice from your speakers.
             </p>
             <AppButton
               onClick={() => startSessionMutation.mutate()}

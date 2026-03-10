@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Receipt,
   Mic,
+  Video,
 } from 'lucide-react';
 
 const patientItems = [
@@ -28,9 +29,10 @@ const providerItems = [
   { href: '/dashboard/provider/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/providers', label: 'Providers', icon: Stethoscope },
   { href: '/dashboard/services', label: 'Services', icon: BookOpen },
+  { href: '/dashboard/provider/meetings', label: 'Meetings', icon: Video },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/dashboard/provider/calendar', label: 'AI Scribe', icon: Mic },
+  { href: '/dashboard/appointments', label: 'AI Scribe', icon: Mic },
 ];
 
 const staffAdminItems = [
@@ -77,7 +79,7 @@ export function AppSidebar() {
             const Icon = item.icon;
             return (
               <Link
-                key={item.href}
+                key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-subtle',

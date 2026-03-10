@@ -17,6 +17,7 @@ import formRoutes from './forms';
 import invoiceRoutes from './invoices';
 import analyticsRoutes from './analytics';
 import aiScribeRoutes from './aiScribe';
+import googleCalendarRoutes from './googleCalendar';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/forms', formRoutes);
 router.use('/invoices', invoiceRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/ai-scribe', aiScribeRoutes);
+router.use('/integrations/google', googleCalendarRoutes);
 
 export default router;

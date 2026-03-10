@@ -22,6 +22,7 @@ export interface CreateAppointmentPayload {
   patientId: string;
   startTime: string;
   endTime: string;
+  slotHoldId?: string;
 }
 
 export interface CreatedAppointment {
@@ -52,4 +53,45 @@ export const createAppointment = async (
     data: { appointment: CreatedAppointment };
   }>('/appointments', payload);
   return data.data.appointment;
+};
+
+export interface SlotHoldPayload {
+  clinicId: string;
+  providerId: string;
+  serviceId: string;
+  locationId?: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface CreatedSlotHold {
+  id: string;
+  clinicId: string;
+  providerId: string;
+  serviceId: string;
+  locationId?: string | null;
+  startTime: string;
+  endTime: string;
+  expiresAt: string;
+}
+
+export const createSlotHold = async (
+  payload: SlotHoldPayload
+): Promise<CreatedSlotHold> => {
+  const { data } = await publicApi.post<{
+    success: boolean;
+    data: { hold: CreatedSlotHold };
+  }>('/slots/hold', payload);
+  return data.data.hold;
+};
+
+export const releaseSlotHold = async (
+  holdId: string,
+  clinicId: string
+): Promise<boolean> => {
+  const { data } = await publicApi.delete<{
+    success: boolean;
+    data: { released: boolean };
+  }>(`/slots/hold/${holdId}?clinicId=${encodeURIComponent(clinicId)}`);
+  return data.data.released;
 };

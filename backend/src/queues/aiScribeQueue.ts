@@ -1,7 +1,8 @@
 /**
  * BullMQ queue for AI Scribe processing.
  * Queue name: ai-scribe-processing
- * Worker steps: transcribe (Whisper) -> generate SOAP (GPT) -> update session -> create VisitNoteVersion
+ * Worker steps: transcribe (Whisper) -> generate SOAP (GPT) -> update session.
+ * Visit note versions are only created during explicit provider approval.
  */
 
 import { Queue, Worker, Job } from 'bullmq';
@@ -293,7 +294,6 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
   });
   await job.updateProgress(80);
 
-  await aiScribeService.saveDraftAsVisitNoteVersion(sessionId, soapDraft);
   await job.updateProgress(100);
 
   const duration = Math.round((Date.now() - startTime) / 1000);

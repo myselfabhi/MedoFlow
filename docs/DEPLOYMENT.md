@@ -42,6 +42,8 @@ Deploy MedoFlow with **Vercel** (frontend) and **Render** (backend).
 | `CORS_ORIGIN` | Yes* | Your Vercel frontend URL, e.g. `https://medoflow.vercel.app` |
 | `STRIPE_SECRET` | No | If using Stripe payments |
 | `FILE_SIZE_LIMIT_MB` | No | Default `10` |
+| `OPENAI_API_KEY` | Yes* | For AI Scribe (transcription + SOAP notes) |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` (default) or `gpt-4o` |
 
 \* Required for cross-origin auth (cookies). Use your exact Vercel URL.
 
@@ -85,7 +87,19 @@ Click **Deploy**. Vercel will build and deploy. Note your frontend URL (e.g. `ht
 
 ---
 
-## 4. Troubleshooting
+## 4. AI Scribe
+
+Requires `OPENAI_API_KEY` and `OPENAI_MODEL` (default: `gpt-4o-mini`) in backend env.
+
+**Google Meet flow:** Click **Start Meeting with AI Scribe** → Meet opens in new tab → you're redirected to Scribe → click **Start Recording** to capture your mic (use speakers so both voices are captured).
+
+---
+
+## 5. Troubleshooting
+
+### AI Scribe: "OPENAI_API_KEY is not configured"
+
+Add `OPENAI_API_KEY` to your backend `.env` or Render environment.
 
 ### "The table `public.Clinic` does not exist" (500 error)
 
@@ -103,7 +117,7 @@ DATABASE_URL="postgresql://..." npx prisma migrate deploy
 
 ---
 
-## 5. Post-Deploy Checklist
+## 6. Post-Deploy Checklist
 
 - [ ] Backend health: `https://your-backend.onrender.com/api/v1/health` (if you have a health route)
 - [ ] Frontend loads and can reach the API
@@ -112,7 +126,7 @@ DATABASE_URL="postgresql://..." npx prisma migrate deploy
 
 ---
 
-## 6. Important Notes
+## 7. Important Notes
 
 ### File Uploads (Patient Files)
 
@@ -135,7 +149,7 @@ The backend stores files on local disk (`uploads/`). On Render, the filesystem i
 
 ---
 
-## 7. Using Blueprint (Optional)
+## 8. Using Blueprint (Optional)
 
 A `render.yaml` is included for [Render Blueprint](https://render.com/docs/blueprint-spec) deployment:
 

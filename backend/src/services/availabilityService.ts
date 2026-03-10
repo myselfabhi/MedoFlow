@@ -3,6 +3,7 @@ import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
 
 const CANCELLED_STATUS = 'CANCELLED';
+const RESCHEDULED_STATUS = 'RESCHEDULED';
 
 function parseTime(timeStr: string): { hours: number; minutes: number } {
   const [h, m] = timeStr.split(':').map(Number);
@@ -65,7 +66,7 @@ export const getAvailableSlots = async (
   const appointments = await prisma.appointment.findMany({
     where: {
       providerId,
-      status: { not: CANCELLED_STATUS },
+      status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
       startTime: { lt: dayEnd },
       endTime: { gt: dayStart },
     },
@@ -149,7 +150,7 @@ export const previewAvailabilityUpdate = async (
   const appointments = await prisma.appointment.findMany({
     where: {
       providerId,
-      status: { not: CANCELLED_STATUS },
+      status: { notIn: [CANCELLED_STATUS, RESCHEDULED_STATUS] },
       startTime: { gte: now },
     },
     select: { id: true, startTime: true, endTime: true },

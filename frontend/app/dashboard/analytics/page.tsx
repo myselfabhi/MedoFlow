@@ -8,6 +8,8 @@ import {
   getRevenueByService,
   getRevenueByProvider,
   getAppointmentsByDiscipline,
+  downloadAnalyticsReport,
+  type AnalyticsExportType,
 } from '@/lib/analyticsApi';
 import {
   AppCard,
@@ -40,6 +42,7 @@ const CHART_COLORS = [
 export default function AnalyticsPage() {
   const { user } = useAuth();
   const clinicId = user?.clinicId ?? undefined;
+  const isProvider = user?.role === 'PROVIDER';
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['analytics', 'overview'],
@@ -50,19 +53,19 @@ export default function AnalyticsPage() {
   const { data: revenueByService } = useQuery({
     queryKey: ['analytics', 'revenue-by-service'],
     queryFn: () => getRevenueByService(),
-    enabled: !!clinicId,
+    enabled: !!clinicId && !isProvider,
   });
 
   const { data: revenueByProvider } = useQuery({
     queryKey: ['analytics', 'revenue-by-provider'],
     queryFn: () => getRevenueByProvider(),
-    enabled: !!clinicId,
+    enabled: !!clinicId && !isProvider,
   });
 
   const { data: appointmentsByDiscipline } = useQuery({
     queryKey: ['analytics', 'appointments-by-discipline'],
     queryFn: () => getAppointmentsByDiscipline(),
-    enabled: !!clinicId,
+    enabled: !!clinicId && !isProvider,
   });
 
   const pieData =
@@ -101,6 +104,31 @@ export default function AnalyticsPage() {
         title="Analytics"
         description="Clinic performance overview"
       />
+      {!isProvider && (
+        <div className="flex justify-end">
+          <select
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+            defaultValue=""
+            onChange={(e) => {
+              const type = e.target.value as AnalyticsExportType;
+              if (type) {
+                void downloadAnalyticsReport(type);
+                e.currentTarget.selectedIndex = 0;
+              }
+            }}
+          >
+            <option value="" disabled>
+              Export report...
+            </option>
+            <option value="overview">Overview</option>
+            <option value="revenue-by-service">Revenue by Service</option>
+            <option value="revenue-by-provider">Revenue by Provider</option>
+            <option value="appointments-by-discipline">
+              Appointments by Discipline
+            </option>
+          </select>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <AppCard>
@@ -153,7 +181,7 @@ export default function AnalyticsPage() {
         </AppCard>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {!isProvider && <div className="grid gap-6 lg:grid-cols-2">
         <AppCard>
           <AppCardHeader>
             <h2 className="text-lg font-semibold text-foreground">
@@ -241,9 +269,9 @@ export default function AnalyticsPage() {
             </div>
           </AppCardContent>
         </AppCard>
-      </div>
+      </div>}
 
-      <AppCard>
+      {!isProvider && <AppCard>
         <AppCardHeader>
           <h2 className="text-lg font-semibold text-slate-900">
             Appointments by Discipline
@@ -280,7 +308,7 @@ export default function AnalyticsPage() {
             )}
           </div>
         </AppCardContent>
-      </AppCard>
+      </AppCard>}
     </div>
   );
 }

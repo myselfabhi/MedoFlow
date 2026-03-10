@@ -231,3 +231,86 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
 
   return expired.length;
 };
+
+export const refundPayment = async (
+  paymentId: string,
+  performedById: string,
+  where?: { clinicId?: string }
+) => {
+  const payment = await prisma.payment.findFirst({
+    where: {
+      id: paymentId,
+      status: 'SUCCESS',
+      ...(where?.clinicId && { clinicId: where.clinicId }),
+    },
+    include: {
+      appointment: true,
+    },
+  });
+
+  if (!payment) {
+    const err = new Error('Successful payment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const existingRefund = await prisma.payment.findFirst({
+    where: {
+      refundForPaymentId: payment.id,
+      status: 'REFUNDED',
+    },
+  });
+  if (existingRefund) {
+    const err = new Error('Payment already refunded') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const [refund, updatedAppointment] = await prisma.$transaction([
+    prisma.payment.create({
+      data: {
+        clinicId: payment.clinicId,
+        providerId: payment.providerId ?? null,
+        invoiceId: payment.invoiceId ?? null,
+        appointmentId: payment.appointmentId,
+        patientId: payment.patientId,
+        amount: payment.amount.mul(-1),
+        status: 'REFUNDED',
+        refundForPaymentId: payment.id,
+      },
+    }),
+    prisma.appointment.update({
+      where: { id: payment.appointmentId },
+      data: { paymentStatus: 'REFUNDED' },
+      include: {
+        clinic: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+        provider: {
+          include: {
+            disciplines: {
+              include: { discipline: { select: { id: true, name: true } } },
+            },
+            user: { select: { id: true, name: true } },
+          },
+        },
+        service: { select: { id: true, name: true, duration: true } },
+        patient: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
+
+  await auditService.logAudit({
+    clinicId: payment.clinicId,
+    entityType: 'Payment',
+    entityId: payment.id,
+    action: 'PAYMENT_REFUNDED',
+    newValue: {
+      refundPaymentId: refund.id,
+      originalAmount: Number(payment.amount),
+      refundAmount: Number(refund.amount),
+    },
+    performedById,
+  });
+
+  return { refund, appointment: updatedAppointment };
+};

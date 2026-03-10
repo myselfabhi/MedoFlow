@@ -5,6 +5,20 @@ import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../types/errors';
 
+const sanitizeVisitRecordForPatient = <T extends Record<string, unknown>>(visitRecord: T): T => {
+  if (visitRecord.isFinalized) return visitRecord;
+  return {
+    ...visitRecord,
+    subjective: null,
+    objective: null,
+    assessment: null,
+    plan: null,
+    note: null,
+    currentVersion: null,
+    versions: [],
+  };
+};
+
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const provider = await visitService.getProviderByUserId(req.user!.id);
@@ -57,7 +71,13 @@ export const getById = asyncHandler(
         err.statusCode = 403;
         throw err;
     }
-    let payload: { visitRecord: typeof visitRecord; patientSummary?: object } = { visitRecord };
+    const safeVisitRecord =
+      req.user?.role === 'PATIENT'
+        ? sanitizeVisitRecordForPatient(visitRecord as unknown as Record<string, unknown>)
+        : visitRecord;
+    let payload: { visitRecord: typeof visitRecord | Record<string, unknown>; patientSummary?: object } = {
+      visitRecord: safeVisitRecord,
+    };
     if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
       const patientSummary = await aiScribeService.getApprovedPatientSummary(
         visitRecord.id,
@@ -116,7 +136,13 @@ export const getByAppointment = asyncHandler(
       err.statusCode = 403;
       throw err;
     }
-    let payload: { visitRecord: typeof visitRecord; patientSummary?: object } = { visitRecord };
+    const safeVisitRecord =
+      req.user?.role === 'PATIENT'
+        ? sanitizeVisitRecordForPatient(visitRecord as unknown as Record<string, unknown>)
+        : visitRecord;
+    let payload: { visitRecord: typeof visitRecord | Record<string, unknown>; patientSummary?: object } = {
+      visitRecord: safeVisitRecord,
+    };
     if (req.user?.role === 'PATIENT' && visitRecord.isFinalized) {
       const patientSummary = await aiScribeService.getApprovedPatientSummary(
         visitRecord.id,

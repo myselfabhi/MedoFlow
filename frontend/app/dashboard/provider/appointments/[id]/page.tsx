@@ -374,7 +374,7 @@ export default function ProviderAppointmentDetailPage() {
             <CardContent className="p-6">
               <p className="mb-4 text-sm text-gray-500">
                 {isProvider
-                  ? 'Start a visit to document the consultation. Use AI Scribe to record or upload audio and generate clinical notes.'
+                  ? 'Start a Google Meet for the consultation. AI Scribe will open in a new tab—record or upload the meeting audio to generate clinical notes.'
                   : 'Visit record will be created when the provider starts the consultation.'}
               </p>
               {isProvider && (
@@ -386,6 +386,7 @@ export default function ProviderAppointmentDetailPage() {
                         patientId: appointment.patientId,
                       });
                       queryClient.invalidateQueries({ queryKey: ['visit', id] });
+                      window.open('https://meet.google.com/new', '_blank', 'noopener,noreferrer');
                       window.location.href = `/dashboard/provider/visits/${vr.id}/scribe?appointmentId=${id}`;
                     } catch {
                       toast.error('Failed to create visit');
@@ -395,7 +396,7 @@ export default function ProviderAppointmentDetailPage() {
                   }}
                   disabled={creatingVisit}
                 >
-                  {creatingVisit ? 'Creating...' : 'Start Visit with AI Scribe'}
+                  {creatingVisit ? 'Creating...' : 'Start Meeting with AI Scribe'}
                 </Button>
               )}
             </CardContent>

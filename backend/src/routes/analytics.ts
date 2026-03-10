@@ -33,4 +33,10 @@ router.get(
   analyticsController.getAppointmentsByDiscipline
 );
 
+router.get(
+  '/export',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  analyticsController.exportReport
+);
+
 export default router;

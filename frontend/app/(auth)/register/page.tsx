@@ -29,20 +29,26 @@ const registerSchema = z
   .refine(
     (data) => {
       if (data.role === 'FRONT_DESK') {
-        return !!data.clinicName && !!data.clinicEmail;
+        return !!data.clinicId;
       }
       return true;
     },
-    { message: 'Clinic name and email are required for FRONT_DESK', path: ['clinicName'] }
+    { message: 'Clinic ID is required for FRONT_DESK', path: ['clinicId'] }
   )
   .refine(
     (data) => {
       if (data.role === 'PROVIDER') {
         return !!data.clinicId;
       }
+      if (data.role === 'SUPER_ADMIN') {
+        return !!data.clinicName && !!data.clinicEmail;
+      }
       return true;
     },
-    { message: 'Clinic ID is required for PROVIDER', path: ['clinicId'] }
+    {
+      message: 'Clinic ID is required for PROVIDER and clinic details are required for SUPER_ADMIN',
+      path: ['clinicId'],
+    }
   );
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -59,7 +65,7 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: 'FRONT_DESK' },
+    defaultValues: { role: 'SUPER_ADMIN' },
   });
 
   const selectedRole = watch('role');
@@ -74,11 +80,14 @@ export default function RegisterPage() {
         password: data.password,
       };
       if (data.role) payload.role = data.role;
-      if (data.role === 'FRONT_DESK' && data.clinicName && data.clinicEmail) {
+      if (data.role === 'SUPER_ADMIN' && data.clinicName && data.clinicEmail) {
         payload.clinicName = data.clinicName;
         payload.clinicEmail = data.clinicEmail;
       }
-      if (data.role === 'PROVIDER' && data.clinicId) {
+      if (
+        (data.role === 'PROVIDER' || data.role === 'FRONT_DESK') &&
+        data.clinicId
+      ) {
         payload.clinicId = data.clinicId;
       }
       await api.post('/auth/register', payload);
@@ -145,7 +154,7 @@ export default function RegisterPage() {
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
           </AppFormField>
-          {selectedRole === 'FRONT_DESK' && (
+          {selectedRole === 'SUPER_ADMIN' && (
             <>
               <AppFormField
                 label="Clinic Name"
@@ -173,7 +182,7 @@ export default function RegisterPage() {
               </AppFormField>
             </>
           )}
-          {selectedRole === 'PROVIDER' && (
+          {(selectedRole === 'PROVIDER' || selectedRole === 'FRONT_DESK') && (
             <AppFormField
               label="Clinic ID"
               htmlFor="clinicId"

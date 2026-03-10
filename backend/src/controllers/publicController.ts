@@ -4,6 +4,7 @@ import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../types/errors';
 import * as slotHoldService from '../services/slotHoldService';
+import * as availabilityService from '../services/availabilityService';
 
 export const listClinics = asyncHandler(
   async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -164,52 +165,26 @@ export const getAvailability = asyncHandler(
       providerIds = providers.map((p) => p.id);
     }
 
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        providerId: { in: providerIds },
-        status: { notIn: ['CANCELLED'] },
-        startTime: { gte: dayStart },
-        endTime: { lte: dayEnd },
-      },
-      select: { providerId: true, startTime: true, endTime: true },
-    });
-
-    const slotDuration = service.duration;
-    const slots: { start: string; end: string }[] = [];
-    for (let hour = 9; hour < 17; hour++) {
-      for (let min = 0; min < 60; min += 30) {
-        const start = new Date(dayStart);
-        start.setHours(hour, min, 0, 0);
-        const end = new Date(start);
-        end.setMinutes(end.getMinutes() + slotDuration);
-        if (
-          end.getHours() > 17 ||
-          (end.getHours() === 17 && end.getMinutes() > 0)
-        )
-          continue;
-        let available = false;
-        for (const pid of providerIds) {
-          const providerAppointments = appointments.filter(
-            (a) => a.providerId === pid
-          );
-          const hasConflict = providerAppointments.some(
-            (apt) => start < apt.endTime && end > apt.startTime
-          );
-          if (!hasConflict) {
-            available = true;
-            break;
-          }
-        }
-        if (available) {
-          slots.push({ start: start.toISOString(), end: end.toISOString() });
-        }
+    const startTimes = new Set<string>();
+    for (const pid of providerIds) {
+      const providerSlots = await availabilityService.getAvailableSlots({
+        providerId: pid,
+        serviceDurationMinutes: service.duration,
+        date,
+        clinicId,
+      });
+      for (const slotStart of providerSlots) {
+        startTimes.add(slotStart);
       }
     }
+    const slots = Array.from(startTimes)
+      .sort()
+      .map((startIso) => {
+        const start = new Date(startIso);
+        const end = new Date(start);
+        end.setMinutes(end.getMinutes() + service.duration);
+        return { start: start.toISOString(), end: end.toISOString() };
+      });
 
     successResponse(res, 200, 'Availability retrieved', { slots });
   }

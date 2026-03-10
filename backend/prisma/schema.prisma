@@ -84,6 +84,12 @@ model Clinic {
   formResponses   FormResponse[]
   invoices        Invoice[]
   aiScribeSessions AIScribeSession[]
+  products        Product[]
+  inventoryItems  InventoryItem[]
+  packages        Package[]
+  memberships     Membership[]
+  googleCalendarConnections GoogleCalendarConnection[]
+  googleCalendarEvents GoogleCalendarEvent[]
 }
 
 model User {
@@ -113,6 +119,7 @@ model User {
   uploadedFiles    PatientFile[] @relation("UploadedFiles")
   formResponses    FormResponse[]
   invoices         Invoice[]
+  googleCalendarConnections GoogleCalendarConnection[]
 }
 
 model Discipline {
@@ -174,6 +181,7 @@ model Provider {
   invoices               Invoice[]
   aiScribeSessions       AIScribeSession[]
   slotHolds              SlotHold[]
+  googleCalendarEvents   GoogleCalendarEvent[]
 
   @@index([clinicId])
 }
@@ -395,6 +403,7 @@ model Payment {
   invoiceId     String?
   appointmentId String
   patientId     String
+  refundForPaymentId String?
   amount        Decimal  @db.Decimal(10, 2)
   status        String   // PENDING, SUCCESS, FAILED, REFUNDED
   createdAt     DateTime @default(now())
@@ -406,6 +415,124 @@ model Payment {
 
   @@index([appointmentId])
   @@index([status])
+  @@index([refundForPaymentId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  clinicId    String
+  name        String
+  description String?
+  sku         String?
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem?
+
+  @@index([clinicId])
+  @@unique([clinicId, name])
+}
+
+model InventoryItem {
+  id               String   @id @default(cuid())
+  clinicId         String
+  productId        String   @unique
+  quantityInStock  Int      @default(0)
+  reorderThreshold Int?
+  supplier         String?
+  batchNumber      String?
+  expiryDate       DateTime?
+  storageLocation  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+}
+
+model Package {
+  id          String   @id @default(cuid())
+  clinicId    String
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  totalSessions Int?
+  expiresInDays Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@unique([clinicId, name])
+}
+
+model Membership {
+  id            String   @id @default(cuid())
+  clinicId      String
+  name          String
+  description   String?
+  monthlyPrice  Decimal  @db.Decimal(10, 2)
+  billingPeriod String   @default("MONTHLY")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@unique([clinicId, name])
+}
+
+model GoogleCalendarConnection {
+  id             String   @id @default(cuid())
+  userId         String
+  clinicId       String
+  email          String
+  accessToken    String
+  refreshToken   String?
+  tokenType      String?
+  scope          String?
+  expiryDate     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic         Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  events         GoogleCalendarEvent[]
+
+  @@unique([userId, clinicId])
+  @@index([clinicId])
+}
+
+model GoogleCalendarEvent {
+  id             String   @id @default(cuid())
+  connectionId   String
+  clinicId       String
+  providerId     String?
+  googleEventId  String
+  summary        String?
+  startTime      DateTime
+  endTime        DateTime
+  meetLink       String?
+  status         String
+  appointmentId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  connection     GoogleCalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  clinic         Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider       Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, googleEventId])
+  @@index([clinicId, startTime])
+  @@index([providerId, startTime])
 }
 
 model VisitRecord {

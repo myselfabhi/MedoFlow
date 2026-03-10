@@ -864,7 +864,7 @@ export const getAppointmentTimeline = async (
 
   const logs = await prisma.auditLog.findMany({
     where: {
-      entityType: 'APPOINTMENT',
+      entityType: 'Appointment',
       entityId: appointmentId,
     },
     orderBy: { createdAt: 'asc' },

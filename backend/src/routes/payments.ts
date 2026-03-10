@@ -30,4 +30,11 @@ router.post(
   paymentController.fail
 );
 
+router.post(
+  '/:paymentId/refund',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  setClinicFromUser,
+  paymentController.refund
+);
+
 export default router;

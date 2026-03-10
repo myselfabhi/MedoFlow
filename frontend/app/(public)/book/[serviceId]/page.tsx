@@ -16,6 +16,8 @@ import {
   getClinicLocations,
   checkPatientExists,
   createAppointment,
+  createSlotHold,
+  releaseSlotHold,
 } from '@/lib/appointmentApi';
 import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringApi';
 import { LoginModal } from '@/components/LoginModal';
@@ -68,6 +70,8 @@ export default function BookingPage() {
     conflicts: RecurringConflict[];
     createdCount: number;
   } | null>(null);
+  const [slotHoldId, setSlotHoldId] = useState<string | null>(null);
+  const [holdingSlot, setHoldingSlot] = useState(false);
 
   const { data: clinic } = useQuery({
     queryKey: ['clinic', clinicId],
@@ -129,6 +133,32 @@ export default function BookingPage() {
     }
   }, [email]);
 
+  const releaseCurrentHold = useCallback(async () => {
+    if (!slotHoldId || !clinicId) return;
+    try {
+      await releaseSlotHold(slotHoldId, clinicId);
+    } catch {
+      // Best-effort release; server also expires old holds.
+    } finally {
+      setSlotHoldId(null);
+    }
+  }, [slotHoldId, clinicId]);
+
+  React.useEffect(() => {
+    return () => {
+      if (slotHoldId && clinicId) {
+        void releaseSlotHold(slotHoldId, clinicId);
+      }
+    };
+  }, [slotHoldId, clinicId]);
+
+  React.useEffect(() => {
+    if (slotHoldId) {
+      void releaseCurrentHold();
+    }
+    setSelectedSlot(null);
+  }, [providerId, selectedDate, slotHoldId, releaseCurrentHold]);
+
   const handleLoginSubmit = useCallback(
     async (loginEmail: string, password: string) => {
       setLoginError(null);
@@ -152,6 +182,7 @@ export default function BookingPage() {
         patientId,
         startTime: selectedSlot!.start,
         endTime: selectedSlot!.end,
+        ...(slotHoldId && { slotHoldId }),
       });
       if (appointment.status === 'PENDING_PAYMENT') {
         router.push(`/payment/${appointment.id}`);
@@ -159,7 +190,16 @@ export default function BookingPage() {
         router.push('/dashboard/appointments');
       }
     },
-    [clinicId, locations, providerId, providersForService, router, selectedSlot, serviceId]
+    [
+      clinicId,
+      locations,
+      providerId,
+      providersForService,
+      router,
+      selectedSlot,
+      serviceId,
+      slotHoldId,
+    ]
   );
 
   const doCreateRecurringSeries = useCallback(
@@ -480,9 +520,40 @@ export default function BookingPage() {
                     <button
                       key={slot.start}
                       type="button"
-                      onClick={() => {
-                        setSelectedSlot(slot);
-                        nextStep();
+                      onClick={async () => {
+                        if (holdingSlot) return;
+                        const resolvedProviderId =
+                          providerId || providersForService?.[0]?.id;
+                        if (!resolvedProviderId) {
+                          setBookingError(
+                            'No provider is currently available for this service.'
+                          );
+                          return;
+                        }
+                        setHoldingSlot(true);
+                        setBookingError(null);
+                        try {
+                          await releaseCurrentHold();
+                          const hold = await createSlotHold({
+                            clinicId,
+                            providerId: resolvedProviderId,
+                            serviceId,
+                            ...(locations?.[0]?.id && {
+                              locationId: locations[0].id,
+                            }),
+                            startTime: slot.start,
+                            endTime: slot.end,
+                          });
+                          setSlotHoldId(hold.id);
+                          setSelectedSlot(slot);
+                          nextStep();
+                        } catch {
+                          setBookingError(
+                            'Unable to lock this slot. Please pick another time.'
+                          );
+                        } finally {
+                          setHoldingSlot(false);
+                        }
                       }}
                       className={`rounded-lg border-2 p-3 text-sm font-medium transition-all ${
                         selectedSlot?.start === slot.start
@@ -510,6 +581,11 @@ export default function BookingPage() {
                     </div>
                   )}
                 </div>
+              )}
+              {holdingSlot && (
+                <p className="text-xs text-primary-700">
+                  Locking slot for checkout...
+                </p>
               )}
               <button type="button" onClick={prevStep} className="text-sm text-gray-600 hover:underline">
                 Back

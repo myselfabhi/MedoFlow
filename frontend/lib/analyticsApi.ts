@@ -39,3 +39,22 @@ export const getAppointmentsByDiscipline = async () => {
   }>('/analytics/appointments-by-discipline');
   return data.data.data;
 };
+
+export type AnalyticsExportType =
+  | 'overview'
+  | 'revenue-by-service'
+  | 'revenue-by-provider'
+  | 'appointments-by-discipline';
+
+export const downloadAnalyticsReport = async (type: AnalyticsExportType) => {
+  const response = await api.get(`/analytics/export?type=${type}`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `analytics-${type}.csv`;
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+};

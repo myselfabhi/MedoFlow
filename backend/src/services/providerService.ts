@@ -301,7 +301,7 @@ export const updateProvider = async (
     };
   }
 
-  return prisma.provider.update({
+  const updatedProvider = await prisma.provider.update({
     where: { id },
     data: baseData as Parameters<typeof prisma.provider.update>[0]['data'],
     include: {
@@ -309,6 +309,15 @@ export const updateProvider = async (
       user: { select: { id: true, name: true, email: true } },
     },
   });
+
+  if (data.isActive !== undefined && provider.userId) {
+    await prisma.user.update({
+      where: { id: provider.userId },
+      data: { isActive: data.isActive },
+    });
+  }
+
+  return updatedProvider;
 };
 
 export const softDeleteProvider = async (
@@ -358,6 +367,13 @@ export const softDeleteProvider = async (
     },
   });
 
+  if (provider.userId) {
+    await prisma.user.update({
+      where: { id: provider.userId },
+      data: { isActive: false },
+    });
+  }
+
   await auditService.logAudit({
     clinicId: provider.clinicId,
     entityType: 'Provider',
@@ -368,6 +384,19 @@ export const softDeleteProvider = async (
     newValue: false,
     performedById,
   });
+
+  if (provider.userId) {
+    await auditService.logAudit({
+      clinicId: provider.clinicId,
+      entityType: 'User',
+      entityId: provider.userId,
+      action: 'DEACTIVATE',
+      fieldChanged: 'isActive',
+      oldValue: true,
+      newValue: false,
+      performedById,
+    });
+  }
 
   return updated;
 };
