@@ -139,29 +139,29 @@ export default function PatientAppointmentDetailPage() {
                 </dd>
               </div>
             </dl>
+            {appointment.meetLink && (
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <a
+                  href={appointment.meetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                  </svg>
+                  Join Video Call
+                </a>
+              </div>
+            )}
             {consultationSession?.joinToken && (
               <div className="mt-4 border-t border-gray-100 pt-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  {appointment.meetLink && (
-                    <a
-                      href={appointment.meetLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 transition"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                      </svg>
-                      Join Video Call
-                    </a>
-                  )}
-                  <a
-                    href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}
-                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 transition"
-                  >
-                    Open AI Scribe Consent Panel
-                  </a>
-                </div>
+                <a
+                  href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 transition"
+                >
+                  Open AI Scribe Consent Panel
+                </a>
                 <p className="mt-2 text-xs text-gray-500">
                   {consultationSession.consentStatus === 'GRANTED'
                     ? 'You have consented to recording. Your provider can begin recording.'

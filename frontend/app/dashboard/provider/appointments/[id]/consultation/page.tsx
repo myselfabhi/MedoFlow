@@ -348,15 +348,6 @@ export default function ConsultationRoomPage() {
                     )}
                 </div>
 
-                {/* Patient join link */}
-                {session.joinToken && (
-                    <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-                        <p className="text-xs text-indigo-600 font-medium mb-1">Patient Join Link</p>
-                        <p className="text-sm font-mono text-indigo-800 break-all">
-                            {typeof window !== 'undefined' ? `${window.location.origin}/consultation/${session.joinToken}` : ''}
-                        </p>
-                    </div>
-                )}
             </div>
 
             {/* Error banner */}
