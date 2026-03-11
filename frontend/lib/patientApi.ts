@@ -34,13 +34,12 @@ export interface PatientAppointment {
     user: { id: string; name: string };
   };
   service: { id: string; name: string };
+  meetLink?: string | null;
 }
 
 export interface PatientAppointmentDetail extends PatientAppointment {
   clinic: { id: string; name: string };
   service: { id: string; name: string; duration: number };
-  /** Google Meet URL when the appointment is linked to a calendar event */
-  meetLink?: string | null;
 }
 
 export interface PatientSummary {
@@ -105,6 +104,7 @@ export interface ProviderAppointment {
   service: { id: string; name: string };
   patient: { id: string; name: string; email: string };
   provider?: { id: string; firstName: string; lastName: string };
+  meetLink?: string | null;
 }
 
 export const getProviderAppointments = async (

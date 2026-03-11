@@ -71,6 +71,23 @@ test('expired hold no longer blocks availability once removed from blocked inter
   assert.equal(slots.length, 2);
 });
 
+test('default slot stepping uses 30-minute booking windows', () => {
+  const slots = buildCandidateSlots({
+    date: '2026-03-12',
+    timezone: 'UTC',
+    locationId: 'loc-1',
+    providerId: 'provider-a',
+    serviceId: 'service-1',
+    durationMinutes: 30,
+    schedules: [{ startTime: '09:00', endTime: '10:00' }],
+    blocked: [],
+  });
+
+  assert.equal(slots.length, 2);
+  assert.equal(slots[0]?.start, '2026-03-12T09:00:00.000Z');
+  assert.equal(slots[1]?.start, '2026-03-12T09:30:00.000Z');
+});
+
 test('overlapping provider or patient booking ranges are rejected by overlap logic', () => {
   assert.equal(
     rangeOverlaps(

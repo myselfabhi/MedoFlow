@@ -4,12 +4,15 @@ import * as auditService from './auditService';
 import {
   BlockedInterval,
   buildCandidateSlots,
+  DEFAULT_SLOT_STEP_MINUTES,
   getDateWindow,
+  MIN_APPOINTMENT_DURATION_MINUTES,
   SchedulingSlot,
 } from './schedulingCore';
 
 const CANCELLED_STATUS = 'CANCELLED';
 const RESCHEDULED_STATUS = 'RESCHEDULED';
+const ONLINE_LOCATION_NAME = 'Online';
 
 function parseTime(timeStr: string): { hours: number; minutes: number } {
   const [h, m] = timeStr.split(':').map(Number);
@@ -31,6 +34,79 @@ function addMinutes(date: Date, minutes: number): Date {
   return result;
 }
 
+function getTimeWindowMinutes(startTime: string, endTime: string): number {
+  return timeStringToMinutes(endTime) - timeStringToMinutes(startTime);
+}
+
+function assertValidAvailabilityWindow(startTime: string, endTime: string) {
+  const windowMinutes = getTimeWindowMinutes(startTime, endTime);
+
+  if (windowMinutes <= 0) {
+    const err = new Error('End time must be after start time') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (windowMinutes < MIN_APPOINTMENT_DURATION_MINUTES) {
+    const err = new Error(
+      `Availability windows must be at least ${MIN_APPOINTMENT_DURATION_MINUTES} minutes`
+    ) as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+}
+
+async function ensureOnlineLocation(providerId: string, clinicId: string) {
+  let location = await prisma.location.findFirst({
+    where: {
+      clinicId,
+      isActive: true,
+      name: { equals: ONLINE_LOCATION_NAME, mode: 'insensitive' },
+    },
+    select: { id: true, timezone: true },
+  });
+
+  if (!location) {
+    const fallbackLocation = await prisma.location.findFirst({
+      where: { clinicId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { timezone: true },
+    });
+
+    location = await prisma.location.create({
+      data: {
+        clinicId,
+        name: ONLINE_LOCATION_NAME,
+        address: 'Online',
+        timezone: fallbackLocation?.timezone ?? 'UTC',
+      },
+      select: { id: true, timezone: true },
+    });
+  }
+
+  const existingAssignment = await prisma.providerLocationAssignment.findFirst({
+    where: { providerId, locationId: location.id },
+    select: { id: true },
+  });
+
+  if (!existingAssignment) {
+    const hasAssignments = await prisma.providerLocationAssignment.findFirst({
+      where: { providerId },
+      select: { id: true },
+    });
+
+    await prisma.providerLocationAssignment.create({
+      data: {
+        providerId,
+        locationId: location.id,
+        isPrimary: !hasAssignments,
+      },
+    });
+  }
+
+  return location.id;
+}
+
 export interface GetAvailableSlotsParams {
   providerId: string;
   serviceId: string;
@@ -44,6 +120,10 @@ export const getAvailableSlots = async (
   params: GetAvailableSlotsParams
 ): Promise<SchedulingSlot[]> => {
   const { providerId, serviceId, serviceDurationMinutes, date, clinicId } = params;
+  const normalizedDurationMinutes = Math.max(
+    serviceDurationMinutes,
+    MIN_APPOINTMENT_DURATION_MINUTES
+  );
 
   const provider = await prisma.provider.findFirst({
     where: { id: providerId, isActive: true, ...(clinicId && { clinicId }) },
@@ -165,12 +245,13 @@ export const getAvailableSlots = async (
     locationId,
     providerId,
     serviceId,
-    durationMinutes: serviceDurationMinutes,
+    durationMinutes: normalizedDurationMinutes,
     schedules: schedules.map((schedule) => ({
       startTime: schedule.startTime,
       endTime: schedule.endTime,
     })),
     blocked: blockedRanges,
+    stepMinutes: DEFAULT_SLOT_STEP_MINUTES,
   });
 };
 
@@ -234,6 +315,8 @@ export const createAvailability = async (
   clinicId: string,
   performedById: string
 ) => {
+  assertValidAvailabilityWindow(data.startTime, data.endTime);
+
   const provider = await prisma.provider.findFirst({
     where: { id: data.providerId, clinicId },
   });
@@ -242,10 +325,11 @@ export const createAvailability = async (
     err.statusCode = 404;
     throw err;
   }
+  const onlineLocationId = await ensureOnlineLocation(data.providerId, clinicId);
   const created = await prisma.providerAvailability.create({
     data: {
       providerId: data.providerId,
-      locationId: data.locationId ?? null,
+      locationId: onlineLocationId,
       weekday: data.weekday,
       startTime: data.startTime,
       endTime: data.endTime,
@@ -286,6 +370,8 @@ export const updateAvailability = async (
   const newStartTime = data.startTime ?? existing.startTime;
   const newEndTime = data.endTime ?? existing.endTime;
 
+  assertValidAvailabilityWindow(newStartTime, newEndTime);
+
   const preview = await previewAvailabilityUpdate({
     providerId: existing.providerId,
     weekday: newWeekday,
@@ -301,9 +387,12 @@ export const updateAvailability = async (
     };
   }
 
+  const onlineLocationId = await ensureOnlineLocation(existing.providerId, clinicId);
+
   const updated = await prisma.providerAvailability.update({
     where: { id },
     data: {
+      locationId: onlineLocationId,
       ...(data.weekday !== undefined && { weekday: data.weekday }),
       ...(data.startTime !== undefined && { startTime: data.startTime }),
       ...(data.endTime !== undefined && { endTime: data.endTime }),

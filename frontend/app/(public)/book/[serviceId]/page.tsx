@@ -44,6 +44,7 @@ const patientSchema = z.object({
 type PatientFormData = z.infer<typeof patientSchema>;
 
 const STEPS = ['Provider', 'Date', 'Time', 'Patient', 'Confirm'];
+const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
 
 export default function BookingPage() {
   const params = useParams();
@@ -101,7 +102,12 @@ export default function BookingPage() {
   });
 
   const service = services?.find((s) => s.id === serviceId);
-  const launchLocation = locations?.[0] ?? null;
+  const launchLocation =
+    locations?.find((location) =>
+      ONLINE_LOCATION_NAMES.includes(location.name.trim().toLowerCase())
+    ) ??
+    locations?.[0] ??
+    null;
   const providersForService = providers?.filter((p) =>
     p.providerServices.some((ps) => ps.serviceId === serviceId)
   );

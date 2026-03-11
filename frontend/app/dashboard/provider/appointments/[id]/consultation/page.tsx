@@ -307,12 +307,27 @@ export default function ConsultationRoomPage() {
                             </p>
                         )}
                     </div>
-                    <button
-                        onClick={() => router.back()}
-                        className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
-                    >
-                        ← Back
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {session.appointment?.meetLink && (
+                            <a
+                                href={session.appointment.meetLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg shadow hover:bg-blue-700 transition flex items-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                Join Video Call
+                            </a>
+                        )}
+                        <button
+                            onClick={() => router.back()}
+                            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+                        >
+                            ← Back
+                        </button>
+                    </div>
                 </div>
 
                 {/* Status badges */}
@@ -383,14 +398,19 @@ export default function ConsultationRoomPage() {
                 <div className="flex items-center gap-4">
                     {/* Start recording */}
                     {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
-                        <button
-                            onClick={handleStartRecording}
-                            disabled={session.consentStatus !== 'GRANTED'}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
-                        >
-                            <span className="w-3 h-3 bg-white rounded-full" />
-                            Start Recording
-                        </button>
+                        <div className="flex flex-col items-start gap-2">
+                            <button
+                                onClick={handleStartRecording}
+                                disabled={session.consentStatus !== 'GRANTED'}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                            >
+                                <span className="w-3 h-3 bg-white rounded-full" />
+                                Start AI Scribe (Share Meeting Tab)
+                            </button>
+                            <p className="text-xs text-gray-500 max-w-sm">
+                                <b>Important:</b> To capture the patient's voice, please select the Google Meet tab and ensure <b>"Share tab audio"</b> is checked.
+                            </p>
+                        </div>
                     )}
 
                     {/* Stop recording */}

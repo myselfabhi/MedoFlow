@@ -292,7 +292,35 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
     await job.updateProgress(50);
   }
 
-  const { timeline, soap: soapDraft } = await generateClinicalAnalysis(transcript);
+  let finalTranscriptText = transcript;
+
+  try {
+    const diarizationPrompt = `You are an expert medical transcriptionist. You have been given a messy block of text that represents a raw audio transcript of a patient consultation.
+There are two speakers: a Provider (doctor) and a Patient.
+Your job is to read the text, use context clues to figure out who is speaking, and rewrite the transcript as a clean dialogue.
+Format your output exactly like this:
+Provider: [text]
+Patient: [text]
+Output ONLY the dialogue, nothing else. Do not summarize, keep the exact words if possible.`;
+
+    const diarizedText = await aiProviderService.chatCompletion({
+      systemPrompt: diarizationPrompt,
+      userMessage: transcript,
+      jsonMode: false,
+    });
+
+    if (diarizedText && diarizedText.length > 50) {
+      finalTranscriptText = diarizedText;
+      await prisma.aIScribeSession.update({
+        where: { id: sessionId },
+        data: { transcript: finalTranscriptText },
+      });
+    }
+  } catch (e) {
+    console.warn("Pseudo-diarization failed, falling back to raw transcript", e);
+  }
+
+  const { timeline, soap: soapDraft } = await generateClinicalAnalysis(finalTranscriptText);
   await prisma.aIScribeSession.update({
     where: { id: sessionId },
     data: {

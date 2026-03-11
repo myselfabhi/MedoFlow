@@ -49,6 +49,7 @@ export interface ConsultationSession {
         startTime: string;
         endTime: string;
         status?: string;
+        meetLink?: string | null;
     };
     provider?: {
         id: string;

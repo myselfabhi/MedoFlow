@@ -22,6 +22,39 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/button';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MIN_SLOT_MINUTES = 30;
+const TIME_INPUT_STEP_SECONDS = 30 * 60;
+
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDateValue() {
+  return formatDateInputValue(new Date());
+}
+
+function getDateWeekday(date: string) {
+  if (!date) return new Date().getDay();
+  return new Date(`${date}T00:00:00`).getDay();
+}
+
+function getNextDateForWeekday(weekday: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const offset = (weekday - today.getDay() + 7) % 7;
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + offset);
+  return formatDateInputValue(nextDate);
+}
+
+function getMinutesBetweenTimes(startTime: string, endTime: string) {
+  const [startHours, startMinutes] = startTime.split(':').map(Number);
+  const [endHours, endMinutes] = endTime.split(':').map(Number);
+  return (endHours ?? 0) * 60 + (endMinutes ?? 0) - ((startHours ?? 0) * 60 + (startMinutes ?? 0));
+}
 
 export default function ProviderAvailabilityPage() {
   const params = useParams();
@@ -217,7 +250,7 @@ export default function ProviderAvailabilityPage() {
         <CardHeader>
           <h2 className="text-lg font-medium text-gray-900">Schedule</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Edit weekly availability. Changes that affect existing appointments will require confirmation.
+            Pick a date with a start and end time. Each saved range is treated as online availability.
           </p>
         </CardHeader>
         <CardContent>
@@ -396,12 +429,15 @@ function AddSlotForm({
   showCancel: boolean;
   isSubmitting: boolean;
 }) {
-  const [weekday, setWeekday] = useState(1); // Monday default
+  const [date, setDate] = useState(getNextDateForWeekday(1));
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
+  const weekday = getDateWeekday(date);
+  const isValidWindow = getMinutesBetweenTimes(startTime, endTime) >= MIN_SLOT_MINUTES;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidWindow) return;
     onSubmit({ weekday, startTime, endTime });
   };
 
@@ -411,23 +447,21 @@ function AddSlotForm({
       className="flex flex-wrap items-end gap-4 rounded-lg border border-primary-200 bg-primary-50/30 p-4 sm:flex-nowrap"
     >
       <div className="w-full min-w-0 sm:w-40">
-        <label className="block text-xs font-medium text-gray-500">Day</label>
-        <select
-          value={weekday}
-          onChange={(e) => setWeekday(Number(e.target.value))}
+        <label className="block text-xs font-medium text-gray-500">Date</label>
+        <input
+          type="date"
+          value={date}
+          min={getTodayDateValue()}
+          onChange={(e) => setDate(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        >
-          {WEEKDAY_NAMES.map((name, i) => (
-            <option key={i} value={i}>
-              {name}
-            </option>
-          ))}
-        </select>
+        />
+        <p className="mt-1 text-xs text-gray-500">Applies every {WEEKDAY_NAMES[weekday]}.</p>
       </div>
       <div className="w-full min-w-0 sm:w-28">
         <label className="block text-xs font-medium text-gray-500">Start</label>
         <input
           type="time"
+          step={TIME_INPUT_STEP_SECONDS}
           value={startTime}
           onChange={(e) => setStartTime(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -437,6 +471,7 @@ function AddSlotForm({
         <label className="block text-xs font-medium text-gray-500">End</label>
         <input
           type="time"
+          step={TIME_INPUT_STEP_SECONDS}
           value={endTime}
           onChange={(e) => setEndTime(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -444,7 +479,7 @@ function AddSlotForm({
       </div>
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !isValidWindow}
         className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
       >
         {isSubmitting ? 'Adding...' : 'Add slot'}
@@ -471,12 +506,15 @@ function AvailabilityRow({
   onUpdate: (payload: UpdateAvailabilityPayload) => void;
   isSubmitting: boolean;
 }) {
-  const [weekday, setWeekday] = useState(slot.weekday);
+  const [date, setDate] = useState(getNextDateForWeekday(slot.weekday));
   const [startTime, setStartTime] = useState(slot.startTime);
   const [endTime, setEndTime] = useState(slot.endTime);
+  const weekday = getDateWeekday(date);
+  const isValidWindow = getMinutesBetweenTimes(startTime, endTime) >= MIN_SLOT_MINUTES;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidWindow) return;
     onUpdate({
       weekday,
       startTime,
@@ -490,23 +528,21 @@ function AvailabilityRow({
       className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4 sm:flex-nowrap"
     >
       <div className="w-full min-w-0 sm:w-40">
-        <label className="block text-xs font-medium text-gray-500">Day</label>
-        <select
-          value={weekday}
-          onChange={(e) => setWeekday(Number(e.target.value))}
+        <label className="block text-xs font-medium text-gray-500">Date</label>
+        <input
+          type="date"
+          value={date}
+          min={getTodayDateValue()}
+          onChange={(e) => setDate(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        >
-          {WEEKDAY_NAMES.map((name, i) => (
-            <option key={i} value={i}>
-              {name}
-            </option>
-          ))}
-        </select>
+        />
+        <p className="mt-1 text-xs text-gray-500">Recurring every {WEEKDAY_NAMES[weekday]}.</p>
       </div>
       <div className="w-full min-w-0 sm:w-28">
         <label className="block text-xs font-medium text-gray-500">Start</label>
         <input
           type="time"
+          step={TIME_INPUT_STEP_SECONDS}
           value={startTime}
           onChange={(e) => setStartTime(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -516,6 +552,7 @@ function AvailabilityRow({
         <label className="block text-xs font-medium text-gray-500">End</label>
         <input
           type="time"
+          step={TIME_INPUT_STEP_SECONDS}
           value={endTime}
           onChange={(e) => setEndTime(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -523,7 +560,7 @@ function AvailabilityRow({
       </div>
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !isValidWindow}
         className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
       >
         {isSubmitting ? 'Updating...' : 'Update'}

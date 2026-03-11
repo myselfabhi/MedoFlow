@@ -101,7 +101,7 @@ export const createOrGetSession = async (
             clinicId,
             status: { not: ConsultationStatus.FAILED },
         },
-        include: { appointment: { select: { id: true, startTime: true, endTime: true } } },
+        include: { appointment: { select: { id: true, startTime: true, endTime: true, meetLink: true } } },
     });
     if (existing) return existing;
 
@@ -115,7 +115,7 @@ export const createOrGetSession = async (
             status: ConsultationStatus.READY,
         },
         include: {
-            appointment: { select: { id: true, startTime: true, endTime: true } },
+            appointment: { select: { id: true, startTime: true, endTime: true, meetLink: true } },
         },
     });
 
@@ -148,6 +148,7 @@ export const getSessionById = async (
                     startTime: true,
                     endTime: true,
                     status: true,
+                    meetLink: true,
                 },
             },
             provider: { select: { id: true, firstName: true, lastName: true } },
@@ -192,7 +193,7 @@ export const getSessionByToken = async (joinToken: string) => {
         where: { joinToken },
         include: {
             appointment: {
-                select: { id: true, startTime: true, endTime: true, status: true },
+                select: { id: true, startTime: true, endTime: true, status: true, meetLink: true },
             },
             provider: { select: { firstName: true, lastName: true } },
             patient: { select: { id: true, name: true } },
@@ -212,7 +213,7 @@ export const getSessionForAppointment = async (
         orderBy: { createdAt: 'desc' },
         include: {
             appointment: {
-                select: { id: true, startTime: true, endTime: true, status: true },
+                select: { id: true, startTime: true, endTime: true, status: true, meetLink: true },
             },
             provider: { select: { id: true, firstName: true, lastName: true } },
             patient: { select: { id: true, name: true } },
@@ -389,8 +390,20 @@ export const uploadRecording = async (
     if (session.clinicId !== clinicId) throwApi('Access denied', 403, 'forbidden');
 
     const recStatus = session.recordingStatus as string;
-    if (recStatus !== 'STOPPED' && recStatus !== 'FAILED') {
+    if (recStatus !== 'STOPPED' && recStatus !== 'FAILED' && recStatus !== 'RECORDING') {
         throwApi('Recording must be stopped before upload', 400, 'invalid_state');
+    }
+
+    // If still in RECORDING state (e.g. screen-share ended natively), auto-stop first
+    if (recStatus === 'RECORDING') {
+        await prisma.consultationSession.update({
+            where: { id: sessionId },
+            data: {
+                status: ConsultationStatus.ENDED,
+                recordingStatus: RecordingStatus.STOPPED,
+                endedAt: new Date(),
+            },
+        });
     }
 
     // Transition to UPLOADING

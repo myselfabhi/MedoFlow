@@ -12,7 +12,11 @@ import {
 import * as auditService from './auditService';
 import * as waitlistService from './waitlistService';
 import * as patientMembershipService from './patientMembershipService';
-import { buildSlotFingerprint, resolveAppointmentLifecycle } from './schedulingCore';
+import {
+  buildSlotFingerprint,
+  MIN_APPOINTMENT_DURATION_MINUTES,
+  resolveAppointmentLifecycle,
+} from './schedulingCore';
 
 const CANCELLED_STATUS = 'CANCELLED';
 
@@ -162,6 +166,25 @@ const createApiError = (
   return err;
 };
 
+const validateAppointmentWindow = (startTime: Date, endTime: Date) => {
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    throw createApiError('Start time and end time must be valid dates', 400, 'validation_error');
+  }
+
+  const durationMinutes = (endTime.getTime() - startTime.getTime()) / 60000;
+  if (durationMinutes <= 0) {
+    throw createApiError('End time must be after start time', 400, 'validation_error');
+  }
+
+  if (durationMinutes < MIN_APPOINTMENT_DURATION_MINUTES) {
+    throw createApiError(
+      `Appointments must be at least ${MIN_APPOINTMENT_DURATION_MINUTES} minutes long`,
+      400,
+      'validation_error'
+    );
+  }
+};
+
 const lockBookingScope = async (
   tx: Prisma.TransactionClient,
   providerId: string,
@@ -273,6 +296,8 @@ export const createAppointment = async (
   const startDate = new Date(startTime);
   const endDate = new Date(endTime);
 
+  validateAppointmentWindow(startDate, endDate);
+
   return prisma.$transaction(async (tx) => {
     await lockBookingScope(tx, providerId, patientId);
 
@@ -360,12 +385,12 @@ export const createAppointment = async (
     const resolvedLocation =
       (locationId
         ? await tx.location.findFirst({
-            where: { id: locationId, clinicId, isActive: true },
-          })
+          where: { id: locationId, clinicId, isActive: true },
+        })
         : await tx.location.findFirst({
-            where: { clinicId, isActive: true },
-            orderBy: { createdAt: 'asc' },
-          })) ?? null;
+          where: { clinicId, isActive: true },
+          orderBy: { createdAt: 'asc' },
+        })) ?? null;
 
     if (!resolvedLocation) {
       throw createApiError(
@@ -583,6 +608,7 @@ export const createAppointment = async (
       paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
       slotHeldUntil,
       bookingHoldExpiresAt: slotHeldUntil,
+      meetLink: `https://meet.jit.si/MedoFlow-${Math.random().toString(36).substring(2, 8)}-${Date.now().toString(36)}`,
       notes: context?.notes ?? null,
       createdById: performedById ?? null,
       updatedById: performedById ?? null,
@@ -691,14 +717,14 @@ export const createRecurringSeries = async (
   const location =
     (input.locationId
       ? await prisma.location.findFirst({
-          where: { id: input.locationId, clinicId: input.clinicId, isActive: true },
-          select: { id: true, timezone: true },
-        })
+        where: { id: input.locationId, clinicId: input.clinicId, isActive: true },
+        select: { id: true, timezone: true },
+      })
       : await prisma.location.findFirst({
-          where: { clinicId: input.clinicId, isActive: true },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true, timezone: true },
-        })) ?? null;
+        where: { clinicId: input.clinicId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, timezone: true },
+      })) ?? null;
 
   if (!location) {
     throw createApiError('Location not found', 404, 'validation_error');
@@ -1188,7 +1214,7 @@ export const updateAppointmentStatus = async (
     data: {
       status,
       ...(status === AppointmentStatus.CONFIRMED &&
-      appointment.status === AppointmentStatus.PENDING_PROVIDER_APPROVAL
+        appointment.status === AppointmentStatus.PENDING_PROVIDER_APPROVAL
         ? { approvalStatus: ApprovalStatus.APPROVED }
         : {}),
       updatedById: req.user?.id ?? null,

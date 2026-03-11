@@ -20,6 +20,9 @@ export interface BlockedInterval {
   end: Date;
 }
 
+export const MIN_APPOINTMENT_DURATION_MINUTES = 30;
+export const DEFAULT_SLOT_STEP_MINUTES = 30;
+
 export interface AppointmentLifecycleState {
   status: AppointmentStatus;
   approvalStatus: ApprovalStatus;
@@ -86,7 +89,7 @@ export function buildCandidateSlots(params: {
     durationMinutes,
     schedules,
     blocked,
-    stepMinutes = 15,
+    stepMinutes = DEFAULT_SLOT_STEP_MINUTES,
   } = params;
 
   const slots: SchedulingSlot[] = [];

@@ -6,6 +6,8 @@ import { ApiError } from '../types/errors';
 import * as slotHoldService from '../services/slotHoldService';
 import * as availabilityService from '../services/availabilityService';
 
+const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
+
 export const listClinics = asyncHandler(
   async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinics = await prisma.clinic.findMany({
@@ -97,6 +99,11 @@ export const getClinicLocations = asyncHandler(
       where: { clinicId: id, isActive: true },
       select: { id: true, name: true, address: true, timezone: true },
     });
+    locations.sort((left, right) => {
+      const leftOnline = ONLINE_LOCATION_NAMES.includes(left.name.trim().toLowerCase()) ? 1 : 0;
+      const rightOnline = ONLINE_LOCATION_NAMES.includes(right.name.trim().toLowerCase()) ? 1 : 0;
+      return rightOnline - leftOnline || left.name.localeCompare(right.name);
+    });
     successResponse(res, 200, 'Locations retrieved', { locations });
   }
 );
@@ -158,17 +165,27 @@ export const getAvailability = asyncHandler(
       throw err;
     }
 
-    const resolvedLocation =
-      (locationId
-        ? await prisma.location.findFirst({
-            where: { id: locationId, clinicId, isActive: true },
-            select: { id: true, timezone: true },
-          })
-        : await prisma.location.findFirst({
-            where: { clinicId, isActive: true },
-            orderBy: { createdAt: 'asc' },
-            select: { id: true, timezone: true },
-          })) ?? null;
+    const resolvedLocation = locationId
+      ? await prisma.location.findFirst({
+          where: { id: locationId, clinicId, isActive: true },
+          select: { id: true, timezone: true },
+        })
+      : (await prisma.location.findFirst({
+          where: {
+            clinicId,
+            isActive: true,
+            OR: ONLINE_LOCATION_NAMES.map((name) => ({
+              name: { equals: name, mode: 'insensitive' as const },
+            })),
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, timezone: true },
+        })) ??
+        (await prisma.location.findFirst({
+          where: { clinicId, isActive: true },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, timezone: true },
+        }));
 
     if (!resolvedLocation) {
       const err = new Error('Location not found') as ApiError;
