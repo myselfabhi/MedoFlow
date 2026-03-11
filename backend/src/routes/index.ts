@@ -20,6 +20,7 @@ import analyticsRoutes from './analytics';
 import aiScribeRoutes from './aiScribe';
 import googleCalendarRoutes from './googleCalendar';
 import staffRoutes from './staff';
+import consultationRoutes, { appointmentConsultationRouter } from './consultations';
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.use('/providers', providerRoutes);
 router.use('/locations', locationRoutes);
 router.use('/services', serviceRoutes);
 router.use('/appointments', appointmentRoutes);
+router.use('/appointments', appointmentConsultationRouter);
 router.use('/visits', visitRoutes);
 router.use('/prescriptions', prescriptionRoutes);
 router.use('/waitlist', waitlistRoutes);
@@ -44,5 +46,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/ai-scribe', aiScribeRoutes);
 router.use('/integrations/google', googleCalendarRoutes);
 router.use('/staff', staffRoutes);
+router.use('/consultations', consultationRoutes);
 
 export default router;

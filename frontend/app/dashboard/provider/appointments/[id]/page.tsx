@@ -294,7 +294,7 @@ export default function ProviderAppointmentDetailPage() {
                 <dd className="mt-1 text-sm text-gray-900">
                   {appointment.provider.firstName} {appointment.provider.lastName}
                 </dd>
-                </div>
+              </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
                 <dd className="mt-1 text-sm text-gray-900">{formatDateTime(appointment.startTime)}</dd>
@@ -320,8 +320,8 @@ export default function ProviderAppointmentDetailPage() {
                     size="sm"
                     asChild
                   >
-                    <Link href={`/dashboard/provider/visits/${visitRecord.id}/scribe?appointmentId=${id}`}>
-                      AI Scribe
+                    <Link href={`/dashboard/provider/appointments/${id}/consultation`}>
+                      Consultation Room
                     </Link>
                   </Button>
                 )}
@@ -370,34 +370,21 @@ export default function ProviderAppointmentDetailPage() {
         {!visitRecord && !creatingVisit && appointment && (
           <Card>
             <CardHeader>
-              <CardTitle>Visit Record</CardTitle>
+              <CardTitle>Consultation</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <p className="mb-4 text-sm text-gray-500">
                 {isProvider
-                  ? 'Start a Google Meet for the consultation. AI Scribe will open in a new tab—record or upload the meeting audio to generate clinical notes.'
+                  ? 'Start a Medoflow consultation session. Record audio, transcribe, and generate clinical notes—all in one place.'
                   : 'Visit record will be created when the provider starts the consultation.'}
               </p>
               {isProvider && (
                 <Button
-                  onClick={async () => {
-                    setCreatingVisit(true);
-                    try {
-                      const vr = await createVisitRecord(id, {
-                        patientId: appointment.patientId,
-                      });
-                      queryClient.invalidateQueries({ queryKey: ['visit', id] });
-                      window.open('https://meet.google.com/new', '_blank', 'noopener,noreferrer');
-                      window.location.href = `/dashboard/provider/visits/${vr.id}/scribe?appointmentId=${id}`;
-                    } catch {
-                      toast.error('Failed to create visit');
-                    } finally {
-                      setCreatingVisit(false);
-                    }
+                  onClick={() => {
+                    window.location.href = `/dashboard/provider/appointments/${id}/consultation`;
                   }}
-                  disabled={creatingVisit}
                 >
-                  {creatingVisit ? 'Creating...' : 'Start Meeting with AI Scribe'}
+                  Start Consultation
                 </Button>
               )}
             </CardContent>

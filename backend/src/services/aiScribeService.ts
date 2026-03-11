@@ -353,6 +353,7 @@ export const approveDraft = async (
       data: {
         status: AIScribeStatus.APPROVED,
         patientSummary: patientSummary as object,
+        patientSummaryPublished: true,
       },
     });
   });

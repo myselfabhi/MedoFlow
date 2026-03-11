@@ -82,8 +82,8 @@ function highlightTranscript(text: string): React.ReactNode {
     if (
       nonOverlapping.length &&
       m.index <
-        nonOverlapping[nonOverlapping.length - 1].index +
-          nonOverlapping[nonOverlapping.length - 1].length
+      nonOverlapping[nonOverlapping.length - 1].index +
+      nonOverlapping[nonOverlapping.length - 1].length
     )
       continue;
     nonOverlapping.push(m);
@@ -253,16 +253,16 @@ export default function ProviderAIScribePage() {
                 provider to document the consultation.
               </p>
             </div>
-        <Link
-          href={
-            appointmentId
-              ? `/dashboard/provider/appointments/${appointmentId}`
-              : '/dashboard'
-          }
-          className="mt-4 inline-block text-sm text-accent hover:underline"
-        >
-          ← Back
-        </Link>
+            <Link
+              href={
+                appointmentId
+                  ? `/dashboard/provider/appointments/${appointmentId}`
+                  : '/dashboard'
+              }
+              className="mt-4 inline-block text-sm text-accent hover:underline"
+            >
+              ← Back
+            </Link>
           </AppCardContent>
         </AppCard>
       </div>
@@ -460,7 +460,7 @@ export default function ProviderAIScribePage() {
       <Link
         href={
           appointmentId ||
-          session?.visitRecord?.appointmentId
+            session?.visitRecord?.appointmentId
             ? `/dashboard/provider/appointments/${appointmentId || session?.visitRecord?.appointmentId}`
             : '/dashboard/provider/calendar'
         }
@@ -486,7 +486,6 @@ export default function ProviderAIScribePage() {
           <AppCardContent className="flex flex-col items-center gap-4 py-8">
             <p className="text-sm text-muted-foreground">
               Start an AI Scribe session to record or upload consultation audio.
-              If you started a Google Meet, record your microphone here—it will capture your voice and the patient&apos;s voice from your speakers.
             </p>
             <AppButton
               onClick={() => startSessionMutation.mutate()}
@@ -561,27 +560,27 @@ export default function ProviderAIScribePage() {
                 {(session.status === 'RECORDING' ||
                   session.status === 'TRANSCRIBING' ||
                   isFailed) && (
-                  <>
-                    <input
-                      ref={setAudioInputRef}
-                      type="file"
-                      accept="audio/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <AppButton
-                      variant="outline"
-                      size="sm"
-                      onClick={handleUploadClick}
-                      disabled={
-                        uploadMutation.isPending || isProcessing
-                      }
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Audio
-                    </AppButton>
-                  </>
-                )}
+                    <>
+                      <input
+                        ref={setAudioInputRef}
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                      <AppButton
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUploadClick}
+                        disabled={
+                          uploadMutation.isPending || isProcessing
+                        }
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Audio
+                      </AppButton>
+                    </>
+                  )}
                 {isProcessing && (
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -622,58 +621,58 @@ export default function ProviderAIScribePage() {
           {(session.status === 'DRAFT_GENERATED' ||
             session.status === 'EDITED' ||
             session.status === 'APPROVED') && (
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>SOAP Editor</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent>
-                <SoapEditor
-                  draft={draft}
-                  onChange={setLocalDraft}
-                  onSave={() =>
-                    saveDraftMutation.mutate({
-                      sessionId: session.id,
-                      draft,
-                    })
-                  }
-                  onRegenerate={() =>
-                    regenerateMutation.mutate(session.id)
-                  }
-                  onApprove={() => approveMutation.mutate(session.id)}
-                  isSaving={saveDraftMutation.isPending}
-                  isRegenerating={regenerateMutation.isPending}
-                  isApproving={approveMutation.isPending}
-                  canEdit={
-                    canEdit && !session.visitRecord?.isFinalized
-                  }
-                />
-                {session.status === 'APPROVED' &&
-                  session.patientSummary &&
-                  !session.patientSummaryPublished && (
-                    <div className="mt-4 border-t border-slate-200 pt-4">
-                      <AppButton
-                        variant="outline"
-                        size="sm"
-                        onClick={() => publishMutation.mutate(session.id)}
-                        disabled={publishMutation.isPending}
-                      >
-                        {publishMutation.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Share2 className="mr-2 h-4 w-4" />
-                        )}
-                        Publish Summary to Patient
-                      </AppButton>
-                    </div>
+              <AppCard>
+                <AppCardHeader>
+                  <AppCardTitle>SOAP Editor</AppCardTitle>
+                </AppCardHeader>
+                <AppCardContent>
+                  <SoapEditor
+                    draft={draft}
+                    onChange={setLocalDraft}
+                    onSave={() =>
+                      saveDraftMutation.mutate({
+                        sessionId: session.id,
+                        draft,
+                      })
+                    }
+                    onRegenerate={() =>
+                      regenerateMutation.mutate(session.id)
+                    }
+                    onApprove={() => approveMutation.mutate(session.id)}
+                    isSaving={saveDraftMutation.isPending}
+                    isRegenerating={regenerateMutation.isPending}
+                    isApproving={approveMutation.isPending}
+                    canEdit={
+                      canEdit && !session.visitRecord?.isFinalized
+                    }
+                  />
+                  {session.status === 'APPROVED' &&
+                    session.patientSummary &&
+                    !session.patientSummaryPublished && (
+                      <div className="mt-4 border-t border-slate-200 pt-4">
+                        <AppButton
+                          variant="outline"
+                          size="sm"
+                          onClick={() => publishMutation.mutate(session.id)}
+                          disabled={publishMutation.isPending}
+                        >
+                          {publishMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Share2 className="mr-2 h-4 w-4" />
+                          )}
+                          Publish Summary to Patient
+                        </AppButton>
+                      </div>
+                    )}
+                  {session.status === 'APPROVED' && session.patientSummaryPublished && (
+                    <p className="mt-4 text-sm text-slate-600">
+                      Visit summary has been published to the patient.
+                    </p>
                   )}
-                {session.status === 'APPROVED' && session.patientSummaryPublished && (
-                  <p className="mt-4 text-sm text-slate-600">
-                    Visit summary has been published to the patient.
-                  </p>
-                )}
-              </AppCardContent>
-            </AppCard>
-          )}
+                </AppCardContent>
+              </AppCard>
+            )}
         </>
       )}
     </div>

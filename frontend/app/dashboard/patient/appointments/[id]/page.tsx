@@ -10,6 +10,7 @@ import {
   getMyPrescriptions,
 } from '@/lib/patientApi';
 import { getPatientForms } from '@/lib/formsApi';
+import { getByAppointment } from '@/lib/consultationApi';
 import { PatientFilesSection } from '@/components/PatientFilesSection';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -63,6 +64,13 @@ export default function PatientAppointmentDetailPage() {
     enabled: !!appointment?.patientId && !!appointment?.clinicId,
   });
 
+  const { data: consultationSession } = useQuery({
+    queryKey: ['consultation', 'appointment', id],
+    queryFn: () => getByAppointment(id),
+    enabled: !!appointment?.id,
+    refetchInterval: 10000,
+  });
+
   if (appointmentLoading || !appointment) {
     if (appointmentError) {
       return (
@@ -103,49 +111,49 @@ export default function PatientAppointmentDetailPage() {
             <CardTitle>Appointment Summary</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Service</dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {appointment.service.name}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Provider</dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {appointment.provider.firstName} {appointment.provider.lastName}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {formatDateTime(appointment.startTime)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Status</dt>
-              <dd className="mt-1">
-                <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                  {appointment.status.replace(/_/g, ' ')}
-                </span>
-              </dd>
-            </div>
-          </dl>
-          {appointment.meetLink && (
-            <div className="mt-4 border-t border-gray-100 pt-4">
-              <a
-                href={appointment.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-              >
-                Join online meeting
-              </a>
-              <p className="mt-2 text-xs text-gray-500">
-                Use the link above at your appointment time to join the video call with your provider.
-              </p>
-            </div>
-          )}
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Service</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {appointment.service.name}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Provider</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {appointment.provider.firstName} {appointment.provider.lastName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {formatDateTime(appointment.startTime)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Status</dt>
+                <dd className="mt-1">
+                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                    {appointment.status.replace(/_/g, ' ')}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            {consultationSession?.joinToken && (
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <a
+                  href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition"
+                >
+                  Join Consultation
+                </a>
+                <p className="mt-2 text-xs text-gray-500">
+                  {consultationSession.consentStatus === 'GRANTED'
+                    ? 'You have consented to recording. Your provider can begin recording.'
+                    : 'Click to join and provide consent for the consultation recording.'}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -184,67 +192,67 @@ export default function PatientAppointmentDetailPage() {
             <CardTitle>Visit Record</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-          {visitRecord ? (
-            <div className="mt-4 space-y-6">
-              <div>
-                <StatusBadge status={visitRecord.status} variant="visitRecord" />
-              </div>
-              <div className="space-y-4">
-                {visitRecord.subjective && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">
-                      Subjective
-                    </h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.subjective}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.objective && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">
-                      Objective
-                    </h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.objective}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.assessment && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">
-                      Assessment
-                    </h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.assessment}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.plan && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Plan</h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.plan}
-                    </p>
-                  </div>
-                )}
-                {!visitRecord.subjective &&
-                  !visitRecord.objective &&
-                  !visitRecord.assessment &&
-                  !visitRecord.plan && (
-                    <p className="text-sm text-gray-500">
-                      {visitRecord.status === 'FINAL'
-                        ? 'Your provider has finalized the visit. A summary will appear here when they share it with you.'
-                        : 'No visit notes recorded yet.'}
-                    </p>
+            {visitRecord ? (
+              <div className="mt-4 space-y-6">
+                <div>
+                  <StatusBadge status={visitRecord.status} variant="visitRecord" />
+                </div>
+                <div className="space-y-4">
+                  {visitRecord.subjective && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700">
+                        Subjective
+                      </h3>
+                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
+                        {visitRecord.subjective}
+                      </p>
+                    </div>
                   )}
+                  {visitRecord.objective && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700">
+                        Objective
+                      </h3>
+                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
+                        {visitRecord.objective}
+                      </p>
+                    </div>
+                  )}
+                  {visitRecord.assessment && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700">
+                        Assessment
+                      </h3>
+                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
+                        {visitRecord.assessment}
+                      </p>
+                    </div>
+                  )}
+                  {visitRecord.plan && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700">Plan</h3>
+                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
+                        {visitRecord.plan}
+                      </p>
+                    </div>
+                  )}
+                  {!visitRecord.subjective &&
+                    !visitRecord.objective &&
+                    !visitRecord.assessment &&
+                    !visitRecord.plan && (
+                      <p className="text-sm text-gray-500">
+                        {visitRecord.status === 'FINAL'
+                          ? 'Your provider has finalized the visit. A summary will appear here when they share it with you.'
+                          : 'No visit notes recorded yet.'}
+                      </p>
+                    )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-gray-500">
-              No visit record for this appointment yet.
-            </p>
-          )}
+            ) : (
+              <p className="mt-4 text-sm text-gray-500">
+                No visit record for this appointment yet.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -267,30 +275,30 @@ export default function PatientAppointmentDetailPage() {
             <CardTitle>Prescriptions</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-          {prescriptions.length > 0 ? (
-            <div className="mt-4 space-y-4">
-              {prescriptions.map((rx) => (
-                <div
-                  key={rx.id}
-                  className="rounded border border-gray-100 bg-gray-50 p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                    <span>
-                      {formatDateTime(rx.createdAt)} •{' '}
-                      {rx.provider.firstName} {rx.provider.lastName}
-                    </span>
+            {prescriptions.length > 0 ? (
+              <div className="mt-4 space-y-4">
+                {prescriptions.map((rx) => (
+                  <div
+                    key={rx.id}
+                    className="rounded border border-gray-100 bg-gray-50 p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                      <span>
+                        {formatDateTime(rx.createdAt)} •{' '}
+                        {rx.provider.firstName} {rx.provider.lastName}
+                      </span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
+                      {rx.notes}
+                    </p>
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
-                    {rx.notes}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-gray-500">
-              No prescriptions for this appointment.
-            </p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-gray-500">
+                No prescriptions for this appointment.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

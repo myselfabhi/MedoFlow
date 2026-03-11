@@ -34,6 +34,7 @@
     "luxon": "^3.7.2",
     "morgan": "^1.10.0",
     "multer": "^2.1.0",
+    "nodejs-whisper": "^0.2.9",
     "nodemailer": "^8.0.1",
     "openai": "^6.27.0",
     "prisma": "^6.0.0",

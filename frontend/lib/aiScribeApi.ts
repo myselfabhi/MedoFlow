@@ -179,7 +179,19 @@ export const approveSession = async (
   const { data } = await api.post<{
     success: boolean;
     data: { session: AIScribeSession };
-  }>(`/ai-scribe/session/${sessionId}/approve`, body);
+  }>(`/ai-scribe/session/${sessionId}/approve`);
+  return data.data.session;
+};
+
+export const regenerateSoapOnly = async (
+  sessionId: string,
+  clinicId?: string
+): Promise<AIScribeSession> => {
+  const body = clinicId ? { clinicId } : {};
+  const { data } = await api.post<{
+    success: boolean;
+    data: { session: AIScribeSession };
+  }>(`/ai-scribe/session/${sessionId}/regenerate-soap-only`, body);
   return data.data.session;
 };
 

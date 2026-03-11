@@ -102,6 +102,32 @@ enum AIScribeStatus {
   FAILED
 }
 
+enum ConsultationStatus {
+  NOT_STARTED
+  READY
+  LIVE
+  RECORDING
+  ENDED
+  PROCESSING
+  TRANSCRIPT_READY
+  FAILED
+}
+
+enum RecordingStatus {
+  NOT_STARTED
+  RECORDING
+  STOPPED
+  UPLOADING
+  STORED
+  FAILED
+}
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  DECLINED
+}
+
 model Clinic {
   id               String   @id @default(cuid())
   name             String
@@ -138,6 +164,7 @@ model Clinic {
   patientMemberships PatientClinicMembership[]
   googleCalendarConnections GoogleCalendarConnection[]
   googleCalendarEvents GoogleCalendarEvent[]
+  consultationSessions ConsultationSession[]
 }
 
 model User {
@@ -170,6 +197,7 @@ model User {
   invoices         Invoice[]
   patientClinicMemberships PatientClinicMembership[] @relation("PatientClinicMemberships")
   googleCalendarConnections GoogleCalendarConnection[]
+  consultationSessionsAsPatient ConsultationSession[]
 }
 
 model Discipline {
@@ -234,6 +262,7 @@ model Provider {
   slotHolds              SlotHold[]
   locationAssignments    ProviderLocationAssignment[]
   googleCalendarEvents   GoogleCalendarEvent[]
+  consultationSessions   ConsultationSession[]
 
   @@index([clinicId])
 }
@@ -493,6 +522,7 @@ model Appointment {
   payments       Payment[]
   formResponses  FormResponse[]
   invoices       Invoice[]
+  consultationSessions ConsultationSession[]
 
   @@index([providerId])
   @@index([patientId])
@@ -703,6 +733,7 @@ model AIScribeSession {
   visitRecord VisitRecord @relation(fields: [visitRecordId], references: [id], onDelete: Cascade)
   provider    Provider   @relation(fields: [providerId], references: [id], onDelete: Restrict)
   clinic      Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultationSession ConsultationSession?
 
   @@index([visitRecordId])
   @@index([providerId])
@@ -931,4 +962,37 @@ model FormResponse {
   @@index([patientId])
   @@index([clinicId])
   @@index([templateId])
+}
+
+model ConsultationSession {
+  id               String              @id @default(cuid())
+  clinicId         String
+  appointmentId    String
+  providerId       String
+  patientId        String
+  status           ConsultationStatus  @default(NOT_STARTED)
+  recordingStatus  RecordingStatus     @default(NOT_STARTED)
+  consentStatus    ConsentStatus       @default(PENDING)
+  consentGrantedAt DateTime?
+  joinToken        String              @unique @default(cuid())
+  recordingUrl     String?
+  transcriptText   String?             @db.Text
+  transcriptStatus String              @default("NOT_STARTED")
+  aiScribeSessionId String?            @unique
+  startedAt        DateTime?
+  endedAt          DateTime?
+  errorMessage     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  clinic      Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  provider    Provider    @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  patient     User        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  aiScribeSession AIScribeSession? @relation(fields: [aiScribeSessionId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId])
+  @@index([appointmentId])
+  @@index([providerId])
+  @@index([patientId])
 }

@@ -6,10 +6,10 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
-import OpenAI from 'openai';
 import prisma from '../config/prisma';
 import * as aiScribeService from '../services/aiScribeService';
 import * as storageService from '../services/storageService';
+import * as aiProviderService from '../services/aiProviderService';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
@@ -17,7 +17,7 @@ import http from 'http';
 import os from 'os';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const AI_MODEL = process.env.OLLAMA_MODEL || 'llama3.1:8b';
 
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -94,27 +94,7 @@ async function fetchAudioBuffer(audioRef: string): Promise<Buffer> {
 }
 
 async function transcribeWithWhisper(buffer: Buffer, mimeType: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-  const openai = new OpenAI({ apiKey });
-  const ext = mimeType.includes('webm') ? 'webm' : mimeType.includes('mp3') ? 'mp3' : 'webm';
-  const tmpPath = path.join(os.tmpdir(), `whisper-${Date.now()}.${ext}`);
-  fs.writeFileSync(tmpPath, buffer);
-  try {
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(tmpPath),
-      model: 'whisper-1',
-    });
-    return transcription.text;
-  } finally {
-    try {
-      fs.unlinkSync(tmpPath);
-    } catch {
-      // ignore
-    }
-  }
+  return aiProviderService.transcribeAudio(buffer, mimeType);
 }
 
 function cleanTranscript(transcript: string): string {
@@ -152,17 +132,7 @@ export interface ClinicalAnalysisResult {
 
 async function generateClinicalAnalysis(transcript: string): Promise<ClinicalAnalysisResult> {
   const cleaned = cleanTranscript(transcript);
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-  const openai = new OpenAI({ apiKey });
-  const response = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: `Convert this medical conversation into a clinical timeline and a structured SOAP note.
+  const systemPrompt = `Convert this medical conversation into a clinical timeline and a structured SOAP note.
 Return valid JSON only, no markdown or extra text:
 {
   "timeline": {
@@ -177,23 +147,66 @@ Return valid JSON only, no markdown or extra text:
     "assessment": "",
     "plan": ""
   }
-}`,
-      },
-      {
-        role: 'user',
-        content: cleaned,
-      },
-    ],
-    response_format: { type: 'json_object' },
+}`;
+
+  const text = await aiProviderService.chatCompletion({
+    systemPrompt,
+    userMessage: cleaned,
+    jsonMode: true,
   });
-  const text = response.choices[0]?.message?.content;
-  if (!text) throw new Error('No response from GPT');
-  const parsed = JSON.parse(text) as {
-    timeline?: { symptoms?: string[]; duration?: string | null; assessment?: string | null; plan?: string[] };
-    soap?: aiScribeService.SoapDraft;
+
+  let parsed: any = {};
+  try {
+    // Try to find a JSON object in the text if it contains markdown or extra conversational text
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0]);
+    } else {
+      parsed = JSON.parse(text);
+    }
+  } catch (err) {
+    console.error('Failed to parse LLM JSON response:', err);
+    parsed = {};
+  }
+
+  // --- Resilient parsing: deep search for keywords if structure is unexpected ---
+  function findKeyAcross(obj: any, keys: string[]): any {
+    if (!obj || typeof obj !== 'object') return undefined;
+
+    for (const key of keys) {
+      // Direct match (case-insensitive)
+      const exactMatch = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+      if (exactMatch && obj[exactMatch] !== undefined) return obj[exactMatch];
+    }
+
+    // Recursive search
+    for (const val of Object.values(obj)) {
+      if (val && typeof val === 'object') {
+        const found = findKeyAcross(val, keys);
+        if (found !== undefined) return found;
+      }
+    }
+    return undefined;
+  }
+
+  // Try standard path first, fallback to deep search
+  const soapSource = parsed.soap || parsed.aiDraft || parsed;
+  const timelineSource = parsed.timeline || parsed;
+
+  const timeline = {
+    symptoms: findKeyAcross(timelineSource, ['symptom', 'symptoms']) || [],
+    duration: findKeyAcross(timelineSource, ['duration', 'time']) || null,
+    assessment: findKeyAcross(timelineSource, ['assessment', 'timelineAssessment', 'impression']) || null,
+    plan: findKeyAcross(timelineSource, ['plan', 'timelinePlan', 'steps']) || [],
   };
-  const timeline = parsed.timeline ?? {};
-  const soap = (parsed.soap ?? {}) as Partial<aiScribeService.SoapDraft>;
+
+  const soap = {
+    subjective: String(findKeyAcross(soapSource, ['subjective', 's']) || ''),
+    objective: String(findKeyAcross(soapSource, ['objective', 'o']) || ''),
+    assessment: String(findKeyAcross(soapSource, ['assessment', 'a', 'impression']) || ''),
+    plan: String(findKeyAcross(soapSource, ['plan', 'p', 'treatment']) || ''),
+  };
+
   return {
     timeline: {
       symptoms: Array.isArray(timeline.symptoms) ? timeline.symptoms.map(String) : [],
@@ -201,12 +214,7 @@ Return valid JSON only, no markdown or extra text:
       assessment: timeline.assessment != null ? String(timeline.assessment) : null,
       plan: Array.isArray(timeline.plan) ? timeline.plan.map(String) : [],
     },
-    soap: {
-      subjective: String(soap.subjective ?? ''),
-      objective: String(soap.objective ?? ''),
-      assessment: String(soap.assessment ?? ''),
-      plan: String(soap.plan ?? ''),
-    },
+    soap
   };
 }
 
@@ -292,7 +300,7 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
       aiDraft: soapDraft as object,
       status: 'DRAFT_GENERATED',
       processingCompletedAt: new Date(),
-      aiModel: OPENAI_MODEL,
+      aiModel: AI_MODEL,
       errorMessage: null,
     },
   });
@@ -306,7 +314,7 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
     visitRecordId,
     providerId,
     duration: `${duration}s`,
-    model: OPENAI_MODEL,
+    model: AI_MODEL,
   });
 }
 
@@ -315,7 +323,7 @@ export function createAiScribeWorker(): Worker<AiScribeJobData> {
     AI_SCRIBE_QUEUE_NAME,
     async (job) => {
       const { sessionId } = job.data;
-      const JOB_TIMEOUT_MS = 60000;
+      const JOB_TIMEOUT_MS = 600000; // 10 minutes for local AI processing
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('AI processing timeout')), JOB_TIMEOUT_MS);
       });
@@ -325,7 +333,7 @@ export function createAiScribeWorker(): Worker<AiScribeJobData> {
         const errorMessage = err instanceof Error ? err.message : String(err);
         const session = await prisma.aIScribeSession.findUnique({
           where: { id: sessionId },
-    select: { visitRecordId: true, providerId: true },
+          select: { visitRecordId: true, providerId: true },
         });
         await prisma.aIScribeSession.update({
           where: { id: sessionId },
