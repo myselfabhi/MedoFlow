@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 import { addInvoiceItem, createInvoice, finalizeInvoice, recordManualInvoicePayment } from '@/lib/invoiceApi';
+import { getPatientEntitlements, type PatientEntitlements } from '@/lib/patientApi';
 import { toast } from 'sonner';
 import { Receipt, ShoppingCart, Trash2 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export default function FrontDeskCheckoutPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [entitlements, setEntitlements] = useState<PatientEntitlements | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,6 +70,19 @@ export default function FrontDeskCheckoutPage() {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setEntitlements(null);
+      return;
+    }
+
+    getPatientEntitlements(selectedPatientId)
+      .then(setEntitlements)
+      .catch(() => {
+        setEntitlements(null);
+      });
+  }, [selectedPatientId]);
 
   const addToCart = (item: CatalogItem, itemType: CatalogType) => {
     setCart((current) => {
@@ -121,7 +136,7 @@ export default function FrontDeskCheckoutPage() {
           itemType: line.itemType,
           itemId: line.id,
           quantity: line.quantity,
-          unitPrice: line.unitPrice,
+          ...(line.itemType !== 'SERVICE' ? { unitPrice: line.unitPrice } : {}),
           description: line.name,
         });
       }
@@ -247,6 +262,29 @@ export default function FrontDeskCheckoutPage() {
               ))}
             </SelectContent>
           </Select>
+          {entitlements && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-slate-700">
+              {entitlements.activeMembershipBenefit ? (
+                <div className="mb-2">
+                  Membership discount: {entitlements.activeMembershipBenefit.membershipName} (
+                  {Number(entitlements.activeMembershipBenefit.serviceDiscountPercent).toFixed(0)}% off services)
+                </div>
+              ) : (
+                <div className="mb-2">No active membership discount</div>
+              )}
+              {entitlements.packages.length > 0 ? (
+                <div className="space-y-1">
+                  {entitlements.packages.map((pkg) => (
+                    <div key={pkg.id}>
+                      {pkg.package.name}: {pkg.remainingSessions ?? Math.max(pkg.totalSessions - pkg.usedSessions, 0)} sessions left
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>No active packages</div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto p-6 space-y-4">

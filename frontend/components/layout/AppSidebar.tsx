@@ -24,6 +24,7 @@ import {
 const patientItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/patient/appointments', label: 'Appointments', icon: Calendar },
+  { href: '/dashboard/memberships', label: 'Memberships', icon: Tags },
 ];
 
 const providerItems = [

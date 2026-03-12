@@ -534,6 +534,14 @@ export const refundPayment = async (
     : null;
 
   if (invoice) {
+    if (invoice.items.some((item) => Boolean(item.membershipId))) {
+      const err = new Error(
+        'Membership subscription refunds are not supported from the app'
+      ) as ApiError;
+      err.statusCode = 400;
+      err.code = 'membership_refund_unsupported';
+      throw err;
+    }
     const packageUsageCount = await prisma.packageSessionUsage.count({
       where: {
         patientPackage: {

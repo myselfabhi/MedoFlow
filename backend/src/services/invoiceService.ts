@@ -2,6 +2,7 @@ import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import { PaymentStatus, Prisma } from '@prisma/client';
 import * as auditService from './auditService';
+import * as membershipService from './membershipService';
 
 const DEFAULT_TAX_RATE = 0.13; // 13% - configurable via env if needed
 
@@ -257,6 +258,17 @@ export const addCatalogInvoiceItem = async (
       throw err;
     }
     expectedPrice = invoice.provider?.providerServices[0]?.priceOverride ?? service.defaultPrice;
+    const membershipBenefit = await membershipService.getActiveMembershipBenefit(
+      invoice.clinicId,
+      invoice.patientId
+    );
+    if (membershipBenefit) {
+      const discountPercent = new Prisma.Decimal(
+        membershipBenefit.membership.serviceDiscountPercent
+      );
+      const discountAmount = expectedPrice.mul(discountPercent).div(100);
+      expectedPrice = expectedPrice.minus(discountAmount).toDecimalPlaces(2);
+    }
     finalDescription ||= service.name;
     createData = {
       ...createData,

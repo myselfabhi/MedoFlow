@@ -214,10 +214,13 @@ export const getMyPrescriptions = async (): Promise<Prescription[]> => {
 export interface PatientPackage {
   id: string;
   packageId: string;
+  status?: string;
   totalSessions: number;
   usedSessions: number;
+  remainingSessions?: number;
   expiresAt: string | null;
   package: {
+    id?: string;
     name: string;
   };
 }
@@ -228,4 +231,48 @@ export const getMyPackages = async (): Promise<PatientPackage[]> => {
     data: { packages: PatientPackage[] };
   }>('/patients/packages');
   return data.data.packages;
+};
+
+export interface PatientMembershipSubscription {
+  id: string;
+  status: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  membership: {
+    id: string;
+    name: string;
+    billingPeriod: string;
+    monthlyPrice: string;
+    serviceDiscountPercent: string;
+  };
+}
+
+export interface PatientEntitlements {
+  packages: PatientPackage[];
+  subscriptions: PatientMembershipSubscription[];
+  activeMembershipBenefit: {
+    subscriptionId: string;
+    membershipId: string;
+    membershipName: string;
+    serviceDiscountPercent: string;
+  } | null;
+}
+
+export const getMyEntitlements = async (): Promise<PatientEntitlements> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { entitlements: PatientEntitlements };
+  }>('/patients/entitlements');
+  return data.data.entitlements;
+};
+
+export const getPatientEntitlements = async (
+  patientId: string
+): Promise<PatientEntitlements> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { entitlements: PatientEntitlements };
+  }>(`/patients/${patientId}/entitlements`);
+  return data.data.entitlements;
 };

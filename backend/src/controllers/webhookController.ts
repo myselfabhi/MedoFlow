@@ -4,6 +4,7 @@ import prisma from '../config/prisma';
 import * as emailService from '../services/emailService';
 import * as commissionService from '../services/commissionService';
 import { PaymentStatus } from '@prisma/client';
+import * as membershipService from '../services/membershipService';
 
 const cancelCommissionRecords = async (invoiceId: string) => {
   await prisma.commissionRecord.updateMany({
@@ -311,14 +312,21 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
     case 'invoice.paid': {
       const invoiceObject = event.data.object as any;
       if (invoiceObject.subscription) {
-        const subId = invoiceObject.subscription;
+        await membershipService.recordPaidSubscriptionInvoice(invoiceObject);
+      }
+      break;
+    }
+
+    case 'invoice.payment_failed': {
+      const invoiceObject = event.data.object as any;
+      if (invoiceObject.subscription) {
+        const subId =
+          typeof invoiceObject.subscription === 'string'
+            ? invoiceObject.subscription
+            : invoiceObject.subscription.id;
         await prisma.patientSubscription.updateMany({
           where: { stripeSubscriptionId: subId },
-          data: {
-            status: 'ACTIVE',
-            currentPeriodStart: new Date(invoiceObject.period_start * 1000),
-            currentPeriodEnd: new Date(invoiceObject.period_end * 1000),
-          },
+          data: { status: 'PAST_DUE' },
         });
       }
       break;
@@ -326,22 +334,19 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
 
     case 'customer.subscription.deleted': {
       const deletedSub = event.data.object as any;
-      await prisma.patientSubscription.updateMany({
-        where: { stripeSubscriptionId: deletedSub.id },
-        data: { status: 'CANCELED' },
-      });
+      await membershipService.syncSubscriptionFromStripe(deletedSub);
       break;
     }
 
     case 'customer.subscription.updated': {
       const updatedSub = event.data.object as any;
-      await prisma.patientSubscription.updateMany({
-        where: { stripeSubscriptionId: updatedSub.id },
-        data: {
-          status: updatedSub.status === 'active' ? 'ACTIVE' : 'PAST_DUE',
-          cancelAtPeriodEnd: updatedSub.cancel_at_period_end,
-        },
-      });
+      await membershipService.syncSubscriptionFromStripe(updatedSub);
+      break;
+    }
+
+    case 'customer.subscription.created': {
+      const createdSub = event.data.object as any;
+      await membershipService.syncSubscriptionFromStripe(createdSub);
       break;
     }
 

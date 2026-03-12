@@ -19,7 +19,7 @@ import {
   createSlotHold,
   releaseSlotHold,
 } from '@/lib/appointmentApi';
-import { getMyPackages } from '@/lib/patientApi';
+import { getMyEntitlements } from '@/lib/patientApi';
 import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringApi';
 import { LoginModal } from '@/components/LoginModal';
 import { WaitlistModal } from '@/components/WaitlistModal';
@@ -104,13 +104,23 @@ export default function BookingPage() {
     enabled: !!clinicId,
   });
 
-  const { data: patientPackages } = useQuery({
-    queryKey: ['patient-packages'],
-    queryFn: () => getMyPackages(),
+  const { data: patientEntitlements } = useQuery({
+    queryKey: ['patient-entitlements-self'],
+    queryFn: () => getMyEntitlements(),
     enabled: !!isAuthenticated && !!user && user.role === 'PATIENT',
   });
+  const patientPackages = patientEntitlements?.packages ?? [];
+  const activeMembershipBenefit = patientEntitlements?.activeMembershipBenefit ?? null;
 
   const service = services?.find((s) => s.id === serviceId);
+  const membershipDiscountedPrice =
+    service && activeMembershipBenefit
+      ? Math.max(
+          Number(service.defaultPrice) *
+            (1 - Number(activeMembershipBenefit.serviceDiscountPercent) / 100),
+          0
+        )
+      : null;
   const launchLocation =
     locations?.find((location) =>
       ONLINE_LOCATION_NAMES.includes(location.name.trim().toLowerCase())
@@ -888,11 +898,26 @@ export default function BookingPage() {
                 )}
               </div>
 
+              {isAuthenticated && activeMembershipBenefit && !selectedPackageId && (
+                <div className="space-y-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
+                  <h3 className="text-sm font-semibold text-emerald-900">Membership discount applied</h3>
+                  <p className="text-xs text-emerald-700">
+                    {activeMembershipBenefit.membershipName} applies{' '}
+                    {Number(activeMembershipBenefit.serviceDiscountPercent).toFixed(0)}% off this service when no package session is used.
+                  </p>
+                  {membershipDiscountedPrice !== null && (
+                    <div className="text-sm text-emerald-800">
+                      Estimated bookable price: ${membershipDiscountedPrice.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {isAuthenticated && patientPackages && patientPackages.length > 0 && !isRecurring && (
                 <div className="space-y-3 rounded-lg border border-primary-100 bg-primary-50/30 p-4">
                   <h3 className="text-sm font-semibold text-primary-900">Use a wellness package?</h3>
                   <p className="text-xs text-primary-700 mb-2">
-                    You have active packages. Select one to use a pre-paid session for this visit.
+                    You have active packages. Package coverage takes precedence over membership discounts and reduces this visit charge to $0.00.
                   </p>
                   <div className="space-y-2">
                     <label className="flex cursor-pointer items-center gap-3">

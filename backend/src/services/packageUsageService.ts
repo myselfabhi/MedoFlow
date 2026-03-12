@@ -2,7 +2,7 @@ import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 
 export const getAvailablePatientPackages = async (clinicId: string, patientId: string) => {
-  return prisma.patientPackage.findMany({
+  const packages = await prisma.patientPackage.findMany({
     where: {
       clinicId,
       patientId,
@@ -17,6 +17,8 @@ export const getAvailablePatientPackages = async (clinicId: string, patientId: s
       package: true,
     },
   });
+
+  return packages.filter((pkg) => pkg.usedSessions < pkg.totalSessions);
 };
 
 export const findValidPackageForService = async (clinicId: string, patientId: string, serviceId: string) => {
@@ -67,5 +69,47 @@ export const consumePackageSession = async (patientPackageId: string, appointmen
     });
 
     return updated;
+  });
+};
+
+export const releasePackageSession = async (appointmentId: string) => {
+  return prisma.$transaction(async (tx) => {
+    const usage = await tx.packageSessionUsage.findUnique({
+      where: { appointmentId },
+      include: { patientPackage: true },
+    });
+
+    if (!usage) return null;
+
+    await tx.packageSessionUsage.delete({
+      where: { id: usage.id },
+    });
+
+    const nextUsedSessions = Math.max(usage.patientPackage.usedSessions - 1, 0);
+    return tx.patientPackage.update({
+      where: { id: usage.patientPackageId },
+      data: {
+        usedSessions: nextUsedSessions,
+        status: nextUsedSessions < usage.patientPackage.totalSessions ? 'ACTIVE' : usage.patientPackage.status,
+      },
+    });
+  });
+};
+
+export const transferPackageSessionReservation = async (
+  fromAppointmentId: string,
+  toAppointmentId: string
+) => {
+  return prisma.$transaction(async (tx) => {
+    const usage = await tx.packageSessionUsage.findUnique({
+      where: { appointmentId: fromAppointmentId },
+    });
+
+    if (!usage) return null;
+
+    return tx.packageSessionUsage.update({
+      where: { id: usage.id },
+      data: { appointmentId: toAppointmentId },
+    });
   });
 };

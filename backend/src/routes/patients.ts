@@ -17,5 +17,11 @@ router.get(
 );
 
 router.get('/packages', patientController.getMyPackages);
+router.get('/entitlements', authorize(Role.PATIENT), patientController.getMyEntitlements);
+router.get(
+  '/:patientId/entitlements',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN, Role.PROVIDER),
+  patientController.getPatientEntitlements
+);
 
 export default router;

@@ -150,8 +150,11 @@ enum PackageStatus {
 
 enum SubscriptionStatus {
   ACTIVE
+  TRIALING
+  INCOMPLETE
   PAST_DUE
   CANCELED
+  ENDED
 }
 
 enum CommissionType {
@@ -491,6 +494,7 @@ model Invoice {
   appointmentId String?
   patientId     String
   providerId    String?
+  stripeInvoiceId String?
   status        InvoiceStatus @default(DRAFT)
   subtotal      Decimal       @db.Decimal(10, 2)
   taxAmount     Decimal       @db.Decimal(10, 2)
@@ -506,6 +510,7 @@ model Invoice {
   payments          Payment[]
   commissionRecords CommissionRecord[]
 
+  @@unique([stripeInvoiceId])
   @@index([clinicId])
   @@index([clinicId, createdAt])
   @@index([appointmentId])
@@ -711,6 +716,7 @@ model Membership {
   name          String
   description   String?
   monthlyPrice  Decimal  @db.Decimal(10, 2)
+  serviceDiscountPercent Decimal @default(0) @db.Decimal(5, 2)
   billingPeriod String   @default("MONTHLY")
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -1180,7 +1186,8 @@ model PatientSubscription {
   clinicId             String
   patientId            String
   membershipId         String
-  stripeSubscriptionId String?
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?
   status               SubscriptionStatus
   currentPeriodStart   DateTime
   currentPeriodEnd     DateTime

@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import {
   getAppointmentById,
+  getPatientEntitlements,
   getVisitByAppointment,
   createVisitRecord,
 } from '@/lib/patientApi';
@@ -147,6 +148,8 @@ export default function ProviderAppointmentDetailPage() {
   const id = params.id as string;
   const toast = useAppToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isProvider = user?.role === 'PROVIDER';
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
   const [creatingVisit, setCreatingVisit] = useState(false);
@@ -183,6 +186,12 @@ export default function ProviderAppointmentDetailPage() {
     queryKey: ['prescriptions', 'patient', appointment?.patientId],
     queryFn: () => getPrescriptionsByPatient(appointment!.patientId),
     enabled: !!appointment?.patientId && appointment?.status === 'COMPLETED',
+  });
+
+  const { data: entitlements } = useQuery({
+    queryKey: ['patient-entitlements', appointment?.patientId],
+    queryFn: () => getPatientEntitlements(appointment!.patientId),
+    enabled: !!appointment?.patientId && isProvider,
   });
 
   const createPrescriptionMutation = useMutation({
@@ -228,8 +237,6 @@ export default function ProviderAppointmentDetailPage() {
     onError: () => toast.error('Failed to mark invoice as paid'),
   });
 
-  const { user } = useAuth();
-  const isProvider = user?.role === 'PROVIDER';
   const invoice = invoices[0] ?? null;
   const isDraft = invoice?.status === 'DRAFT';
   const isFinalized = invoice?.status === 'FINALIZED';
@@ -329,6 +336,35 @@ export default function ProviderAppointmentDetailPage() {
             </dl>
           </CardContent>
         </Card>
+
+        {entitlements && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Patient Entitlements</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 p-6 text-sm text-slate-700">
+              {entitlements.activeMembershipBenefit ? (
+                <div>
+                  Membership discount: {entitlements.activeMembershipBenefit.membershipName} (
+                  {Number(entitlements.activeMembershipBenefit.serviceDiscountPercent).toFixed(0)}% off services)
+                </div>
+              ) : (
+                <div>No active membership discount</div>
+              )}
+              {entitlements.packages.length > 0 ? (
+                <div className="space-y-1">
+                  {entitlements.packages.map((pkg) => (
+                    <div key={pkg.id}>
+                      {pkg.package.name}: {pkg.remainingSessions ?? Math.max(pkg.totalSessions - pkg.usedSessions, 0)} sessions left
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>No active packages</div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {visitRecord && (
           <Card>

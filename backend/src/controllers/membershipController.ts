@@ -45,3 +45,40 @@ export const remove = asyncHandler(
     successResponse(res, 200, 'Membership deleted successfully');
   }
 );
+
+export const getMySubscriptions = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const subscriptions = await membershipService.listPatientSubscriptions(
+      clinicId,
+      req.user!.id
+    );
+    successResponse(res, 200, 'Subscriptions retrieved successfully', { subscriptions });
+  }
+);
+
+export const purchase = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const membershipId = req.params.id as string;
+    const result = await membershipService.startMembershipPurchase(
+      clinicId,
+      req.user!.id,
+      membershipId
+    );
+    successResponse(res, 200, 'Membership checkout created', result);
+  }
+);
+
+export const cancelAtPeriodEnd = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const subscriptionId = req.params.subscriptionId as string;
+    const subscription = await membershipService.cancelMembershipAtPeriodEnd(
+      clinicId,
+      req.user!.id,
+      subscriptionId
+    );
+    successResponse(res, 200, 'Membership cancellation scheduled', { subscription });
+  }
+);

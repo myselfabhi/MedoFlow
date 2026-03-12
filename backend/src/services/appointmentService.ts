@@ -13,6 +13,7 @@ import * as auditService from './auditService';
 import * as waitlistService from './waitlistService';
 import * as patientMembershipService from './patientMembershipService';
 import * as packageUsageService from './packageUsageService';
+import * as membershipService from './membershipService';
 import {
   buildSlotFingerprint,
   MIN_APPOINTMENT_DURATION_MINUTES,
@@ -24,6 +25,7 @@ import stripe from '../config/stripe';
 import * as emailService from './emailService';
 
 const CANCELLED_STATUS = 'CANCELLED';
+const ZERO = new Prisma.Decimal(0);
 
 export interface CreateAppointmentData {
   locationId?: string | null;
@@ -43,6 +45,7 @@ export interface CreateAppointmentContext {
   recurringSeriesId?: string | null;
   notes?: string | null;
   patientPackageId?: string;
+  skipPackageSessionConsumption?: boolean;
 }
 
 const validateServiceBelongsToClinic = async (
@@ -570,9 +573,9 @@ export const createAppointment = async (
       );
     }
 
-    const priceAtBooking =
+    const standardPriceAtBooking =
       assignment.priceOverride ?? assignment.service.defaultPrice;
-    
+
     // Check for package usage
     let usingPackage = false;
     if (context?.patientPackageId) {
@@ -591,6 +594,28 @@ export const createAppointment = async (
         throw createApiError('Selected package is not available or exhausted', 400, 'invalid_package');
       }
     }
+
+    const membershipBenefit = usingPackage
+      ? null
+      : await membershipService.getActiveMembershipBenefitWithExecutor(
+          tx as any,
+          clinicId,
+          patientId
+        );
+
+    const membershipDiscountPercent = membershipBenefit
+      ? new Prisma.Decimal(membershipBenefit.membership.serviceDiscountPercent)
+      : ZERO;
+    const membershipDiscountAmount = membershipBenefit
+      ? standardPriceAtBooking
+          .mul(membershipDiscountPercent)
+          .div(100)
+          .toDecimalPlaces(2)
+      : ZERO;
+    const discountedPriceAtBooking = membershipBenefit
+      ? standardPriceAtBooking.minus(membershipDiscountAmount).toDecimalPlaces(2)
+      : standardPriceAtBooking;
+    const priceAtBooking = usingPackage ? ZERO : discountedPriceAtBooking;
 
     const paymentRequirementType = usingPackage 
       ? PaymentRequirementType.NONE
@@ -630,6 +655,10 @@ export const createAppointment = async (
       depositAmount:
         paymentRequirementType === PaymentRequirementType.DEPOSIT
           ? service.depositAmount
+            ? service.depositAmount.lte(priceAtBooking)
+              ? service.depositAmount
+              : priceAtBooking
+            : null
           : paymentRequirementType === PaymentRequirementType.FULL
             ? priceAtBooking
             : null,
@@ -659,7 +688,7 @@ export const createAppointment = async (
       },
     });
 
-    if (usingPackage && context?.patientPackageId) {
+    if (usingPackage && context?.patientPackageId && !context.skipPackageSessionConsumption) {
       const updatedPkg = await tx.patientPackage.update({
         where: { id: context.patientPackageId },
         data: {
@@ -705,6 +734,8 @@ export const createAppointment = async (
           newValue: {
             slotHeldUntil: slotHeldUntil?.toISOString(),
             amount: Number(priceAtBooking),
+            standardAmount: Number(standardPriceAtBooking),
+            membershipDiscountPercent: Number(membershipDiscountPercent),
           } as Prisma.InputJsonValue,
           performedById,
         },
@@ -733,6 +764,9 @@ export const createAppointment = async (
           status: appointment.status,
           bookingSource,
           timezone: resolvedLocation.timezone,
+          priceAtBooking: Number(priceAtBooking),
+          packageApplied: usingPackage,
+          membershipDiscountPercent: Number(membershipDiscountPercent),
         } as Prisma.InputJsonValue,
         oldValue: Prisma.JsonNull,
         performedById: performedById ?? patientId,
@@ -979,6 +1013,22 @@ export const cancelAppointment = async (
     performedById,
   });
 
+  if (appointment.status !== 'COMPLETED' && appointment.status !== 'NO_SHOW') {
+    const releasedPackage = await packageUsageService.releasePackageSession(appointmentId);
+    if (releasedPackage) {
+      await auditService.logAudit({
+        clinicId: appointment.clinicId,
+        entityType: 'Appointment',
+        entityId: appointmentId,
+        action: 'PACKAGE_SESSION_RELEASED',
+        newValue: {
+          patientPackageId: releasedPackage.id,
+        },
+        performedById,
+      });
+    }
+  }
+
   // Send cancellation email
   await emailService.sendAppointmentCancellation({
     to: updated.patient.email,
@@ -1041,6 +1091,9 @@ export const rescheduleAppointment = async (
     throw err;
   }
   const { newStartTime, newEndTime } = data;
+  const existingPackageUsage = await prisma.packageSessionUsage.findUnique({
+    where: { appointmentId: oldAppointmentId },
+  });
   const createData: CreateAppointmentData = {
     locationId: data.locationId ?? oldAppointment.locationId,
     providerId: oldAppointment.providerId,
@@ -1054,6 +1107,8 @@ export const rescheduleAppointment = async (
     excludeAppointmentId: oldAppointmentId,
     slotHoldId: data.slotHoldId,
     bookingSource: BookingSource.PATIENT_PORTAL,
+    patientPackageId: existingPackageUsage?.patientPackageId,
+    skipPackageSessionConsumption: Boolean(existingPackageUsage),
   });
   await prisma.$transaction([
     prisma.appointment.update({
@@ -1108,6 +1163,23 @@ export const rescheduleAppointment = async (
     newValue: { status: 'RESCHEDULED', newAppointmentId: newAppointment.id },
     performedById,
   });
+
+  const transferredUsage = await packageUsageService.transferPackageSessionReservation(
+    oldAppointmentId,
+    newAppointment.id
+  );
+  if (transferredUsage) {
+    await auditService.logAudit({
+      clinicId: oldAppointment.clinicId,
+      entityType: 'Appointment',
+      entityId: newAppointment.id,
+      action: 'PACKAGE_SESSION_TRANSFERRED',
+      newValue: {
+        fromAppointmentId: oldAppointmentId,
+      },
+      performedById,
+    });
+  }
   return {
     oldAppointment: updatedOld,
     newAppointment,
@@ -1322,7 +1394,7 @@ export const updateAppointmentStatus = async (
     });
   }
 
-  return prisma.appointment.update({
+  const updated = await prisma.appointment.update({
     where: { id },
     data: {
       status,
@@ -1344,4 +1416,10 @@ export const updateAppointmentStatus = async (
       patient: { select: { id: true, name: true, email: true } },
     },
   });
+
+  if (status === AppointmentStatus.CANCELLED && appointment.status !== AppointmentStatus.CANCELLED) {
+    await packageUsageService.releasePackageSession(id);
+  }
+
+  return updated;
 };
