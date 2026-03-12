@@ -14,6 +14,11 @@ import {
   Video,
   Building2,
   MapPin,
+  FileText,
+  Package,
+  ShoppingCart,
+  Tags,
+  ShieldCheck,
 } from 'lucide-react';
 
 const patientItems = [
@@ -39,15 +44,23 @@ const superAdminItems = [
   { href: '/dashboard/providers', label: 'Providers', icon: Users },
   { href: '/dashboard/services', label: 'Services', icon: ClipboardList },
   { href: '/dashboard/disciplines', label: 'Disciplines', icon: ClipboardList },
+  { href: '/dashboard/products', label: 'Products', icon: ShoppingCart },
+  { href: '/dashboard/packages', label: 'Packages', icon: Package },
+  { href: '/dashboard/memberships', label: 'Memberships', icon: Tags },
+  { href: '/dashboard/forms', label: 'Forms', icon: FileText },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
+  { href: '/dashboard/commissions', label: 'Commissions', icon: Tags },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/dashboard/audit', label: 'Audit Logs', icon: ShieldCheck },
 ];
 
 const frontDeskItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/appointments', label: 'Appointments', icon: ClipboardList },
   { href: '/dashboard/patients', label: 'Patients', icon: Users },
+  { href: '/dashboard/forms', label: 'Forms', icon: FileText },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
+  { href: '/dashboard/front-desk/pos', label: 'Point of Sale', icon: ShoppingCart },
 ];
 
 export function AppSidebar() {

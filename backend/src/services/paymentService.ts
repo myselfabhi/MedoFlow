@@ -36,6 +36,10 @@ export const confirmPayment = async (
 
   const amount = appointment.priceAtBooking;
 
+  const nextStatus = appointment.approvalStatus === 'PENDING' 
+    ? 'PENDING_PROVIDER_APPROVAL' 
+    : 'CONFIRMED';
+
   const invoice = await prisma.invoice.findFirst({
     where: { appointmentId, clinicId: appointment.clinicId },
     select: { id: true },
@@ -56,7 +60,7 @@ export const confirmPayment = async (
     prisma.appointment.update({
       where: { id: appointmentId },
       data: {
-        status: 'CONFIRMED',
+        status: nextStatus as any,
         paymentStatus: PaymentStatus.PAID,
         paymentDueAt: null,
         slotHeldUntil: null,
@@ -270,7 +274,7 @@ export const refundPayment = async (
     throw err;
   }
 
-  const [refund, updatedAppointment] = await prisma.$transaction([
+  const txOperations: any[] = [
     prisma.payment.create({
       data: {
         clinicId: payment.clinicId,
@@ -283,25 +287,34 @@ export const refundPayment = async (
         refundForPaymentId: payment.id,
       },
     }),
-    prisma.appointment.update({
-      where: { id: payment.appointmentId },
-      data: { paymentStatus: PaymentStatus.REFUNDED, updatedById: performedById },
-      include: {
-        clinic: { select: { id: true, name: true } },
-        location: { select: { id: true, name: true } },
-        provider: {
-          include: {
-            disciplines: {
-              include: { discipline: { select: { id: true, name: true } } },
+  ];
+
+  if (payment.appointmentId) {
+    txOperations.push(
+      prisma.appointment.update({
+        where: { id: payment.appointmentId },
+        data: { paymentStatus: PaymentStatus.REFUNDED, updatedById: performedById },
+        include: {
+          clinic: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true } },
+          provider: {
+            include: {
+              disciplines: {
+                include: { discipline: { select: { id: true, name: true } } },
+              },
+              user: { select: { id: true, name: true } },
             },
-            user: { select: { id: true, name: true } },
           },
+          service: { select: { id: true, name: true, duration: true } },
+          patient: { select: { id: true, name: true, email: true } },
         },
-        service: { select: { id: true, name: true, duration: true } },
-        patient: { select: { id: true, name: true, email: true } },
-      },
-    }),
-  ]);
+      })
+    );
+  }
+
+  const results = await prisma.$transaction(txOperations);
+  const refund = results[0] as any;
+  const updatedAppointment = payment.appointmentId ? results[1] : null;
 
   await auditService.logAudit({
     clinicId: payment.clinicId,

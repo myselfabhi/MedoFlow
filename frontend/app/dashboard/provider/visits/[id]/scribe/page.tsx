@@ -27,6 +27,7 @@ import {
   type AIScribeSession,
   type SoapDraft,
 } from '@/lib/aiScribeApi';
+import { getVisitWithHistory } from '@/lib/patientApi';
 import {
   AppCard,
   AppCardHeader,
@@ -42,6 +43,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useAuth } from '@/contexts/AuthContext';
+import { NoteHistoryModal } from '@/components/visit/NoteHistoryModal';
+import { History } from 'lucide-react';
 
 const SYMPTOM_PATTERN =
   /\b(pain|swelling|fever|headache|nausea|fatigue|dizziness|cough|soreness|stiffness)\b/gi;
@@ -148,6 +151,7 @@ function SoapEditor({
   onSave,
   onRegenerate,
   onApprove,
+  onShowHistory,
   isSaving,
   isRegenerating,
   isApproving,
@@ -158,6 +162,7 @@ function SoapEditor({
   onSave: () => void;
   onRegenerate: () => void;
   onApprove: () => void;
+  onShowHistory: () => void;
   isSaving: boolean;
   isRegenerating: boolean;
   isApproving: boolean;
@@ -165,6 +170,17 @@ function SoapEditor({
 }) {
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <AppButton
+          variant="ghost"
+          size="sm"
+          onClick={onShowHistory}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <History className="mr-2 h-4 w-4" />
+          View History
+        </AppButton>
+      </div>
       <div className="grid gap-4">
         {(['subjective', 'objective', 'assessment', 'plan'] as const).map(
           (field) => (
@@ -271,6 +287,7 @@ export default function ProviderAIScribePage() {
 
   const queryClient = useQueryClient();
   const [localDraft, setLocalDraft] = useState<SoapDraft | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [audioInputRef, setAudioInputRef] = useState<HTMLInputElement | null>(
     null
   );
@@ -288,6 +305,12 @@ export default function ProviderAIScribePage() {
       if (s?.status === 'TRANSCRIBING') return 3000;
       return false;
     },
+  });
+
+  const { data: visitWithHistory } = useQuery({
+    queryKey: ['visit-history', visitRecordId],
+    queryFn: () => getVisitWithHistory(visitRecordId),
+    enabled: !!visitRecordId && showHistory,
   });
 
   const startSessionMutation = useMutation({
@@ -639,6 +662,7 @@ export default function ProviderAIScribePage() {
                       regenerateMutation.mutate(session.id)
                     }
                     onApprove={() => approveMutation.mutate(session.id)}
+                    onShowHistory={() => setShowHistory(true)}
                     isSaving={saveDraftMutation.isPending}
                     isRegenerating={regenerateMutation.isPending}
                     isApproving={approveMutation.isPending}
@@ -673,6 +697,12 @@ export default function ProviderAIScribePage() {
                 </AppCardContent>
               </AppCard>
             )}
+
+          <NoteHistoryModal
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+            versions={visitWithHistory?.versions || []}
+          />
         </>
       )}
     </div>

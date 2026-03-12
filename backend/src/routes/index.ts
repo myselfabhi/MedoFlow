@@ -22,8 +22,22 @@ import googleCalendarRoutes from './googleCalendar';
 import staffRoutes from './staff';
 import consultationRoutes, { appointmentConsultationRouter } from './consultations';
 
+import productRoutes from './products';
+import inventoryRoutes from './inventory';
+import packageRoutes from './packages';
+import membershipRoutes from './memberships';
+import cartRoutes from './carts';
+import webhookRoutes from './webhooks';
+import commissionRoutes from './commissions';
+import auditRoutes from './audit';
+import patientRoutes from './patients';
+
 const router = Router();
 
+router.use('/webhooks', webhookRoutes);
+router.use('/commissions', commissionRoutes);
+router.use('/audit', auditRoutes);
+router.use('/patients', patientRoutes);
 router.use('/health', healthRoutes);
 router.use('/public', publicRoutes);
 router.use('/auth', authRoutes);
@@ -47,5 +61,10 @@ router.use('/ai-scribe', aiScribeRoutes);
 router.use('/integrations/google', googleCalendarRoutes);
 router.use('/staff', staffRoutes);
 router.use('/consultations', consultationRoutes);
+router.use('/products', productRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/packages', packageRoutes);
+router.use('/memberships', membershipRoutes);
+router.use('/carts', cartRoutes);
 
 export default router;

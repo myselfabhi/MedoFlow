@@ -22,6 +22,7 @@ const providerItems = [
 
 const staffAdminItems = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/staff', label: 'Staff' },
   { href: '/dashboard/front-desk', label: 'Front Desk' },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices' },
   { href: '/dashboard/appointments', label: 'Appointments' },

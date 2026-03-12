@@ -37,6 +37,7 @@ import { IntakeFormsSection } from '@/components/intake/IntakeFormsSection';
 import { PatientRecordSheet } from '@/components/patient/PatientRecordSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPatientForms } from '@/lib/formsApi';
+import { createPrescription, getPrescriptionsByPatient, type Prescription } from '@/lib/prescriptionApi';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -149,6 +150,8 @@ export default function ProviderAppointmentDetailPage() {
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
   const [creatingVisit, setCreatingVisit] = useState(false);
+  const [prescriptionNotes, setPrescriptionNotes] = useState('');
+  const [prescriptionOpen, setPrescriptionOpen] = useState(false);
 
   const { data: appointment, isLoading: appointmentLoading, error: appointmentError } = useQuery({
     queryKey: ['appointment', id],
@@ -174,6 +177,24 @@ export default function ProviderAppointmentDetailPage() {
     queryFn: () =>
       getPatientForms(appointment!.patientId, appointment?.clinicId),
     enabled: !!appointment?.patientId,
+  });
+
+  const { data: prescriptions = [], refetch: refetchPrescriptions } = useQuery({
+    queryKey: ['prescriptions', 'patient', appointment?.patientId],
+    queryFn: () => getPrescriptionsByPatient(appointment!.patientId),
+    enabled: !!appointment?.patientId && appointment?.status === 'COMPLETED',
+  });
+
+  const createPrescriptionMutation = useMutation({
+    mutationFn: (notes: string) =>
+      createPrescription({ appointmentId: id, patientId: appointment!.patientId, notes }),
+    onSuccess: () => {
+      setPrescriptionNotes('');
+      setPrescriptionOpen(false);
+      refetchPrescriptions();
+      toast.success('Prescription added');
+    },
+    onError: () => toast.error('Failed to create prescription'),
   });
 
   const createMutation = useMutation({
@@ -501,6 +522,77 @@ export default function ProviderAppointmentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {isProvider && appointment?.status === 'COMPLETED' && (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <CardTitle>Prescriptions</CardTitle>
+                {!prescriptionOpen && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPrescriptionOpen(true)}
+                  >
+                    Add Prescription
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {prescriptionOpen && (
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Prescription notes
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={prescriptionNotes}
+                    onChange={(e) => setPrescriptionNotes(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    placeholder="Enter medication name, dosage, instructions..."
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPrescriptionOpen(false);
+                        setPrescriptionNotes('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!prescriptionNotes.trim() || createPrescriptionMutation.isPending}
+                      onClick={() => createPrescriptionMutation.mutate(prescriptionNotes.trim())}
+                    >
+                      {createPrescriptionMutation.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {prescriptions.length === 0 && !prescriptionOpen && (
+                <p className="text-sm text-gray-500">No prescriptions for this appointment.</p>
+              )}
+              {prescriptions.map((rx: Prescription) => (
+                <div
+                  key={rx.id}
+                  className="rounded-lg border border-slate-200 bg-white p-4"
+                >
+                  <p className="whitespace-pre-wrap text-sm text-gray-900">{rx.notes}</p>
+                  <p className="mt-2 text-xs text-gray-400">
+                    {new Date(rx.createdAt).toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <IntakeFormsSection
           responses={formResponses}

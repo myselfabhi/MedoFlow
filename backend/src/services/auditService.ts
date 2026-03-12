@@ -39,3 +39,21 @@ export const logAudit = async (params: LogAuditParams): Promise<void> => {
     },
   });
 };
+
+export const listAuditLogs = async (clinicId: string, limit = 100, offset = 0) => {
+  return prisma.auditLog.findMany({
+    where: { clinicId },
+    include: {
+      performedBy: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip: offset,
+  });
+};
+
+export const countAuditLogs = async (clinicId: string) => {
+  return prisma.auditLog.count({
+    where: { clinicId },
+  });
+};

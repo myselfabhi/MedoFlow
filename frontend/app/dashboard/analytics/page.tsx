@@ -8,6 +8,8 @@ import {
   getRevenueByService,
   getRevenueByProvider,
   getAppointmentsByDiscipline,
+  getCommerceAnalytics,
+  getMembershipAnalytics,
   downloadAnalyticsReport,
   type AnalyticsExportType,
 } from '@/lib/analyticsApi';
@@ -65,6 +67,18 @@ export default function AnalyticsPage() {
   const { data: appointmentsByDiscipline } = useQuery({
     queryKey: ['analytics', 'appointments-by-discipline'],
     queryFn: () => getAppointmentsByDiscipline(),
+    enabled: !!clinicId && !isProvider,
+  });
+
+  const { data: commerceAnalytics } = useQuery({
+    queryKey: ['analytics', 'commerce'],
+    queryFn: () => getCommerceAnalytics(),
+    enabled: !!clinicId && !isProvider,
+  });
+
+  const { data: membershipAnalytics } = useQuery({
+    queryKey: ['analytics', 'memberships'],
+    queryFn: () => getMembershipAnalytics(),
     enabled: !!clinicId && !isProvider,
   });
 
@@ -176,6 +190,46 @@ export default function AnalyticsPage() {
           <AppCardContent>
             <p className="text-2xl font-semibold text-foreground">
               {overview?.completedVisits ?? 0}
+            </p>
+          </AppCardContent>
+        </AppCard>
+      </div>
+
+      {/* Operational Metrics */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <AppCard className="border-l-4 border-l-yellow-500">
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Cancellation Rate
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-foreground">
+              {overview?.cancellationRate?.toFixed(1) ?? '0.0'}%
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard className="border-l-4 border-l-red-500">
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              No-Show Rate
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-foreground">
+              {overview?.noShowRate?.toFixed(1) ?? '0.0'}%
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard className="border-l-4 border-l-blue-500">
+          <AppCardHeader className="pb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Avg Appointment Duration
+            </h3>
+          </AppCardHeader>
+          <AppCardContent>
+            <p className="text-2xl font-semibold text-foreground">
+              {overview?.averageAppointmentDuration?.toFixed(0) ?? 0} min
             </p>
           </AppCardContent>
         </AppCard>
@@ -309,6 +363,65 @@ export default function AnalyticsPage() {
           </div>
         </AppCardContent>
       </AppCard>}
+
+      {/* Commerce & Membership Analytics */}
+      {!isProvider && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AppCard>
+            <AppCardHeader>
+              <h2 className="text-lg font-semibold text-foreground">
+                Commerce Overview
+              </h2>
+            </AppCardHeader>
+            <AppCardContent className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Product Revenue</span>
+                <span className="font-semibold">${commerceAnalytics?.totalProductRevenue?.toFixed(2) ?? '0.00'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Units Sold</span>
+                <span className="font-semibold">{commerceAnalytics?.totalProductSalesCount ?? 0}</span>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Top Products</h3>
+                <div className="space-y-2">
+                  {commerceAnalytics?.topProducts?.slice(0, 5).map((p, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span>{p.productName}</span>
+                      <span className="text-muted-foreground">{p.quantity} sold</span>
+                    </div>
+                  ))}
+                  {(!commerceAnalytics?.topProducts || commerceAnalytics.topProducts.length === 0) && (
+                    <div className="text-sm text-muted-foreground">No product sales yet</div>
+                  )}
+                </div>
+              </div>
+            </AppCardContent>
+          </AppCard>
+
+          <AppCard>
+            <AppCardHeader>
+              <h2 className="text-lg font-semibold text-foreground">
+                Membership Overview
+              </h2>
+            </AppCardHeader>
+            <AppCardContent className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Active Members</span>
+                <span className="font-semibold">{membershipAnalytics?.activeMemberships ?? 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Churn Rate</span>
+                <span className="font-semibold">{membershipAnalytics?.churnRate?.toFixed(1) ?? '0.0'}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Cancelled (All Time)</span>
+                <span className="font-semibold">{membershipAnalytics?.canceledMemberships ?? 0}</span>
+              </div>
+            </AppCardContent>
+          </AppCard>
+        </div>
+      )}
     </div>
   );
 }

@@ -193,10 +193,39 @@ export const getVisitByAppointment = async (
   }
 };
 
+export const getVisitWithHistory = async (
+  visitId: string
+): Promise<VisitRecord & { versions: any[] }> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { visitRecord: VisitRecord & { versions: any[] } };
+  }>(`/visits/${visitId}?includeHistory=true`);
+  return data.data.visitRecord;
+};
+
 export const getMyPrescriptions = async (): Promise<Prescription[]> => {
   const { data } = await api.get<{
     success: boolean;
     data: { prescriptions: Prescription[] };
   }>('/prescriptions/my');
   return data.data.prescriptions;
+};
+
+export interface PatientPackage {
+  id: string;
+  packageId: string;
+  totalSessions: number;
+  usedSessions: number;
+  expiresAt: string | null;
+  package: {
+    name: string;
+  };
+}
+
+export const getMyPackages = async (): Promise<PatientPackage[]> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { packages: PatientPackage[] };
+  }>('/patients/packages');
+  return data.data.packages;
 };

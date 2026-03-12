@@ -6,6 +6,9 @@ export interface AnalyticsOverview {
   activeTreatmentPlans: number;
   completedTreatmentPlans: number;
   completedVisits: number;
+  cancellationRate: number;
+  noShowRate: number;
+  averageAppointmentDuration: number;
 }
 
 export const getAnalyticsOverview = async (): Promise<AnalyticsOverview> => {
@@ -37,6 +40,34 @@ export const getAppointmentsByDiscipline = async () => {
     success: boolean;
     data: { data: { disciplineName: string; count: number }[] };
   }>('/analytics/appointments-by-discipline');
+  return data.data.data;
+};
+
+export interface CommerceAnalytics {
+  totalProductRevenue: number;
+  totalProductSalesCount: number;
+  topProducts: { productName: string; revenue: number; quantity: number }[];
+}
+
+export const getCommerceAnalytics = async (): Promise<CommerceAnalytics> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { data: CommerceAnalytics };
+  }>('/analytics/commerce');
+  return data.data.data;
+};
+
+export interface MembershipAnalytics {
+  activeMemberships: number;
+  canceledMemberships: number;
+  churnRate: number;
+}
+
+export const getMembershipAnalytics = async (): Promise<MembershipAnalytics> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { data: MembershipAnalytics };
+  }>('/analytics/memberships');
   return data.data.data;
 };
 

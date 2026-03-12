@@ -1,31 +1,100 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma';
 
-export const getOverview = async (clinicId: string) => {
-  const [appointmentCount, revenueResult, treatmentPlanStats, visitCount] =
-    await Promise.all([
+export const getOverview = async (clinicId: string, providerId?: string) => {
+  const appointmentWhere: Prisma.AppointmentWhereInput = {
+    clinicId,
+    ...(providerId ? { providerId } : {}),
+  };
+
+  const invoiceWhere: Prisma.InvoiceWhereInput = {
+    clinicId,
+    status: 'PAID',
+    ...(providerId ? { providerId } : {}),
+  };
+
+  const treatmentPlanWhere: Prisma.TreatmentPlanWhereInput = {
+    clinicId,
+    ...(providerId ? { providerId } : {}),
+  };
+
+  const visitRecordWhere: Prisma.VisitRecordWhereInput = {
+    clinicId,
+    status: 'FINAL',
+    ...(providerId ? { providerId } : {}),
+  };
+
+  const [
+    allAppointments,
+    appointmentCount, 
+    revenueResult, 
+    treatmentPlanStats, 
+    visitCount,
+    cancelledCount,
+    noShowCount,
+    totalDurationResult
+  ] = await Promise.all([
+      prisma.appointment.findMany({
+        where: appointmentWhere,
+        select: { startTime: true, endTime: true, status: true },
+      }),
       prisma.appointment.count({
         where: {
-          clinicId,
+          ...appointmentWhere,
           status: { notIn: ['CANCELLED'] },
         },
       }),
       prisma.invoice.aggregate({
-        where: { clinicId, status: 'PAID' },
+        where: invoiceWhere,
         _sum: { totalAmount: true },
       }),
       prisma.treatmentPlan.groupBy({
         by: ['status'],
-        where: { clinicId },
+        where: treatmentPlanWhere,
         _count: true,
       }),
       prisma.visitRecord.count({
+        where: visitRecordWhere,
+      }),
+      prisma.appointment.count({
         where: {
-          clinicId,
-          status: 'FINAL',
+          ...appointmentWhere,
+          status: 'CANCELLED',
         },
       }),
+      prisma.appointment.count({
+        where: {
+          ...appointmentWhere,
+          status: 'NO_SHOW',
+        },
+      }),
+      prisma.appointment.aggregate({
+        where: {
+          ...appointmentWhere,
+          status: 'COMPLETED',
+        },
+        _sum: {
+          // Duration logic will be computed manually from startTime and endTime 
+          // because prisma doesn't support date diff aggregation directly easily here
+        }
+      })
     ]);
+
+  const totalAppointmentsWithCancelled = allAppointments.length;
+  
+  let totalDurationMinutes = 0;
+  let completedCount = 0;
+  for (const appt of allAppointments) {
+    if (appt.status === 'COMPLETED' || appt.status === 'CONFIRMED') {
+      const diffMs = appt.endTime.getTime() - appt.startTime.getTime();
+      totalDurationMinutes += diffMs / (1000 * 60);
+      completedCount++;
+    }
+  }
+
+  const averageAppointmentDuration = completedCount > 0 ? (totalDurationMinutes / completedCount) : 0;
+  const cancellationRate = totalAppointmentsWithCancelled > 0 ? (cancelledCount / totalAppointmentsWithCancelled) * 100 : 0;
+  const noShowRate = totalAppointmentsWithCancelled > 0 ? (noShowCount / totalAppointmentsWithCancelled) * 100 : 0;
 
   const totalRevenue = revenueResult._sum.totalAmount ?? new Prisma.Decimal(0);
   const activePlans =
@@ -39,6 +108,9 @@ export const getOverview = async (clinicId: string) => {
     activeTreatmentPlans: activePlans,
     completedTreatmentPlans: completedPlans,
     completedVisits: visitCount,
+    cancellationRate,
+    noShowRate,
+    averageAppointmentDuration,
   };
 };
 
@@ -57,7 +129,7 @@ export const getRevenueByService = async (clinicId: string) => {
 
   const byService = items.reduce(
     (acc, item) => {
-      const name = item.service.name;
+      const name = item.service?.name ?? 'Unknown Service';
       if (!acc[name]) acc[name] = { serviceName: name, total: 0 };
       acc[name].total += Number(item.totalPrice);
       return acc;
@@ -121,4 +193,51 @@ export const getAppointmentsByDiscipline = async (clinicId: string) => {
   );
 
   return Object.values(byDiscipline).sort((a, b) => b.count - a.count);
+};
+
+export const getCommerceAnalytics = async (clinicId: string) => {
+  const productSales = await prisma.invoiceItem.findMany({
+    where: {
+      invoice: { clinicId, status: 'PAID' },
+      productId: { not: null },
+    },
+    include: { product: true }
+  });
+
+  const totalProductRevenue = productSales.reduce((sum, item) => sum + Number(item.totalPrice), 0);
+  const totalProductSalesCount = productSales.reduce((sum, item) => sum + item.quantity, 0);
+
+  const topProducts = productSales.reduce((acc, item) => {
+    const name = item.product?.name ?? 'Unknown Product';
+    if (!acc[name]) acc[name] = { productName: name, revenue: 0, quantity: 0 };
+    acc[name].revenue += Number(item.totalPrice);
+    acc[name].quantity += item.quantity;
+    return acc;
+  }, {} as Record<string, { productName: string, revenue: number, quantity: number }>);
+
+  return {
+    totalProductRevenue,
+    totalProductSalesCount,
+    topProducts: Object.values(topProducts).sort((a, b) => b.revenue - a.revenue).slice(0, 10)
+  };
+};
+
+export const getMembershipAnalytics = async (clinicId: string) => {
+  const activeMemberships = await prisma.patientSubscription.count({
+    where: { clinicId, status: 'ACTIVE' },
+  });
+
+  const canceledMemberships = await prisma.patientSubscription.count({
+    where: { clinicId, status: 'CANCELED' },
+  });
+
+  const churnRate = (activeMemberships + canceledMemberships) > 0 
+    ? (canceledMemberships / (activeMemberships + canceledMemberships)) * 100 
+    : 0;
+
+  return {
+    activeMemberships,
+    canceledMemberships,
+    churnRate
+  };
 };

@@ -7,6 +7,11 @@ import Link from 'next/link';
 import { getAppointmentById, type PatientAppointmentDetail } from '@/lib/patientApi';
 import { confirmPayment, failPayment } from '@/lib/paymentApi';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { StripePaymentForm } from '@/components/StripePaymentForm';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
 
 type PaymentStatus = 'NONE' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
 
@@ -15,6 +20,7 @@ type PaymentAppointment = PatientAppointmentDetail & {
   bookingHoldExpiresAt?: string | null;
   priceAtBooking: string;
   service: PatientAppointmentDetail['service'] & { defaultPrice?: string };
+  clientSecret?: string | null;
 };
 
 function formatDateTime(iso: string) {
@@ -196,39 +202,51 @@ export default function PaymentPage() {
             </div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/appointments')}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
-            >
-              Back to appointments
-            </button>
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <button
-                type="button"
-                onClick={() => failMutation.mutate()}
-                disabled={isSubmitting || showExpiredBanner}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
-              >
-                Cancel payment
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmMutation.mutate()}
-                disabled={isSubmitting || showExpiredBanner}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Processing...
-                  </>
-                ) : (
-                  'Confirm payment'
-                )}
-              </button>
-            </div>
+          <div className="flex flex-col gap-3">
+            {!showExpiredBanner && appointment.clientSecret ? (
+              <Elements stripe={stripePromise} options={{ clientSecret: appointment.clientSecret }}>
+                <StripePaymentForm 
+                  clientSecret={appointment.clientSecret}
+                  buttonLabel={`Pay $${formatAmount(appointment.priceAtBooking)} & Confirm`}
+                  onSuccess={() => router.push(`/intake/${appointmentId}`)}
+                />
+              </Elements>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/appointments')}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+                >
+                  Back to appointments
+                </button>
+                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => failMutation.mutate()}
+                    disabled={isSubmitting || showExpiredBanner}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
+                  >
+                    Cancel payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => confirmMutation.mutate()}
+                    disabled={isSubmitting || showExpiredBanner}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Confirm payment (Simulation)'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

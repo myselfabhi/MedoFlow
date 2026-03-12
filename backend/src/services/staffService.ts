@@ -26,6 +26,86 @@ export const listFrontDeskStaff = async (clinicId: string) => {
   });
 };
 
+export const listStaff = async (clinicId: string) => {
+  return prisma.user.findMany({
+    where: {
+      clinicId,
+      role: { in: ['SUPER_ADMIN', 'FRONT_DESK'] },
+      isActive: true,
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+};
+
+export const deactivateStaffUser = async (
+  userId: string,
+  clinicId: string,
+  performedById: string
+) => {
+  const userToDeactivate = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, clinicId: true, role: true },
+  });
+
+  if (!userToDeactivate || userToDeactivate.clinicId !== clinicId) {
+    const err = new Error('User not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // PRD: Protection against removing the last Super Admin
+  if (userToDeactivate.role === 'SUPER_ADMIN') {
+    const adminCount = await prisma.user.count({
+      where: {
+        clinicId,
+        role: 'SUPER_ADMIN',
+        isActive: true,
+      },
+    });
+
+    if (adminCount <= 1) {
+      const err = new Error(
+        'Cannot deactivate the last remaining Super Admin. Assign another Super Admin first.'
+      ) as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: false },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+    },
+  });
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'User',
+    entityId: userId,
+    action: 'DEACTIVATE',
+    fieldChanged: 'isActive',
+    oldValue: true,
+    newValue: false,
+    performedById,
+  });
+
+  return updatedUser;
+};
+
 export const provisionFrontDeskUser = async (
   data: { name: string; email: string },
   clinicId: string,

@@ -8,17 +8,27 @@ import { ApiError } from '../types/errors';
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
-    const { appointmentId, providerId } = req.body;
-    if (!appointmentId || !providerId) {
-      const err = new Error('appointmentId and providerId are required') as ApiError;
+    const { appointmentId, providerId, patientId, locationId } = req.body;
+    
+    if (!providerId) {
+      const err = new Error('providerId is required') as ApiError;
       err.statusCode = 400;
       throw err;
     }
+
+    if (!appointmentId && !patientId) {
+      const err = new Error('Either appointmentId or patientId is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+
     const invoice = await invoiceService.createInvoice(
       appointmentId,
       clinicId,
       providerId,
-      req.user!.id
+      req.user!.id,
+      patientId,
+      locationId
     );
     successResponse(res, 201, 'Invoice created', { invoice });
   }

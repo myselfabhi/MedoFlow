@@ -200,19 +200,20 @@ export function resolveAppointmentLifecycle(params: {
 }): AppointmentLifecycleState {
   const requiresPayment = params.paymentRequirementType !== PaymentRequirementType.NONE;
 
+  // Payment takes precedence for the initial status to ensure the clinic gets paid first
+  if (requiresPayment) {
+    return {
+      status: AppointmentStatus.PENDING_PAYMENT,
+      approvalStatus: params.requiresProviderApproval ? ApprovalStatus.PENDING : ApprovalStatus.NOT_REQUIRED,
+      paymentStatus: PaymentStatus.PENDING,
+    };
+  }
+
   if (params.requiresProviderApproval) {
     return {
       status: AppointmentStatus.PENDING_PROVIDER_APPROVAL,
       approvalStatus: ApprovalStatus.PENDING,
-      paymentStatus: requiresPayment ? PaymentStatus.PENDING : PaymentStatus.NONE,
-    };
-  }
-
-  if (requiresPayment) {
-    return {
-      status: AppointmentStatus.PENDING_PAYMENT,
-      approvalStatus: ApprovalStatus.NOT_REQUIRED,
-      paymentStatus: PaymentStatus.PENDING,
+      paymentStatus: PaymentStatus.NONE,
     };
   }
 

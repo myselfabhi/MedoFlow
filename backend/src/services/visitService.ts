@@ -158,9 +158,13 @@ export const getVisitRecordById = async (
   });
 };
 
+export interface UpdateVisitRecordData extends Partial<CreateVisitRecordData> {
+  expectedVersionId?: string;
+}
+
 export const updateVisitRecord = async (
   id: string,
-  data: Partial<CreateVisitRecordData>,
+  data: UpdateVisitRecordData,
   providerId: string,
   clinicId: string,
   performedById: string
@@ -171,6 +175,14 @@ export const updateVisitRecord = async (
     err.statusCode = 404;
     throw err;
   }
+
+  // Optimistic Concurrency Check
+  if (data.expectedVersionId && record.currentVersionId !== data.expectedVersionId) {
+    const err = new Error('This record has been updated by another user. Please refresh and try again.') as ApiError;
+    err.statusCode = 409;
+    throw err;
+  }
+
   if (record.providerId !== providerId) {
     const err = new Error(
       'Only the provider who created the record can edit it'
@@ -197,7 +209,10 @@ export const updateVisitRecord = async (
   });
 
   return prisma.visitRecord.update({
-    where: { id },
+    where: { 
+      id,
+      ...(data.expectedVersionId && { currentVersionId: data.expectedVersionId })
+    },
     data: {
       currentVersionId: version.id,
       ...(data.subjective !== undefined && { subjective: data.subjective }),

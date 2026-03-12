@@ -23,12 +23,18 @@ export interface CreateAppointmentPayload {
   startTime: string;
   endTime: string;
   slotHoldId?: string;
+  patientPackageId?: string;
 }
 
 export interface CreatedAppointment {
   id: string;
   status: AppointmentStatus;
   bookingHoldExpiresAt?: string | null;
+}
+
+export interface CreateAppointmentResponse {
+  appointment: CreatedAppointment;
+  clientSecret?: string;
 }
 
 export const getClinicLocations = async (clinicId: string): Promise<Location[]> => {
@@ -47,12 +53,12 @@ export const checkPatientExists = async (email: string): Promise<boolean> => {
 
 export const createAppointment = async (
   payload: CreateAppointmentPayload
-): Promise<CreatedAppointment> => {
+): Promise<CreateAppointmentResponse> => {
   const { data } = await api.post<{
     success: boolean;
-    data: { appointment: CreatedAppointment };
+    data: CreateAppointmentResponse;
   }>('/appointments', payload);
-  return data.data.appointment;
+  return data.data;
 };
 
 export interface SlotHoldPayload {

@@ -11,6 +11,7 @@ export interface Service {
   duration: number;
   defaultPrice: string;
   discipline: { id: string; name: string };
+  recommendedProducts?: { id: string; name: string; price: string; description: string | null }[];
 }
 
 export interface Provider {

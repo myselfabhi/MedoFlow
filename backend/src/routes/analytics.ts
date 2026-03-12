@@ -34,6 +34,18 @@ router.get(
 );
 
 router.get(
+  '/commerce',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  analyticsController.getCommerceAnalytics
+);
+
+router.get(
+  '/memberships',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  analyticsController.getMembershipAnalytics
+);
+
+router.get(
   '/export',
   authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
   analyticsController.exportReport

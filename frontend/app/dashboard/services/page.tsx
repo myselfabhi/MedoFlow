@@ -12,8 +12,10 @@ import {
   archiveService,
   type DashboardService,
   type CreateServicePayload,
+  type UpdateServicePayload,
 } from '@/lib/serviceApi';
 import { getDisciplines } from '@/lib/disciplineApi';
+import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useSystemModal } from '@/hooks/useSystemModal';
@@ -49,6 +51,7 @@ const serviceSchema = z.object({
   duration: z.coerce.number().min(1, 'Duration must be at least 1'),
   defaultPrice: z.string().min(1, 'Price is required'),
   disciplineId: z.string().min(1, 'Discipline is required'),
+  recommendedProductIds: z.array(z.string()).optional(),
 });
 
 type ServiceFormData = z.infer<typeof serviceSchema>;
@@ -59,12 +62,14 @@ function ServiceForm({
   isSubmitting,
   submitLabel,
   disciplines,
+  products,
 }: {
   defaultValues?: Partial<ServiceFormData>;
   onSubmit: (data: ServiceFormData) => void;
   isSubmitting: boolean;
   submitLabel: string;
   disciplines: { id: string; name: string }[];
+  products: { id: string; name: string }[];
 }) {
   const {
     register,
@@ -79,10 +84,20 @@ function ServiceForm({
       duration: 30,
       defaultPrice: '',
       disciplineId: '',
+      recommendedProductIds: [],
     },
   });
 
   const disciplineId = watch('disciplineId');
+  const selectedProductIds = watch('recommendedProductIds') || [];
+
+  const toggleProduct = (productId: string) => {
+    if (selectedProductIds.includes(productId)) {
+      setValue('recommendedProductIds', selectedProductIds.filter(id => id !== productId));
+    } else {
+      setValue('recommendedProductIds', [...selectedProductIds, productId]);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -158,6 +173,34 @@ function ServiceForm({
           )}
         </div>
       </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          Recommended Products
+        </label>
+        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md bg-white">
+          {products.map((p) => (
+            <label
+              key={p.id}
+              className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded"
+            >
+              <input
+                type="checkbox"
+                checked={selectedProductIds.includes(p.id)}
+                onChange={() => toggleProduct(p.id)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm truncate">{p.name}</span>
+            </label>
+          ))}
+          {products.length === 0 && (
+            <p className="col-span-2 text-center text-xs text-muted-foreground py-4">
+              No products found
+            </p>
+          )}
+        </div>
+      </div>
+
       <DialogFooter>
         <AppButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : submitLabel}
@@ -188,7 +231,16 @@ export default function ServicesPage() {
   const { data: disciplines = [] } = useQuery({
     queryKey: ['disciplines'],
     queryFn: () => getDisciplines(),
-    enabled: !!clinicId && (addOpen || editOpen),
+    enabled: !!clinicId,
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const res = await api.get('/products');
+      return res.data.data.products;
+    },
+    enabled: !!clinicId,
   });
 
   const createMutation = useMutation({
@@ -209,12 +261,7 @@ export default function ServicesPage() {
       data,
     }: {
       id: string;
-      data: {
-        name?: string;
-        duration?: number;
-        defaultPrice?: string;
-        disciplineId?: string;
-      };
+      data: UpdateServicePayload;
     }) => updateService(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -244,6 +291,7 @@ export default function ServicesPage() {
       duration: data.duration,
       defaultPrice: data.defaultPrice,
       disciplineId: data.disciplineId,
+      recommendedProductIds: data.recommendedProductIds,
     });
   };
 
@@ -256,6 +304,7 @@ export default function ServicesPage() {
         duration: data.duration,
         defaultPrice: data.defaultPrice,
         disciplineId: data.disciplineId,
+        recommendedProductIds: data.recommendedProductIds,
       },
     });
   };
@@ -412,6 +461,7 @@ export default function ServicesPage() {
           </DialogHeader>
           <ServiceForm
             disciplines={disciplines}
+            products={products}
             onSubmit={handleAddSubmit}
             isSubmitting={createMutation.isPending}
             submitLabel="Create"
@@ -434,8 +484,10 @@ export default function ServicesPage() {
                 duration: editing.duration,
                 defaultPrice: editing.defaultPrice,
                 disciplineId: editing.discipline.id,
+                recommendedProductIds: editing.recommendedProducts?.map(p => p.id) || [],
               }}
               disciplines={disciplines}
+              products={products}
               onSubmit={handleEditSubmit}
               isSubmitting={updateMutation.isPending}
               submitLabel="Save"

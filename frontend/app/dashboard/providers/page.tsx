@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { listProviders } from '@/lib/availabilityApi';
+import { listProviders, deactivateProvider, type ProviderListItem } from '@/lib/availabilityApi';
 import {
   AppCard,
   AppCardHeader,
@@ -16,12 +16,20 @@ import {
   AppEmptyState,
 } from '@/components/ui-system';
 import { AddProviderDialog } from '@/components/providers/AddProviderDialog';
+import { EditProviderDialog } from '@/components/providers/EditProviderDialog';
 import { Plus } from 'lucide-react';
+import { useAppToast } from '@/hooks/useAppToast';
+import { useSystemModal } from '@/hooks/useSystemModal';
 
 export default function ProvidersPage() {
   const { user } = useAuth();
   const clinicId = user?.clinicId?.trim() || undefined;
+  const queryClient = useQueryClient();
+  const toast = useAppToast();
+  const { showModal } = useSystemModal();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<ProviderListItem | null>(null);
 
   const canAddProvider = user?.role === 'SUPER_ADMIN';
 
@@ -30,6 +38,29 @@ export default function ProvidersPage() {
     queryFn: () => listProviders(),
     enabled: !!clinicId,
   });
+
+  const deactivateMutation = useMutation({
+    mutationFn: deactivateProvider,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['providers'] });
+      toast.success('Provider deactivated');
+    },
+    onError: () => toast.error('Failed to deactivate provider'),
+  });
+
+  const handleEditClick = (provider: ProviderListItem) => {
+    setEditingProvider(provider);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeactivateClick = (provider: ProviderListItem) => {
+    showModal({
+      title: 'Deactivate Provider',
+      description: `Deactivate ${provider.firstName} ${provider.lastName}? Their login will be disabled and future appointments will be flagged for reassignment. Historical data is preserved.`,
+      actionLabel: 'Deactivate',
+      onAction: () => deactivateMutation.mutate(provider.id),
+    });
+  };
 
   if (!clinicId) {
     return (
@@ -142,14 +173,34 @@ export default function ProvidersPage() {
                           </AppBadge>
                         </div>
                       )}
-                      <Link
-                        href={`/dashboard/providers/${p.id}/availability`}
-                        className="mt-auto pt-2"
-                      >
-                        <AppButton variant="outline" size="sm" className="w-full">
-                          Edit Availability
-                        </AppButton>
-                      </Link>
+                      <div className="mt-auto flex flex-col gap-2 pt-2">
+                        <Link href={`/dashboard/providers/${p.id}/availability`}>
+                          <AppButton variant="outline" size="sm" className="w-full">
+                            Edit Availability
+                          </AppButton>
+                        </Link>
+                        {canAddProvider && (
+                          <div className="flex gap-2">
+                            <AppButton
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleEditClick(p)}
+                            >
+                              Edit
+                            </AppButton>
+                            <AppButton
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1 text-danger hover:bg-danger/10"
+                              onClick={() => handleDeactivateClick(p)}
+                              disabled={deactivateMutation.isPending}
+                            >
+                              Deactivate
+                            </AppButton>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </AppCardContent>
                 </AppCard>
@@ -160,6 +211,17 @@ export default function ProvidersPage() {
       </AppCard>
 
       <AddProviderDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+
+      {editingProvider && (
+        <EditProviderDialog
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) setEditingProvider(null);
+          }}
+          provider={editingProvider}
+        />
+      )}
     </div>
   );
 }

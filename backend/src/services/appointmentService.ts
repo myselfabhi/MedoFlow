@@ -12,11 +12,16 @@ import {
 import * as auditService from './auditService';
 import * as waitlistService from './waitlistService';
 import * as patientMembershipService from './patientMembershipService';
+import * as packageUsageService from './packageUsageService';
 import {
   buildSlotFingerprint,
   MIN_APPOINTMENT_DURATION_MINUTES,
   resolveAppointmentLifecycle,
 } from './schedulingCore';
+
+import stripe from '../config/stripe';
+
+import * as emailService from './emailService';
 
 const CANCELLED_STATUS = 'CANCELLED';
 
@@ -37,6 +42,7 @@ export interface CreateAppointmentContext {
   bookingSource?: BookingSource;
   recurringSeriesId?: string | null;
   notes?: string | null;
+  patientPackageId?: string;
 }
 
 const validateServiceBelongsToClinic = async (
@@ -566,12 +572,34 @@ export const createAppointment = async (
 
     const priceAtBooking =
       assignment.priceOverride ?? assignment.service.defaultPrice;
-    const paymentRequirementType =
-      service.requirePrepayment && service.prepaymentType === 'DEPOSIT'
+    
+    // Check for package usage
+    let usingPackage = false;
+    if (context?.patientPackageId) {
+      const pkg = await tx.patientPackage.findFirst({
+        where: { 
+          id: context.patientPackageId, 
+          patientId, 
+          clinicId, 
+          status: 'ACTIVE',
+          usedSessions: { lt: prisma.patientPackage.fields.totalSessions } // Simple check
+        }
+      });
+      if (pkg) {
+        usingPackage = true;
+      } else {
+        throw createApiError('Selected package is not available or exhausted', 400, 'invalid_package');
+      }
+    }
+
+    const paymentRequirementType = usingPackage 
+      ? PaymentRequirementType.NONE
+      : service.requirePrepayment && service.prepaymentType === 'DEPOSIT'
         ? PaymentRequirementType.DEPOSIT
         : service.requirePrepayment
           ? PaymentRequirementType.FULL
           : PaymentRequirementType.NONE;
+    
     const requirePrepayment = paymentRequirementType !== PaymentRequirementType.NONE;
     const now = new Date();
     const slotHoldMinutes = 10;
@@ -595,7 +623,7 @@ export const createAppointment = async (
       endTime: new Date(endTime),
       status: lifecycle.status,
       priceAtBooking,
-      paymentStatus: lifecycle.paymentStatus,
+      paymentStatus: usingPackage ? PaymentStatus.PAID : lifecycle.paymentStatus,
       paymentRequirementType,
       approvalStatus: lifecycle.approvalStatus,
       bookingSource,
@@ -630,6 +658,40 @@ export const createAppointment = async (
         patient: { select: { id: true, name: true, email: true } },
       },
     });
+
+    if (usingPackage && context?.patientPackageId) {
+      const updatedPkg = await tx.patientPackage.update({
+        where: { id: context.patientPackageId },
+        data: {
+          usedSessions: { increment: 1 },
+        }
+      });
+      
+      if (updatedPkg.usedSessions >= updatedPkg.totalSessions) {
+        await tx.patientPackage.update({
+          where: { id: updatedPkg.id },
+          data: { status: 'EXHAUSTED' }
+        });
+      }
+
+      await tx.packageSessionUsage.create({
+        data: {
+          patientPackageId: context.patientPackageId,
+          appointmentId: appointment.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          clinicId,
+          entityType: 'Appointment',
+          entityId: appointment.id,
+          action: 'PACKAGE_SESSION_CONSUMED',
+          newValue: { patientPackageId: context.patientPackageId } as Prisma.InputJsonValue,
+          performedById: performedById ?? patientId,
+        },
+      });
+    }
 
     if (requirePrepayment && performedById) {
       await tx.auditLog.create({
@@ -677,7 +739,34 @@ export const createAppointment = async (
       },
     });
 
-    return appointment;
+    let clientSecret: string | undefined = undefined;
+
+    if (requirePrepayment) {
+      const amountToCharge = paymentRequirementType === PaymentRequirementType.DEPOSIT 
+        ? Number(service.depositAmount) 
+        : Number(priceAtBooking);
+      
+      const amountInCents = Math.round(amountToCharge * 100);
+
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountInCents,
+          currency: 'usd',
+          metadata: {
+            appointmentId: appointment.id,
+            clinicId,
+            patientId,
+            type: 'APPOINTMENT',
+          },
+        });
+        clientSecret = paymentIntent.client_secret ?? undefined;
+      } catch (err) {
+        console.error('Stripe PaymentIntent Error:', err);
+        // We still created the appointment in PENDING_PAYMENT state
+      }
+    }
+
+    return { appointment, clientSecret };
   });
 };
 
@@ -752,12 +841,12 @@ export const createRecurringSeries = async (
     occurrences.push({ start, end });
   }
 
-  const appointments: Awaited<ReturnType<typeof createAppointment>>[] = [];
+  const appointments: any[] = [];
   const conflicts: RecurringConflict[] = [];
 
   for (const { start, end } of occurrences) {
     try {
-      const apt = await createAppointment(
+      const { appointment } = await createAppointment(
         {
           locationId: location.id,
           providerId: input.providerId,
@@ -773,7 +862,7 @@ export const createRecurringSeries = async (
           recurringSeriesId: recurringSeries.id,
         }
       );
-      appointments.push(apt);
+      appointments.push(appointment);
     } catch (err) {
       conflicts.push({
         date: start.toISOString().split('T')[0],
@@ -875,6 +964,15 @@ export const cancelAppointment = async (
     performedById,
   });
 
+  // Send cancellation email
+  await emailService.sendAppointmentCancellation({
+    to: updated.patient.email,
+    patientName: updated.patient.name,
+    appointmentDate: updated.startTime.toLocaleString(),
+    serviceName: updated.service.name,
+    reason,
+  });
+
   try {
     await waitlistService.offerSlotToWaitlist({
       clinicId: appointment.clinicId,
@@ -936,7 +1034,7 @@ export const rescheduleAppointment = async (
     startTime: newStartTime,
     endTime: newEndTime,
   };
-  const newAppointment = await createAppointment(createData, oldAppointment.clinicId, {
+  const { appointment: newAppointment } = await createAppointment(createData, oldAppointment.clinicId, {
     performedById,
     excludeAppointmentId: oldAppointmentId,
     slotHoldId: data.slotHoldId,

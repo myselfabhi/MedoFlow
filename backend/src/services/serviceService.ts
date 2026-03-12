@@ -8,6 +8,7 @@ export interface CreateServiceData {
   duration: number;
   defaultPrice: number | string;
   taxApplicable?: boolean;
+  recommendedProductIds?: string[];
 }
 
 type ClinicWhere = { clinicId?: string } | Record<string, never>;
@@ -55,9 +56,13 @@ export const createService = async (
       duration: data.duration,
       defaultPrice: data.defaultPrice,
       taxApplicable: data.taxApplicable ?? false,
+      recommendedProducts: {
+        connect: data.recommendedProductIds?.map((id) => ({ id })) ?? [],
+      },
     },
     include: {
       discipline: { select: { id: true, name: true } },
+      recommendedProducts: true,
     },
   });
 
@@ -95,6 +100,7 @@ export const getServiceById = async (id: string, where: ClinicWhere = {}) => {
     where: whereClause as { id: string; clinicId?: string },
     include: {
       discipline: { select: { id: true, name: true } },
+      recommendedProducts: true,
     },
   });
 };
@@ -143,9 +149,15 @@ export const updateService = async (
       ...(data.taxApplicable !== undefined && { taxApplicable: data.taxApplicable }),
       ...(data.disciplineId && { disciplineId: data.disciplineId }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
+      ...(data.recommendedProductIds && {
+        recommendedProducts: {
+          set: data.recommendedProductIds.map((id) => ({ id })),
+        },
+      }),
     },
     include: {
       discipline: { select: { id: true, name: true } },
+      recommendedProducts: true,
     },
   });
 

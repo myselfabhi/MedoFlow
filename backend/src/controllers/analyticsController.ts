@@ -3,11 +3,23 @@ import * as analyticsService from '../services/analyticsService';
 import { successResponse } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../types/errors';
+import prisma from '../config/prisma';
 
 export const getOverview = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId!;
-    const overview = await analyticsService.getOverview(clinicId);
+    let providerId: string | undefined = undefined;
+    
+    // For adaptive visibility: if user is a provider, restrict data to themselves.
+    // If user is super admin, they can optionally filter by provider.
+    if (req.user?.role === 'PROVIDER') {
+      const provider = await prisma.provider.findUnique({ where: { userId: req.user.id }});
+      providerId = provider?.id;
+    } else if (req.query.providerId) {
+      providerId = String(req.query.providerId);
+    }
+
+    const overview = await analyticsService.getOverview(clinicId, providerId);
     successResponse(res, 200, 'Analytics overview', overview);
   }
 );
@@ -33,6 +45,22 @@ export const getAppointmentsByDiscipline = asyncHandler(
     const clinicId = req.clinicId!;
     const data = await analyticsService.getAppointmentsByDiscipline(clinicId);
     successResponse(res, 200, 'Appointments by discipline', { data });
+  }
+);
+
+export const getCommerceAnalytics = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.clinicId!;
+    const data = await analyticsService.getCommerceAnalytics(clinicId);
+    successResponse(res, 200, 'Commerce analytics', { data });
+  }
+);
+
+export const getMembershipAnalytics = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.clinicId!;
+    const data = await analyticsService.getMembershipAnalytics(clinicId);
+    successResponse(res, 200, 'Membership analytics', { data });
   }
 );
 

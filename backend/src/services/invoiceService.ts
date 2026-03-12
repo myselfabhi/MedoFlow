@@ -8,43 +8,59 @@ const DEFAULT_TAX_RATE = 0.13; // 13% - configurable via env if needed
 const ZERO = new Prisma.Decimal(0);
 
 export const createInvoice = async (
-  appointmentId: string,
+  appointmentId: string | undefined | null,
   clinicId: string,
   providerId: string,
-  performedById: string
+  performedById: string,
+  patientId?: string,
+  locationId?: string
 ) => {
-  const appointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId, clinicId, providerId },
-    select: { patientId: true, locationId: true },
-  });
+  let finalPatientId = patientId;
+  let finalLocationId = locationId;
 
-  if (!appointment) {
-    const err = new Error(
-      'Appointment not found or does not belong to this clinic/provider'
-    ) as ApiError;
-    err.statusCode = 404;
-    throw err;
+  if (appointmentId) {
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: appointmentId, clinicId, providerId },
+      select: { patientId: true, locationId: true },
+    });
+
+    if (!appointment) {
+      const err = new Error(
+        'Appointment not found or does not belong to this clinic/provider'
+      ) as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const existing = await prisma.invoice.findFirst({
+      where: { appointmentId, clinicId, status: { not: 'CANCELLED' } },
+    });
+
+    if (existing) {
+      const err = new Error(
+        'An active invoice already exists for this appointment'
+      ) as ApiError;
+      err.statusCode = 409;
+      throw err;
+    }
+
+    finalPatientId = appointment.patientId;
+    finalLocationId = appointment.locationId ?? undefined;
   }
 
-  const existing = await prisma.invoice.findFirst({
-    where: { appointmentId, clinicId, status: { not: 'CANCELLED' } },
-  });
-
-  if (existing) {
-    const err = new Error(
-      'An active invoice already exists for this appointment'
-    ) as ApiError;
-    err.statusCode = 409;
+  if (!finalPatientId) {
+    const err = new Error('patientId is required when creating an invoice without an appointment') as ApiError;
+    err.statusCode = 400;
     throw err;
   }
 
   const invoice = await prisma.invoice.create({
     data: {
       clinicId,
-      appointmentId,
-      patientId: appointment.patientId,
+      appointmentId: appointmentId ?? null,
+      patientId: finalPatientId,
       providerId,
-      locationId: appointment.locationId ?? null,
+      locationId: finalLocationId ?? null,
       status: 'DRAFT',
       subtotal: ZERO,
       taxAmount: ZERO,
@@ -63,7 +79,7 @@ export const createInvoice = async (
     entityType: 'Invoice',
     entityId: invoice.id,
     action: 'INVOICE_CREATED',
-    newValue: { appointmentId, providerId },
+    newValue: { appointmentId: appointmentId ?? null, providerId, patientId: finalPatientId },
     performedById,
   });
 
@@ -169,7 +185,7 @@ export const addInvoiceItem = async (
       include: { service: true },
     });
 
-    await recalculateInvoiceTotalsTx(tx, invoiceId);
+    await recalculateInvoiceTotals(invoiceId, tx);
 
     return created;
   });
@@ -227,7 +243,7 @@ export const updateInvoiceItem = async (
     (ps) => ps.serviceId === item.serviceId
   );
   const expectedPrice =
-    providerService?.priceOverride ?? item.service.defaultPrice;
+    providerService?.priceOverride ?? item.service?.defaultPrice ?? ZERO;
 
   let unitPrice = item.unitPrice;
   let quantity = item.quantity;
@@ -269,7 +285,7 @@ export const updateInvoiceItem = async (
       data: { unitPrice, quantity, totalPrice },
       include: { service: true },
     });
-    await recalculateInvoiceTotalsTx(tx, invoiceId);
+    await recalculateInvoiceTotals(invoiceId, tx);
     return result;
   });
 
@@ -309,22 +325,31 @@ export const deleteInvoiceItem = async (
 
   await prisma.$transaction(async (tx) => {
     await tx.invoiceItem.delete({ where: { id: itemId } });
-    await recalculateInvoiceTotalsTx(tx, invoiceId);
+    await recalculateInvoiceTotals(invoiceId, tx);
   });
 
   return null;
 };
 
-async function recalculateInvoiceTotalsTx(
-  tx: Omit<
+export async function recalculateInvoiceTotals(
+  invoiceId: string,
+  txClient?: Omit<
     typeof prisma,
     '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'
-  >,
-  invoiceId: string
+  >
 ) {
-  const invoice = await tx.invoice.findUnique({
+  const executor = txClient || prisma;
+  const invoice = await executor.invoice.findUnique({
     where: { id: invoiceId },
-    include: { items: { include: { service: true } } },
+    include: { 
+      items: { 
+        include: { 
+          service: true,
+          product: true,
+          package: true
+        } 
+      } 
+    },
   });
 
   if (!invoice) return;
@@ -334,7 +359,13 @@ async function recalculateInvoiceTotalsTx(
 
   for (const item of invoice.items) {
     subtotal = subtotal.plus(item.totalPrice);
-    if (item.service.taxApplicable) {
+    
+    const isTaxable = 
+      item.service?.taxApplicable || 
+      item.product?.taxApplicable || 
+      item.package?.taxApplicable;
+
+    if (isTaxable) {
       taxableAmount = taxableAmount.plus(item.totalPrice);
     }
   }
@@ -342,7 +373,7 @@ async function recalculateInvoiceTotalsTx(
   const taxAmount = taxableAmount.times(DEFAULT_TAX_RATE).toDecimalPlaces(2);
   const totalAmount = subtotal.plus(taxAmount).toDecimalPlaces(2);
 
-  await tx.invoice.update({
+  await executor.invoice.update({
     where: { id: invoiceId },
     data: {
       subtotal: subtotal.toDecimalPlaces(2),

@@ -26,6 +26,7 @@ export interface DashboardService {
   duration: number;
   defaultPrice: string;
   discipline: { id: string; name: string };
+  recommendedProducts?: { id: string; name: string }[];
 }
 
 export const getDashboardServices = async (): Promise<DashboardService[]> => {
@@ -46,6 +47,7 @@ export interface CreateServicePayload {
   duration: number;
   defaultPrice: number | string;
   taxApplicable?: boolean;
+  recommendedProductIds?: string[];
 }
 
 export interface UpdateServicePayload {
@@ -54,6 +56,7 @@ export interface UpdateServicePayload {
   defaultPrice?: number | string;
   disciplineId?: string;
   taxApplicable?: boolean;
+  recommendedProductIds?: string[];
 }
 
 export const createService = async (

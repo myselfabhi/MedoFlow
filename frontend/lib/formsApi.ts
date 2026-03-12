@@ -9,15 +9,59 @@ export interface FormFieldDefinition {
   placeholder?: string;
 }
 
+export type FormScope = 'CLINIC' | 'DISCIPLINE' | 'SERVICE';
+
 export interface FormTemplate {
   id: string;
   name: string;
   description: string | null;
-  scope: string;
+  scope: FormScope;
   fields: FormFieldDefinition[];
-  discipline?: { id: string; name: string };
-  service?: { id: string; name: string };
+  isActive: boolean;
+  discipline?: { id: string; name: string } | null;
+  service?: { id: string; name: string } | null;
+  createdAt: string;
 }
+
+export interface CreateTemplatePayload {
+  name: string;
+  description?: string;
+  scope: FormScope;
+  disciplineId?: string;
+  serviceId?: string;
+  fields: FormFieldDefinition[];
+}
+
+export const listTemplates = async (): Promise<FormTemplate[]> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { templates: FormTemplate[] };
+  }>('/forms/templates');
+  return data.data.templates;
+};
+
+export const createTemplate = async (payload: CreateTemplatePayload): Promise<FormTemplate> => {
+  const { data } = await api.post<{
+    success: boolean;
+    data: { template: FormTemplate };
+  }>('/forms/templates', payload);
+  return data.data.template;
+};
+
+export const updateTemplate = async (
+  id: string,
+  payload: Partial<CreateTemplatePayload>
+): Promise<FormTemplate> => {
+  const { data } = await api.put<{
+    success: boolean;
+    data: { template: FormTemplate };
+  }>(`/forms/templates/${id}`, payload);
+  return data.data.template;
+};
+
+export const disableTemplate = async (id: string): Promise<void> => {
+  await api.delete(`/forms/templates/${id}`);
+};
 
 export interface FormResponsePayload {
   templateId: string;

@@ -19,6 +19,7 @@ import {
   createSlotHold,
   releaseSlotHold,
 } from '@/lib/appointmentApi';
+import { getMyPackages } from '@/lib/patientApi';
 import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringApi';
 import { LoginModal } from '@/components/LoginModal';
 import { WaitlistModal } from '@/components/WaitlistModal';
@@ -58,6 +59,7 @@ export default function BookingPage() {
 
   const [step, setStep] = useState(0);
   const [providerId, setProviderId] = useState<string | null>(null);
+  const [providerSearch, setProviderSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [patientExists, setPatientExists] = useState<boolean | null>(null);
@@ -76,6 +78,7 @@ export default function BookingPage() {
   } | null>(null);
   const [slotHoldId, setSlotHoldId] = useState<string | null>(null);
   const [holdingSlot, setHoldingSlot] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
 
   const { data: clinic } = useQuery({
     queryKey: ['clinic', clinicId],
@@ -99,6 +102,12 @@ export default function BookingPage() {
     queryKey: ['clinic-locations', clinicId],
     queryFn: () => getClinicLocations(clinicId),
     enabled: !!clinicId,
+  });
+
+  const { data: patientPackages } = useQuery({
+    queryKey: ['patient-packages'],
+    queryFn: () => getMyPackages(),
+    enabled: !!isAuthenticated && !!user && user.role === 'PATIENT',
   });
 
   const service = services?.find((s) => s.id === serviceId);
@@ -213,7 +222,7 @@ export default function BookingPage() {
       if (!selectedSlot) {
         throw new Error('No time slot selected. Please go back and choose a time.');
       }
-      const appointment = await createAppointment({
+      const { appointment } = await createAppointment({
         clinicId,
         ...(selectedSlot.locationId && { locationId: selectedSlot.locationId }),
         providerId: selectedSlot.providerId,
@@ -222,6 +231,7 @@ export default function BookingPage() {
         startTime: selectedSlot.start,
         endTime: selectedSlot.end,
         ...(slotHoldId && { slotHoldId }),
+        ...(selectedPackageId && { patientPackageId: selectedPackageId }),
       });
       if (appointment.status === 'PENDING_PAYMENT') {
         router.push(`/payment/${appointment.id}`);
@@ -484,50 +494,88 @@ export default function BookingPage() {
           <p className="mt-1 text-sm text-slate-600">
             {service?.duration} min · ${service?.defaultPrice}
           </p>
+          {service?.recommendedProducts && service.recommendedProducts.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-full">Recommended Products</span>
+              {service.recommendedProducts.map(p => (
+                <div key={p.id} className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs border border-slate-200">
+                  {p.name}
+                </div>
+              ))}
+            </div>
+          )}
         </AppCardHeader>
         <AppCardContent className="space-y-6">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="font-medium text-gray-900">Select Provider</h2>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="font-medium text-gray-900">Select Provider</h2>
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Search for your provider..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
+                    value={providerSearch}
+                    onChange={(e) => setProviderSearch(e.target.value)}
+                  />
+                </div>
+              </div>
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProviderId(null);
-                    nextStep();
-                  }}
-                  className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
-                    !providerId
-                      ? 'border-primary-600 bg-primary-50/50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="font-medium">Any Available</span>
-                </button>
-                {providersForService?.map((p) => (
+                {(!providerSearch || 'any available'.includes(providerSearch.toLowerCase())) && (
                   <button
-                    key={p.id}
                     type="button"
                     onClick={() => {
-                      setProviderId(p.id);
+                      setProviderId(null);
                       nextStep();
                     }}
                     className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
-                      providerId === p.id
+                      !providerId
                         ? 'border-primary-600 bg-primary-50/50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className="font-medium">
-                      {p.firstName} {p.lastName}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {p.disciplines?.length
-                        ? p.disciplines.map((pd) => pd.discipline.name).join(' · ')
-                        : p.discipline?.name ?? ''}
-                    </span>
+                    <span className="font-medium">Any Available</span>
                   </button>
-                ))}
+                )}
+                {providersForService
+                  ?.filter((p) =>
+                    `${p.firstName} ${p.lastName}`
+                      .toLowerCase()
+                      .includes(providerSearch.toLowerCase())
+                  )
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setProviderId(p.id);
+                        nextStep();
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
+                        providerId === p.id
+                          ? 'border-primary-600 bg-primary-50/50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="font-medium">
+                        {p.firstName} {p.lastName}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {p.disciplines?.length
+                          ? p.disciplines.map((pd) => pd.discipline.name).join(' · ')
+                          : p.discipline?.name ?? ''}
+                      </span>
+                    </button>
+                  ))}
+                {providersForService?.filter((p) =>
+                  `${p.firstName} ${p.lastName}`
+                    .toLowerCase()
+                    .includes(providerSearch.toLowerCase())
+                ).length === 0 && !'any available'.includes(providerSearch.toLowerCase()) && (
+                  <p className="text-center text-sm text-gray-500 py-4">
+                    No providers found matching &quot;{providerSearch}&quot;
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -839,6 +887,41 @@ export default function BookingPage() {
                   </div>
                 )}
               </div>
+
+              {isAuthenticated && patientPackages && patientPackages.length > 0 && !isRecurring && (
+                <div className="space-y-3 rounded-lg border border-primary-100 bg-primary-50/30 p-4">
+                  <h3 className="text-sm font-semibold text-primary-900">Use a wellness package?</h3>
+                  <p className="text-xs text-primary-700 mb-2">
+                    You have active packages. Select one to use a pre-paid session for this visit.
+                  </p>
+                  <div className="space-y-2">
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <input
+                        type="radio"
+                        name="packageSelection"
+                        checked={selectedPackageId === null}
+                        onChange={() => setSelectedPackageId(null)}
+                        className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700">Pay today (${service?.defaultPrice})</span>
+                    </label>
+                    {patientPackages.map((pkg) => (
+                      <label key={pkg.id} className="flex cursor-pointer items-center gap-3">
+                        <input
+                          type="radio"
+                          name="packageSelection"
+                          checked={selectedPackageId === pkg.id}
+                          onChange={() => setSelectedPackageId(pkg.id)}
+                          className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {pkg.package.name} ({pkg.totalSessions - pkg.usedSessions} sessions left)
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {bookingError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

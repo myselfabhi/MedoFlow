@@ -1,6 +1,7 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
+import * as emailService from './emailService';
 import { createAppointment } from './appointmentService';
 import { BookingSource, WaitlistStatus } from '@prisma/client';
 
@@ -229,6 +230,15 @@ export const offerSlotToWaitlist = async (
     performedById: first.patient.id,
   });
 
+  // Send waitlist offer email
+  await emailService.sendWaitlistOffer({
+    to: offered.patient.email,
+    patientName: offered.patient.name,
+    appointmentDate: offered.offeredStartTime!.toLocaleString(),
+    serviceName: offered.service.name,
+    bookingUrl: `${process.env.FRONTEND_URL}/book/${offered.serviceId}?waitlistEntryId=${offered.id}`,
+  });
+
   return offered;
 };
 
@@ -239,25 +249,45 @@ export const expireWaitlistOffers = async (): Promise<number> => {
       status: OFFERED,
       expiresAt: { lt: now },
     },
-    select: { id: true, clinicId: true, patientId: true },
+    select: { 
+      id: true, 
+      clinicId: true, 
+      patientId: true,
+      providerId: true,
+      serviceId: true,
+      offeredStartTime: true,
+      offeredEndTime: true,
+      offeredLocationId: true
+    },
   });
 
   if (toExpire.length === 0) return 0;
 
-  await prisma.waitlistEntry.updateMany({
-    where: { id: { in: toExpire.map((e) => e.id) } },
-    data: { status: EXPIRED },
-  });
-
-  for (const e of toExpire) {
-    await auditService.logAudit({
-      clinicId: e.clinicId,
-      entityType: 'WaitlistEntry',
-      entityId: e.id,
-      action: 'WAITLIST_EXPIRED',
-      newValue: { expiredAt: now.toISOString() },
-      performedById: e.patientId,
+  for (const entry of toExpire) {
+    await prisma.waitlistEntry.update({
+      where: { id: entry.id },
+      data: { status: EXPIRED },
     });
+
+    await auditService.logAudit({
+      clinicId: entry.clinicId,
+      entityType: 'WaitlistEntry',
+      entityId: entry.id,
+      action: 'WAITLIST_EXPIRED',
+      performedById: entry.patientId,
+    });
+
+    // Cascade: Offer the same slot to the next person on the list
+    if (entry.offeredStartTime && entry.offeredEndTime) {
+      await offerSlotToWaitlist({
+        clinicId: entry.clinicId,
+        providerId: entry.providerId,
+        serviceId: entry.serviceId,
+        slotStartTime: entry.offeredStartTime,
+        slotEndTime: entry.offeredEndTime,
+        locationId: entry.offeredLocationId,
+      });
+    }
   }
 
   return toExpire.length;
@@ -332,7 +362,7 @@ export const claimWaitlistOffer = async (
     throw err;
   }
 
-  const appointment = await createAppointment(
+  const { appointment } = await createAppointment(
     {
       locationId: entry.offeredLocationId,
       providerId: entry.providerId,

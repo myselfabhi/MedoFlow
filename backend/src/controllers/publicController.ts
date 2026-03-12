@@ -58,6 +58,9 @@ export const getClinicServices = asyncHandler(
       orderBy: { name: 'asc' },
       include: {
         discipline: { select: { id: true, name: true } },
+        recommendedProducts: {
+          select: { id: true, name: true, price: true, description: true }
+        }
       },
     });
     successResponse(res, 200, 'Services retrieved', { services });
