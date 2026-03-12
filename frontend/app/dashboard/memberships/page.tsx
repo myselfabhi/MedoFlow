@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   cancelMembershipAtPeriodEnd,
   getMemberships,
+  getMembershipOperationalSummary,
   getMyMembershipSubscriptions,
   purchaseMembership,
   type MembershipCatalogItem,
@@ -43,6 +44,12 @@ export default function MembershipsPage() {
     queryKey: ['membership-subscriptions'],
     queryFn: getMyMembershipSubscriptions,
     enabled: isPatient,
+  });
+
+  const { data: operationalSummary } = useQuery({
+    queryKey: ['membership-operational-summary'],
+    queryFn: getMembershipOperationalSummary,
+    enabled: !isPatient,
   });
 
   const activeSubscription = useMemo(
@@ -83,38 +90,104 @@ export default function MembershipsPage() {
     <>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Memberships</h1>
-        <Button>
+        <Button disabled title="Catalog CRUD is not surfaced in this admin page yet">
           <Plus className="mr-2 h-4 w-4" /> Add Membership
         </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Active</CardTitle>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold">
+            {operationalSummary?.activeCount ?? 0}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Past Due</CardTitle>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-amber-600">
+            {operationalSummary?.pastDueCount ?? 0}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Incomplete</CardTitle>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-slate-700">
+            {operationalSummary?.incompleteCount ?? 0}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancel At Period End</CardTitle>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-slate-700">
+            {operationalSummary?.cancelAtPeriodEndCount ?? 0}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="text-sm text-slate-600">
+        This page shows live subscription operations. Membership catalog create/edit remains backend-supported but is not exposed in this admin screen yet.
       </div>
 
       {isLoading ? (
         <div>Loading...</div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {memberships.map((membership) => (
-            <Card key={membership.id}>
-              <CardHeader>
-                <CardTitle>{membership.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {membership.description || 'No description available.'}
-                </p>
-                <div className="font-semibold text-lg">
-                  {formatMoney(membership.monthlyPrice)} / {membership.billingPeriod.toLowerCase()}
-                </div>
-                <div className="text-sm text-slate-600">
-                  Service discount: {Number(membership.serviceDiscountPercent ?? 0).toFixed(0)}%
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {memberships.length === 0 && (
-            <div className="col-span-full py-10 text-center text-muted-foreground">
-              No memberships found. Add one to get started.
-            </div>
-          )}
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {memberships.map((membership) => (
+              <Card key={membership.id}>
+                <CardHeader>
+                  <CardTitle>{membership.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {membership.description || 'No description available.'}
+                  </p>
+                  <div className="font-semibold text-lg">
+                    {formatMoney(membership.monthlyPrice)} / {membership.billingPeriod.toLowerCase()}
+                  </div>
+                  <div className="text-sm text-slate-600">
+                    Service discount: {Number(membership.serviceDiscountPercent ?? 0).toFixed(0)}%
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {memberships.length === 0 && (
+              <div className="col-span-full py-10 text-center text-muted-foreground">
+                No memberships found. Add one to get started.
+              </div>
+            )}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Subscription Activity</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(operationalSummary?.recentSubscriptions ?? []).length === 0 ? (
+                <div className="text-sm text-muted-foreground">No subscription activity yet.</div>
+              ) : (
+                operationalSummary!.recentSubscriptions.map((subscription) => (
+                  <div key={subscription.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <div className="font-medium">{subscription.patient?.name ?? 'Patient'}</div>
+                      <div className="text-sm text-slate-600">
+                        {subscription.membership.name} • {subscription.status}
+                      </div>
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      Ends {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </>

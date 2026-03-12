@@ -2,17 +2,18 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  getInvoices,
+  getFilteredInvoices,
+  getFinanceSummary,
   getReceivablesSummary,
   recordManualInvoicePayment,
   refundPayment,
   type Invoice,
   type InvoicePayment,
 } from '@/lib/invoiceApi';
+import { listProviders } from '@/lib/availabilityApi';
 import {
   AppCard,
   AppCardContent,
@@ -77,12 +78,14 @@ function refundableRemaining(payment: InvoicePayment, allPayments: InvoicePaymen
 
 export default function FrontDeskInvoicesPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const clinicId = user?.clinicId ?? undefined;
   const [docStatusFilter, setDocStatusFilter] = React.useState('ALL');
   const [financeStatusFilter, setFinanceStatusFilter] = React.useState('ALL');
+  const [providerFilter, setProviderFilter] = React.useState('ALL');
+  const [dateFrom, setDateFrom] = React.useState('');
+  const [dateTo, setDateTo] = React.useState('');
   const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState('CASH');
   const [paymentAmount, setPaymentAmount] = React.useState('');
@@ -94,8 +97,15 @@ export default function FrontDeskInvoicesPage() {
   const isAllowed = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['front-desk-invoices', docStatusFilter, financeStatusFilter],
-    queryFn: () => getInvoices(docStatusFilter === 'ALL' ? undefined : docStatusFilter),
+    queryKey: ['front-desk-invoices', docStatusFilter, financeStatusFilter, providerFilter, dateFrom, dateTo],
+    queryFn: () =>
+      getFilteredInvoices({
+        status: docStatusFilter === 'ALL' ? undefined : docStatusFilter,
+        financialStatus: financeStatusFilter === 'ALL' ? undefined : financeStatusFilter,
+        providerId: providerFilter === 'ALL' ? undefined : providerFilter,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }),
     enabled: !!clinicId,
   });
 
@@ -105,13 +115,22 @@ export default function FrontDeskInvoicesPage() {
     enabled: !!clinicId,
   });
 
-  const filteredInvoices = React.useMemo(
-    () =>
-      financeStatusFilter === 'ALL'
-        ? invoices
-        : invoices.filter((invoice) => invoice.financialStatus === financeStatusFilter),
-    [financeStatusFilter, invoices]
-  );
+  const { data: financeSummary } = useQuery({
+    queryKey: ['finance-summary', providerFilter, dateFrom, dateTo],
+    queryFn: () =>
+      getFinanceSummary({
+        providerId: providerFilter === 'ALL' ? undefined : providerFilter,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }),
+    enabled: !!clinicId,
+  });
+
+  const { data: providers = [] } = useQuery({
+    queryKey: ['providers'],
+    queryFn: () => listProviders(),
+    enabled: !!clinicId,
+  });
 
   const collectMutation = useMutation({
     mutationFn: (payload: { invoiceId: string; amount: number; paymentMethod: string; notes?: string }) =>
@@ -123,6 +142,7 @@ export default function FrontDeskInvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['front-desk-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-summary'] });
       toast.success('Manual payment recorded');
       setPaymentInvoice(null);
       setPaymentAmount('');
@@ -138,6 +158,7 @@ export default function FrontDeskInvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['front-desk-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-summary'] });
       toast.success('Refund recorded');
       setRefundInvoice(null);
       setRefundPaymentId('');
@@ -249,11 +270,79 @@ export default function FrontDeskInvoicesPage() {
         </AppCard>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-4">
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Total Invoiced</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-bold text-slate-900">
+              {formatCurrency(financeSummary?.totalInvoiced)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {financeSummary?.invoiceCount ?? 0} invoices in the current filter
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Collected</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-bold text-emerald-700">
+              {formatCurrency(financeSummary?.totalCollected)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Paid states: {financeSummary?.paidCount ?? 0} paid, {financeSummary?.partiallyPaidCount ?? 0} partial
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Refunded</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-bold text-slate-900">
+              {formatCurrency(financeSummary?.totalRefunded)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {financeSummary?.partiallyRefundedCount ?? 0} partial, {financeSummary?.refundedCount ?? 0} full
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Open Balances</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-2xl font-bold text-amber-700">
+              {formatCurrency(financeSummary?.totalOutstanding)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {financeSummary?.unpaidCount ?? 0} unpaid, {financeSummary?.partiallyPaidCount ?? 0} partially paid
+            </p>
+          </AppCardContent>
+        </AppCard>
+      </div>
+
       <AppCard>
         <AppCardHeader>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <AppCardTitle>Invoices</AppCardTitle>
             <div className="flex flex-col gap-3 sm:flex-row">
+              <Select value={providerFilter} onValueChange={setProviderFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All providers</SelectItem>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.firstName} {provider.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={docStatusFilter} onValueChange={setDocStatusFilter}>
                 <SelectTrigger className="w-[190px]">
                   <SelectValue placeholder="Document status" />
@@ -278,6 +367,8 @@ export default function FrontDeskInvoicesPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
             </div>
           </div>
         </AppCardHeader>
@@ -286,7 +377,7 @@ export default function FrontDeskInvoicesPage() {
             <div className="flex min-h-[240px] items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
             </div>
-          ) : filteredInvoices.length === 0 ? (
+          ) : invoices.length === 0 ? (
             <AppEmptyState
               title="No invoices found"
               description="Create a front-desk checkout or finalize appointment invoices to see them here."
@@ -305,11 +396,12 @@ export default function FrontDeskInvoicesPage() {
                     <TableHead className="text-right">Paid</TableHead>
                     <TableHead className="text-right">Refunded</TableHead>
                     <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead>History</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.map((invoice) => (
+                  {invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                       <TableCell className="font-medium">{invoice.patient?.name ?? '—'}</TableCell>
                       <TableCell>
@@ -328,6 +420,21 @@ export default function FrontDeskInvoicesPage() {
                       <TableCell className="text-right">{formatCurrency(invoice.totalPaid)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(invoice.totalRefunded)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(invoice.outstandingAmount)}</TableCell>
+                      <TableCell className="max-w-[280px]">
+                        <div className="space-y-1 text-xs text-slate-600">
+                          {(invoice.payments ?? []).length === 0 ? (
+                            <span>No payments recorded</span>
+                          ) : (
+                            (invoice.payments ?? []).map((payment) => (
+                              <div key={payment.id}>
+                                {formatCurrency(payment.amount)} • {payment.paymentChannel === 'MANUAL' ? 'Manual/offline' : payment.paymentChannel ?? 'Stripe/online'}
+                                {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ''}
+                                {payment.refundForPaymentId ? ' • refund entry' : ''}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           {Number(invoice.outstandingAmount) > 0 && invoice.status !== 'DRAFT' && invoice.status !== 'CANCELLED' && (

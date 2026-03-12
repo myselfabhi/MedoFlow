@@ -7,7 +7,8 @@ import prisma from '../config/prisma';
 export const getRules = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
-    const rules = await commissionService.getRules(clinicId);
+    const includeInactive = req.query.includeInactive === 'true';
+    const rules = await commissionService.getRules(clinicId, { includeInactive });
     successResponse(res, 200, 'Commission rules retrieved', { rules });
   }
 );
@@ -24,8 +25,7 @@ export const toggleRule = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
     const id = req.params.id as string;
-    const { isActive } = req.body;
-    const rule = await commissionService.updateRule(id, clinicId, isActive);
+    const rule = await commissionService.updateRule(id, clinicId, req.body);
     successResponse(res, 200, 'Commission rule updated', { rule });
   }
 );
@@ -42,8 +42,17 @@ export const getRecords = asyncHandler(
       providerId = String(req.query.providerId);
     }
 
-    const records = await commissionService.getRecords(clinicId, providerId);
-    successResponse(res, 200, 'Commission records retrieved', { records });
+    const status = req.query.status ? String(req.query.status).toUpperCase() as any : undefined;
+    const dateFrom = req.query.dateFrom ? new Date(String(req.query.dateFrom)) : undefined;
+    const dateTo = req.query.dateTo ? new Date(String(req.query.dateTo)) : undefined;
+
+    const { records, summary } = await commissionService.getRecords(clinicId, {
+      providerId,
+      status,
+      dateFrom,
+      dateTo,
+    });
+    successResponse(res, 200, 'Commission records retrieved', { records, summary });
   }
 );
 

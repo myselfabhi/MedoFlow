@@ -820,9 +820,25 @@ export const getInvoiceById = async (
 export const getInvoicesByClinic = async (
   clinicId: string,
   status?: string,
-  financialStatus?: string
+  financialStatus?: string,
+  filters?: {
+    providerId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }
 ) => {
-  const where: Prisma.InvoiceWhereInput = { clinicId };
+  const where: Prisma.InvoiceWhereInput = {
+    clinicId,
+    ...(filters?.providerId ? { providerId: filters.providerId } : {}),
+    ...(filters?.dateFrom || filters?.dateTo
+      ? {
+          createdAt: {
+            ...(filters?.dateFrom ? { gte: filters.dateFrom } : {}),
+            ...(filters?.dateTo ? { lte: filters.dateTo } : {}),
+          },
+        }
+      : {}),
+  };
   if (status && status !== 'ALL') where.status = status as 'DRAFT' | 'FINALIZED' | 'PAID' | 'CANCELLED';
 
   const invoices = await prisma.invoice.findMany({
@@ -883,5 +899,60 @@ export const getClinicReceivablesSummary = async (clinicId: string) => {
     unpaidCount: enriched.filter((invoice) => invoice.financialStatus === 'UNPAID').length,
     paidCount: enriched.filter((invoice) => invoice.financialStatus === 'PAID').length,
     refundedCount: enriched.filter((invoice) => invoice.financialStatus === 'REFUNDED').length,
+  };
+};
+
+export const getClinicFinanceSummary = async (
+  clinicId: string,
+  filters?: {
+    providerId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }
+) => {
+  const invoices = await getInvoicesByClinic(clinicId, undefined, undefined, filters);
+
+  const summary = invoices.reduce(
+    (acc, invoice) => {
+      acc.totalInvoiced += Number(invoice.totalAmount);
+      acc.totalCollected += Number(invoice.totalPaid);
+      acc.totalRefunded += Number(invoice.totalRefunded);
+      acc.totalOutstanding += Number(invoice.outstandingAmount);
+      acc.invoiceCount += 1;
+      acc.byFinancialStatus[invoice.financialStatus] =
+        (acc.byFinancialStatus[invoice.financialStatus] ?? 0) + 1;
+      return acc;
+    },
+    {
+      totalInvoiced: 0,
+      totalCollected: 0,
+      totalRefunded: 0,
+      totalOutstanding: 0,
+      invoiceCount: 0,
+      byFinancialStatus: {
+        UNPAID: 0,
+        PARTIALLY_PAID: 0,
+        PAID: 0,
+        PARTIALLY_REFUNDED: 0,
+        REFUNDED: 0,
+        DRAFT: 0,
+        CANCELLED: 0,
+      } as Record<InvoiceFinancialStatus, number>,
+    }
+  );
+
+  return {
+    totalInvoiced: summary.totalInvoiced.toFixed(2),
+    totalCollected: summary.totalCollected.toFixed(2),
+    totalRefunded: summary.totalRefunded.toFixed(2),
+    totalOutstanding: summary.totalOutstanding.toFixed(2),
+    invoiceCount: summary.invoiceCount,
+    unpaidCount: summary.byFinancialStatus.UNPAID,
+    partiallyPaidCount: summary.byFinancialStatus.PARTIALLY_PAID,
+    paidCount: summary.byFinancialStatus.PAID,
+    partiallyRefundedCount: summary.byFinancialStatus.PARTIALLY_REFUNDED,
+    refundedCount: summary.byFinancialStatus.REFUNDED,
+    draftCount: summary.byFinancialStatus.DRAFT,
+    cancelledCount: summary.byFinancialStatus.CANCELLED,
   };
 };

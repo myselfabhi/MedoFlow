@@ -19,6 +19,22 @@ export interface PatientSubscriptionRecord {
   membership: MembershipCatalogItem;
 }
 
+export interface MembershipOperationalSummary {
+  totalSubscriptions: number;
+  activeCount: number;
+  trialingCount: number;
+  pastDueCount: number;
+  incompleteCount: number;
+  canceledCount: number;
+  endedCount: number;
+  cancelAtPeriodEndCount: number;
+  recentSubscriptions: Array<
+    PatientSubscriptionRecord & {
+      patient?: { id: string; name: string; email: string };
+    }
+  >;
+}
+
 export const getMemberships = async (): Promise<MembershipCatalogItem[]> => {
   const { data } = await api.get<{
     success: boolean;
@@ -33,6 +49,14 @@ export const getMyMembershipSubscriptions = async (): Promise<PatientSubscriptio
     data: { subscriptions: PatientSubscriptionRecord[] };
   }>('/memberships/subscriptions/me');
   return data.data.subscriptions;
+};
+
+export const getMembershipOperationalSummary = async (): Promise<MembershipOperationalSummary> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { summary: MembershipOperationalSummary };
+  }>('/memberships/summary');
+  return data.data.summary;
 };
 
 export const purchaseMembership = async (membershipId: string) => {

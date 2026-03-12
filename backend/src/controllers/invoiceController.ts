@@ -186,7 +186,14 @@ export const listByClinic = asyncHandler(
     const clinicId = req.clinicId!;
     const status = req.query.status as string | undefined;
     const financialStatus = req.query.financialStatus as string | undefined;
-    const invoices = await invoiceService.getInvoicesByClinic(clinicId, status, financialStatus);
+    const providerId = req.query.providerId as string | undefined;
+    const dateFrom = req.query.dateFrom ? new Date(String(req.query.dateFrom)) : undefined;
+    const dateTo = req.query.dateTo ? new Date(String(req.query.dateTo)) : undefined;
+    const invoices = await invoiceService.getInvoicesByClinic(clinicId, status, financialStatus, {
+      providerId,
+      dateFrom,
+      dateTo,
+    });
     successResponse(res, 200, 'Invoices retrieved', { invoices });
   }
 );
@@ -196,6 +203,21 @@ export const receivablesSummary = asyncHandler(
     const clinicId = req.clinicId!;
     const summary = await invoiceService.getClinicReceivablesSummary(clinicId);
     successResponse(res, 200, 'Receivables summary retrieved', { summary });
+  }
+);
+
+export const financeSummary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.clinicId!;
+    const providerId = req.query.providerId as string | undefined;
+    const dateFrom = req.query.dateFrom ? new Date(String(req.query.dateFrom)) : undefined;
+    const dateTo = req.query.dateTo ? new Date(String(req.query.dateTo)) : undefined;
+    const summary = await invoiceService.getClinicFinanceSummary(clinicId, {
+      providerId,
+      dateFrom,
+      dateTo,
+    });
+    successResponse(res, 200, 'Finance summary retrieved', { summary });
   }
 );
 

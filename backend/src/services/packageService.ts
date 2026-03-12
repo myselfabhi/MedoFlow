@@ -1,9 +1,10 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 
-export const getPackages = async (clinicId: string) => {
+export const getPackages = async (clinicId: string, includeInactive = false) => {
   return prisma.package.findMany({
-    where: { clinicId, isActive: true },
+    where: { clinicId, ...(includeInactive ? {} : { isActive: true }) },
+    orderBy: { createdAt: 'desc' },
   });
 };
 
@@ -83,4 +84,54 @@ export const deletePackage = async (id: string, clinicId: string) => {
     where: { id },
     data: { isActive: false },
   });
+};
+
+export const getPackageOperationalSummary = async (clinicId: string) => {
+  const [patientPackages, recentPatientPackages, activeCatalogPackages] = await Promise.all([
+    prisma.patientPackage.findMany({
+      where: { clinicId },
+      include: {
+        package: true,
+        patient: { select: { id: true, name: true, email: true } },
+      },
+    }),
+    prisma.patientPackage.findMany({
+      where: { clinicId },
+      include: {
+        package: true,
+        patient: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 12,
+    }),
+    prisma.package.count({
+      where: { clinicId, isActive: true },
+    }),
+  ]);
+
+  const now = new Date();
+  const exhaustedCount = patientPackages.filter(
+    (pkg) => pkg.usedSessions >= pkg.totalSessions || pkg.status === 'EXHAUSTED'
+  ).length;
+  const expiringSoonCount = patientPackages.filter((pkg) => {
+    if (!pkg.expiresAt) return false;
+    const msUntilExpiry = pkg.expiresAt.getTime() - now.getTime();
+    return msUntilExpiry >= 0 && msUntilExpiry <= 1000 * 60 * 60 * 24 * 14;
+  }).length;
+
+  return {
+    activeCatalogPackages,
+    patientPackageCount: patientPackages.length,
+    activePatientPackageCount: patientPackages.filter((pkg) => pkg.status === 'ACTIVE').length,
+    exhaustedCount,
+    expiringSoonCount,
+    remainingSessionsTotal: patientPackages.reduce(
+      (sum, pkg) => sum + Math.max(pkg.totalSessions - pkg.usedSessions, 0),
+      0
+    ),
+    recentPatientPackages: recentPatientPackages.map((pkg) => ({
+      ...pkg,
+      remainingSessions: Math.max(pkg.totalSessions - pkg.usedSessions, 0),
+    })),
+  };
 };

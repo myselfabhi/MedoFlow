@@ -64,6 +64,12 @@ router.get(
 );
 
 router.get(
+  '/summary/finance',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  invoiceController.financeSummary
+);
+
+router.get(
   '/appointment/:appointmentId',
   authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
   invoiceController.getByAppointment

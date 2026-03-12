@@ -7,6 +7,7 @@ const router = Router();
 router.use(protect);
 
 router.get('/', packageController.getAll);
+router.get('/summary', authorize('SUPER_ADMIN', 'FRONT_DESK'), packageController.summary);
 router.get('/:id', packageController.getById);
 
 router.post('/', authorize('SUPER_ADMIN'), packageController.create);

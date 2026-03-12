@@ -6,7 +6,10 @@ import { asyncHandler } from '../utils/asyncHandler';
 export const getAll = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;
-    const packages = await packageService.getPackages(clinicId);
+    const includeInactive =
+      req.query.includeInactive === 'true' &&
+      (req.user!.role === 'SUPER_ADMIN' || req.user!.role === 'FRONT_DESK');
+    const packages = await packageService.getPackages(clinicId, includeInactive);
     successResponse(res, 200, 'Packages retrieved successfully', { packages });
   }
 );
@@ -43,5 +46,13 @@ export const remove = asyncHandler(
     const id = req.params.id as string;
     await packageService.deletePackage(id, clinicId);
     successResponse(res, 200, 'Package deleted successfully');
+  }
+);
+
+export const summary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const summary = await packageService.getPackageOperationalSummary(clinicId);
+    successResponse(res, 200, 'Package operational summary retrieved', { summary });
   }
 );

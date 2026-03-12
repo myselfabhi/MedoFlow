@@ -57,6 +57,14 @@ export const getMySubscriptions = asyncHandler(
   }
 );
 
+export const getOperationalSummary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const summary = await membershipService.getMembershipOperationalSummary(clinicId);
+    successResponse(res, 200, 'Membership operational summary retrieved', { summary });
+  }
+);
+
 export const purchase = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.user!.clinicId!;

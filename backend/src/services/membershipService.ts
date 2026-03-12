@@ -144,6 +144,39 @@ export const listPatientSubscriptions = async (clinicId: string, patientId: stri
   });
 };
 
+export const getMembershipOperationalSummary = async (clinicId: string) => {
+  const [subscriptions, recentSubscriptions] = await Promise.all([
+    prisma.patientSubscription.findMany({
+      where: { clinicId },
+      include: { membership: true, patient: { select: { id: true, name: true, email: true } } },
+    }),
+    prisma.patientSubscription.findMany({
+      where: { clinicId },
+      include: { membership: true, patient: { select: { id: true, name: true, email: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 8,
+    }),
+  ]);
+
+  const statusCounts = subscriptions.reduce<Record<string, number>>((acc, subscription) => {
+    acc[subscription.status] = (acc[subscription.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    totalSubscriptions: subscriptions.length,
+    activeCount: statusCounts.ACTIVE ?? 0,
+    trialingCount: statusCounts.TRIALING ?? 0,
+    pastDueCount: statusCounts.PAST_DUE ?? 0,
+    incompleteCount: statusCounts.INCOMPLETE ?? 0,
+    canceledCount: statusCounts.CANCELED ?? 0,
+    endedCount: statusCounts.ENDED ?? 0,
+    cancelAtPeriodEndCount: subscriptions.filter((subscription) => subscription.cancelAtPeriodEnd)
+      .length,
+    recentSubscriptions,
+  };
+};
+
 type PrismaLike = Omit<
   typeof prisma,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'

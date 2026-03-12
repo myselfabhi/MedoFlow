@@ -147,13 +147,26 @@ export const getInvoiceById = async (id: string): Promise<Invoice> => {
 };
 
 export const getInvoices = async (status?: string): Promise<Invoice[]> => {
-  const params = new URLSearchParams();
-  if (status && status !== 'ALL') params.set('status', status);
-  const qs = params.toString();
   const { data } = await api.get<{
     success: boolean;
     data: { invoices: Invoice[] };
-  }>(`/invoices${qs ? `?${qs}` : ''}`);
+  }>('/invoices', {
+    params: status && status !== 'ALL' ? { status } : undefined,
+  });
+  return data.data.invoices;
+};
+
+export const getFilteredInvoices = async (filters?: {
+  status?: string;
+  financialStatus?: string;
+  providerId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<Invoice[]> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { invoices: Invoice[] };
+  }>('/invoices', { params: filters });
   return data.data.invoices;
 };
 
@@ -180,6 +193,46 @@ export const getReceivablesSummary = async (): Promise<{
       };
     };
   }>('/invoices/summary/receivables');
+  return data.data.summary;
+};
+
+export const getFinanceSummary = async (filters?: {
+  providerId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<{
+  totalInvoiced: string;
+  totalCollected: string;
+  totalRefunded: string;
+  totalOutstanding: string;
+  invoiceCount: number;
+  unpaidCount: number;
+  partiallyPaidCount: number;
+  paidCount: number;
+  partiallyRefundedCount: number;
+  refundedCount: number;
+  draftCount: number;
+  cancelledCount: number;
+}> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: {
+      summary: {
+        totalInvoiced: string;
+        totalCollected: string;
+        totalRefunded: string;
+        totalOutstanding: string;
+        invoiceCount: number;
+        unpaidCount: number;
+        partiallyPaidCount: number;
+        paidCount: number;
+        partiallyRefundedCount: number;
+        refundedCount: number;
+        draftCount: number;
+        cancelledCount: number;
+      };
+    };
+  }>('/invoices/summary/finance', { params: filters });
   return data.data.summary;
 };
 
