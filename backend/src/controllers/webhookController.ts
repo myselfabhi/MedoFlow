@@ -5,6 +5,7 @@ import * as emailService from '../services/emailService';
 import * as commissionService from '../services/commissionService';
 import { PaymentStatus } from '@prisma/client';
 import * as membershipService from '../services/membershipService';
+import { syncInvoiceStatusFromPayments } from '../services/invoiceService';
 
 const cancelCommissionRecords = async (invoiceId: string) => {
   await prisma.commissionRecord.updateMany({
@@ -44,11 +45,9 @@ export const handleAppointmentPaymentIntentSucceeded = async (
   });
   const shouldSendConfirmation = appt.paymentStatus !== PaymentStatus.PAID;
 
-  if (
-    existingIntentPayment?.status === PaymentStatus.PAID &&
-    appt.paymentStatus === PaymentStatus.PAID &&
-    existingInvoice?.status === 'PAID'
-  ) {
+  // Idempotency: if a payment record already exists and is marked PAID for
+  // this exact payment_intent, this event has already been fully processed.
+  if (existingIntentPayment?.status === PaymentStatus.PAID) {
     return;
   }
 
@@ -358,9 +357,29 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
       const payment = await prisma.payment.findUnique({
         where: { stripePaymentIntentId: paymentIntentId },
       });
-      if (!payment?.invoiceId) break;
+      if (!payment) break;
 
-      await cancelCommissionRecords(payment.invoiceId);
+      // Cancel pending commissions on any refund
+      if (payment.invoiceId) {
+        await cancelCommissionRecords(payment.invoiceId);
+        // Sync the invoice's financial status to reflect the Stripe-side refund.
+        // This matters when refunds are issued directly through the Stripe dashboard
+        // rather than through the in-app refund flow.
+        await syncInvoiceStatusFromPayments(payment.invoiceId);
+      }
+
+      // Sync appointment payment status if one is associated
+      if (payment.appointmentId) {
+        const refundedAmount = charge.amount_refunded as number | undefined;
+        const originalAmount = charge.amount as number | undefined;
+        const isFullRefund = refundedAmount != null && originalAmount != null && refundedAmount >= originalAmount;
+        await prisma.appointment.update({
+          where: { id: payment.appointmentId },
+          data: {
+            paymentStatus: isFullRefund ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED,
+          },
+        });
+      }
       break;
     }
 

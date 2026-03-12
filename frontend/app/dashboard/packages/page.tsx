@@ -25,7 +25,7 @@ export default function PackagesPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Packages</h1>
-        <Button disabled title="Catalog CRUD is not surfaced in this admin page yet">
+        <Button disabled title="Package catalog setup is managed by your account administrator.">
           <Plus className="mr-2 h-4 w-4" /> Add Package
         </Button>
       </div>
@@ -66,7 +66,7 @@ export default function PackagesPage() {
       </div>
 
       <div className="text-sm text-slate-600">
-        This page is operational package visibility. Package catalog create/edit remains backend-supported but is not exposed in this admin screen yet.
+        This view shows live package catalog and patient package activity. Catalog setup is managed by your account administrator.
       </div>
 
       {isLoading ? (

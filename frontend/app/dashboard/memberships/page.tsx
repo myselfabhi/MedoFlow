@@ -90,7 +90,7 @@ export default function MembershipsPage() {
     <>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Memberships</h1>
-        <Button disabled title="Catalog CRUD is not surfaced in this admin page yet">
+        <Button disabled title="Membership catalog setup is managed by your account administrator.">
           <Plus className="mr-2 h-4 w-4" /> Add Membership
         </Button>
       </div>
@@ -114,7 +114,7 @@ export default function MembershipsPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Incomplete</CardTitle>
+            <CardTitle>Pending Activation</CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-semibold text-slate-700">
             {operationalSummary?.incompleteCount ?? 0}
@@ -131,7 +131,7 @@ export default function MembershipsPage() {
       </div>
 
       <div className="text-sm text-slate-600">
-        This page shows live subscription operations. Membership catalog create/edit remains backend-supported but is not exposed in this admin screen yet.
+        This view shows live subscription activity. Membership catalog setup is managed by your account administrator.
       </div>
 
       {isLoading ? (

@@ -16,7 +16,7 @@ router.get(
   patientController.listClinicPatients
 );
 
-router.get('/packages', patientController.getMyPackages);
+router.get('/packages', authorize(Role.PATIENT), patientController.getMyPackages);
 router.get('/entitlements', authorize(Role.PATIENT), patientController.getMyEntitlements);
 router.get(
   '/:patientId/entitlements',

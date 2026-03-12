@@ -61,7 +61,7 @@ const frontDeskItems = [
   { href: '/dashboard/patients', label: 'Patients', icon: Users },
   { href: '/dashboard/forms', label: 'Forms', icon: FileText },
   { href: '/dashboard/front-desk/invoices', label: 'Invoices', icon: Receipt },
-  { href: '/dashboard/front-desk/pos', label: 'Point of Sale', icon: ShoppingCart },
+  { href: '/dashboard/front-desk/pos', label: 'Checkout', icon: ShoppingCart },
 ];
 
 export function AppSidebar() {

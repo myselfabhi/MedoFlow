@@ -32,7 +32,7 @@ interface CartLine {
 const MANUAL_PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'CHECK', label: 'Check' },
-  { value: 'CARD_PRESENT', label: 'Card (manual/offline)' },
+  { value: 'CARD_PRESENT', label: 'Card (manually recorded — no terminal)' },
   { value: 'BANK_TRANSFER', label: 'Bank transfer' },
   { value: 'OTHER', label: 'Other' },
 ];

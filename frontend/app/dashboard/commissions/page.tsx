@@ -230,7 +230,7 @@ export default function CommissionsPage() {
         description={
           isProvider
             ? 'View your commission ledger and payout status.'
-            : 'Manage supported commission rules and track ledger status. Payout actions here only change local payout status.'
+            : 'Configure commission rules and track provider earnings. Marking records as paid updates payout tracking only — it does not initiate a bank transfer or payroll disbursement.'
         }
       />
 
