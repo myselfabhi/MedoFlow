@@ -1,84 +1,170 @@
 import api from './api';
 
-export interface AnalyticsOverview {
-  totalAppointments: number;
-  totalRevenue: number;
-  activeTreatmentPlans: number;
-  completedTreatmentPlans: number;
-  completedVisits: number;
-  cancellationRate: number;
-  noShowRate: number;
-  averageAppointmentDuration: number;
+export interface AnalyticsRange {
+  dateFrom: string;
+  dateTo: string;
 }
 
-export const getAnalyticsOverview = async (): Promise<AnalyticsOverview> => {
-  const { data } = await api.get<{
-    success: boolean;
-    data: AnalyticsOverview;
-  }>('/analytics/overview');
+export interface BusinessAlert {
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  message: string;
+}
+
+export interface ProviderUtilizationRow {
+  provider: { id: string; firstName: string; lastName: string };
+  scheduledMinutes: number;
+  availableMinutes: number;
+  utilizationRate: number;
+  completedAppointments: number;
+  cancellationCount: number;
+  noShowCount: number;
+}
+
+export interface ClinicDashboardResponse {
+  mode: 'clinic';
+  dashboard: {
+    range: AnalyticsRange;
+    comparison: {
+      previousRange: AnalyticsRange;
+      netCollectedRevenueChangePercent: number | null;
+      outstandingReceivablesChangePercent: number | null;
+    };
+    commandCenter: {
+      finance: {
+        totalRevenue: number;
+        collectedRevenue: number;
+        netCollectedRevenue: number;
+        refundedAmount: number;
+        outstandingReceivables: number;
+        averageRevenuePerPatient: number;
+        averageRevenuePerVisit: number;
+      };
+      operations: {
+        totalAppointments: number;
+        completedAppointments: number;
+        cancellationRate: number;
+        noShowRate: number;
+        averageAppointmentDuration: number;
+        upcomingLoadCount: number;
+        waitlistCount: number;
+        waitlistBookedCount: number;
+        waitlistConversionRate: number;
+      };
+      commerce: {
+        productRevenue: number;
+        packageRevenue: number;
+        membershipRevenue: number;
+        attachRate: number;
+        topProducts: Array<{ productId: string; productName: string; revenue: number; quantity: number }>;
+      };
+      memberships: {
+        activeCount: number;
+        trialingCount: number;
+        pastDueCount: number;
+        canceledCount: number;
+        endedCount: number;
+        churnRate: number;
+      };
+      packages: {
+        activeCount: number;
+        exhaustedCount: number;
+        expiringSoonCount: number;
+        totalSessions: number;
+        usedSessions: number;
+        utilizationRate: number;
+      };
+      commissions: {
+        owed: number;
+        paid: number;
+        pendingCount: number;
+        totalCount: number;
+      };
+      patients: {
+        distinctPatients: number;
+        averageVisitsPerPatient: number;
+        repeatVisitRate: number;
+        inactivePatients: number;
+        dropOffRiskCount: number;
+        topPatientsByValue: Array<{ patientId: string; patientName: string; lifetimeValue: number }>;
+      };
+      providerUtilization: ProviderUtilizationRow[];
+      topServices: Array<{ serviceId: string; serviceName: string; revenue: number; count: number }>;
+      topProviders: Array<{ providerId: string; providerName: string; revenue: number; completedAppointments: number }>;
+      alerts: BusinessAlert[];
+    };
+  };
+}
+
+export interface ProviderDashboardResponse {
+  mode: 'provider';
+  providerAnalytics: {
+    range: AnalyticsRange;
+    provider: { id: string; firstName: string; lastName: string } | null;
+    performance: {
+      completedAppointments: number;
+      totalAppointments: number;
+      cancellationCount: number;
+      noShowCount: number;
+      revenueGenerated: number;
+      averageRevenuePerVisit: number;
+      followUpConversionRate: number;
+      repeatPatientRate: number;
+      utilizationRate: number;
+      scheduledMinutes: number;
+      availableMinutes: number;
+    };
+    commissions: {
+      owed: number;
+      paid: number;
+      pendingCount: number;
+      totalCount: number;
+    };
+    topServices: Array<{ serviceId: string; serviceName: string; revenue: number; count: number }>;
+  };
+}
+
+export type DashboardPayload = ClinicDashboardResponse | ProviderDashboardResponse;
+
+export const getAnalyticsDashboard = async (params?: {
+  dateFrom?: string;
+  dateTo?: string;
+  providerId?: string;
+  serviceId?: string;
+  disciplineId?: string;
+}): Promise<DashboardPayload> => {
+  const { data } = await api.get<{ success: boolean; data: DashboardPayload }>('/analytics/dashboard', {
+    params,
+  });
   return data.data;
 };
 
-export const getRevenueByService = async () => {
+export const getProviderSelfAnalytics = async (params?: {
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<ProviderDashboardResponse['providerAnalytics']> => {
   const { data } = await api.get<{
     success: boolean;
-    data: { data: { serviceName: string; total: number }[] };
-  }>('/analytics/revenue-by-service');
-  return data.data.data;
-};
-
-export const getRevenueByProvider = async () => {
-  const { data } = await api.get<{
-    success: boolean;
-    data: { data: { providerName: string; total: number }[] };
-  }>('/analytics/revenue-by-provider');
-  return data.data.data;
-};
-
-export const getAppointmentsByDiscipline = async () => {
-  const { data } = await api.get<{
-    success: boolean;
-    data: { data: { disciplineName: string; count: number }[] };
-  }>('/analytics/appointments-by-discipline');
-  return data.data.data;
-};
-
-export interface CommerceAnalytics {
-  totalProductRevenue: number;
-  totalProductSalesCount: number;
-  topProducts: { productName: string; revenue: number; quantity: number }[];
-}
-
-export const getCommerceAnalytics = async (): Promise<CommerceAnalytics> => {
-  const { data } = await api.get<{
-    success: boolean;
-    data: { data: CommerceAnalytics };
-  }>('/analytics/commerce');
-  return data.data.data;
-};
-
-export interface MembershipAnalytics {
-  activeMemberships: number;
-  canceledMemberships: number;
-  churnRate: number;
-}
-
-export const getMembershipAnalytics = async (): Promise<MembershipAnalytics> => {
-  const { data } = await api.get<{
-    success: boolean;
-    data: { data: MembershipAnalytics };
-  }>('/analytics/memberships');
-  return data.data.data;
+    data: { providerAnalytics: ProviderDashboardResponse['providerAnalytics'] };
+  }>('/analytics/provider-self', { params });
+  return data.data.providerAnalytics;
 };
 
 export type AnalyticsExportType =
-  | 'overview'
-  | 'revenue-by-service'
-  | 'revenue-by-provider'
-  | 'appointments-by-discipline';
+  | 'command-center'
+  | 'provider'
+  | 'finance'
+  | 'commerce'
+  | 'patients'
+  | 'commissions';
 
-export const downloadAnalyticsReport = async (type: AnalyticsExportType) => {
-  const response = await api.get(`/analytics/export?type=${type}`, {
+export const downloadAnalyticsReport = async (
+  type: AnalyticsExportType,
+  params?: { dateFrom?: string; dateTo?: string; providerId?: string }
+) => {
+  const response = await api.get('/analytics/export', {
+    params: { type, ...params },
     responseType: 'blob',
   });
   const blob = new Blob([response.data], { type: 'text/csv' });

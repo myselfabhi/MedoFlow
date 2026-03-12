@@ -10,44 +10,20 @@ router.use(protect);
 router.use(requireClinic);
 
 router.get(
-  '/overview',
+  '/dashboard',
   authorize(Role.FRONT_DESK, Role.SUPER_ADMIN, Role.PROVIDER),
-  analyticsController.getOverview
+  analyticsController.getDashboard
 );
 
 router.get(
-  '/revenue-by-service',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
-  analyticsController.getRevenueByService
-);
-
-router.get(
-  '/revenue-by-provider',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
-  analyticsController.getRevenueByProvider
-);
-
-router.get(
-  '/appointments-by-discipline',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
-  analyticsController.getAppointmentsByDiscipline
-);
-
-router.get(
-  '/commerce',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
-  analyticsController.getCommerceAnalytics
-);
-
-router.get(
-  '/memberships',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
-  analyticsController.getMembershipAnalytics
+  '/provider-self',
+  authorize(Role.PROVIDER),
+  analyticsController.getProviderSelf
 );
 
 router.get(
   '/export',
-  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN, Role.PROVIDER),
   analyticsController.exportReport
 );
 
