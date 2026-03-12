@@ -1,0 +1,2 @@
+ALTER TABLE "Invoice"
+ALTER COLUMN "providerId" DROP NOT NULL;

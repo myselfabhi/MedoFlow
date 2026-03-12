@@ -1,9 +1,18 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
-import { CartItemType, CartStatus, Prisma } from '@prisma/client';
+import { CartItemType, CartStatus, PaymentStatus, Prisma } from '@prisma/client';
 
 import stripe from '../config/stripe';
 import { recalculateInvoiceTotals } from './invoiceService';
+
+const unsupportedMembershipError = () => {
+  const err = new Error(
+    'Membership checkout is not enabled. Sell memberships only after Stripe subscription linkage is implemented.'
+  ) as ApiError;
+  err.statusCode = 400;
+  err.code = 'membership_checkout_unsupported';
+  return err;
+};
 
 export const getOrCreateCart = async (clinicId: string, patientId: string) => {
   let cart = await prisma.cart.findFirst({
@@ -66,13 +75,7 @@ export const addToCart = async (clinicId: string, patientId: string, input: AddC
     }
     unitPrice = pkg.price;
   } else if (input.itemType === 'MEMBERSHIP') {
-    const membership = await prisma.membership.findUnique({ where: { id: input.itemId } });
-    if (!membership) {
-      const err = new Error('Membership not found') as ApiError;
-      err.statusCode = 404;
-      throw err;
-    }
-    unitPrice = membership.monthlyPrice;
+    throw unsupportedMembershipError();
   }
 
   // Check if item already exists in cart (based on itemId)
@@ -83,7 +86,6 @@ export const addToCart = async (clinicId: string, patientId: string, input: AddC
       ...(input.itemType === 'PRODUCT' ? { productId: input.itemId } : {}),
       ...(input.itemType === 'SERVICE' ? { serviceId: input.itemId } : {}),
       ...(input.itemType === 'PACKAGE' ? { packageId: input.itemId } : {}),
-      ...(input.itemType === 'MEMBERSHIP' ? { membershipId: input.itemId } : {}),
     }
   });
 
@@ -103,7 +105,7 @@ export const addToCart = async (clinicId: string, patientId: string, input: AddC
       productId: input.itemType === 'PRODUCT' ? input.itemId : null,
       serviceId: input.itemType === 'SERVICE' ? input.itemId : null,
       packageId: input.itemType === 'PACKAGE' ? input.itemId : null,
-      membershipId: input.itemType === 'MEMBERSHIP' ? input.itemId : null,
+      membershipId: null,
       appointmentId: input.appointmentId,
     },
   });
@@ -140,6 +142,10 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
     throw err;
   }
 
+  if (cart.items.some((item) => item.itemType === 'MEMBERSHIP')) {
+    throw unsupportedMembershipError();
+  }
+
   let totalAmount = new Prisma.Decimal(0);
   for (const item of cart.items) {
     totalAmount = totalAmount.plus(item.unitPrice.times(item.quantity));
@@ -150,7 +156,7 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
     data: {
       clinicId,
       patientId,
-      providerId: 'PENDING_ASSIGNMENT', // Typically we might want to attach a provider here if available
+      providerId: undefined,
       status: 'DRAFT',
       subtotal: totalAmount,
       taxAmount: 0,
@@ -197,14 +203,36 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
       },
     });
     clientSecret = paymentIntent.client_secret ?? undefined;
+
+    await prisma.$transaction([
+      prisma.invoice.update({
+        where: { id: updatedInvoice.id },
+        data: { status: 'FINALIZED' },
+      }),
+      prisma.payment.create({
+        data: {
+          clinicId,
+          providerId: undefined,
+          invoiceId: updatedInvoice.id,
+          patientId,
+          amount: updatedInvoice.totalAmount,
+          status: PaymentStatus.PENDING,
+          stripePaymentIntentId: paymentIntent.id,
+          stripeClientSecret: paymentIntent.client_secret ?? null,
+        },
+      }),
+      prisma.cart.update({
+        where: { id: cart.id },
+        data: { status: 'CHECKED_OUT' },
+      }),
+    ]);
   } catch (err) {
     console.error('Stripe Cart PaymentIntent Error:', err);
+    const apiError = new Error('Unable to start checkout payment') as ApiError;
+    apiError.statusCode = 502;
+    apiError.code = 'payment_intent_failed';
+    throw apiError;
   }
-
-  await prisma.cart.update({
-    where: { id: cart.id },
-    data: { status: 'CHECKED_OUT' },
-  });
 
   return {
     invoice: updatedInvoice,

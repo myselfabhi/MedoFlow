@@ -13,9 +13,9 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   clinicId: string;
-  appointmentId: string;
+  appointmentId: string | null;
   patientId: string;
-  providerId: string;
+  providerId: string | null;
   status: string;
   subtotal: string;
   taxAmount: string;

@@ -141,7 +141,7 @@ export const addInvoiceItem = async (
     throw err;
   }
 
-  const providerService = invoice.provider.providerServices[0];
+  const providerService = invoice.provider?.providerServices[0];
   const expectedPrice =
     providerService?.priceOverride ?? service.defaultPrice;
 
@@ -239,7 +239,7 @@ export const updateInvoiceItem = async (
     throw err;
   }
 
-  const providerService = invoice.provider.providerServices.find(
+  const providerService = invoice.provider?.providerServices.find(
     (ps) => ps.serviceId === item.serviceId
   );
   const expectedPrice =

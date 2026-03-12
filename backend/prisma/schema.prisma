@@ -490,7 +490,7 @@ model Invoice {
   locationId    String?
   appointmentId String?
   patientId     String
-  providerId    String
+  providerId    String?
   status        InvoiceStatus @default(DRAFT)
   subtotal      Decimal       @db.Decimal(10, 2)
   taxAmount     Decimal       @db.Decimal(10, 2)
@@ -501,7 +501,7 @@ model Invoice {
   clinic            Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointment       Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
   patient           User               @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  provider          Provider           @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  provider          Provider?          @relation(fields: [providerId], references: [id], onDelete: Restrict)
   items             InvoiceItem[]
   commissionRecords CommissionRecord[]
 

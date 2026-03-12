@@ -457,6 +457,13 @@ export const refundPayment = async (
     throw err;
   }
 
+  if (!payment.stripePaymentIntentId) {
+    const err = new Error('Only Stripe-backed payments can be refunded') as ApiError;
+    err.statusCode = 400;
+    err.code = 'unsupported_refund';
+    throw err;
+  }
+
   const existingRefund = await prisma.payment.findFirst({
     where: {
       refundForPaymentId: payment.id,
@@ -466,11 +473,41 @@ export const refundPayment = async (
   if (existingRefund) {
     const err = new Error('Payment already refunded') as ApiError;
     err.statusCode = 400;
+    err.code = 'already_refunded';
     throw err;
   }
 
-  const txOperations: any[] = [
-    prisma.payment.create({
+  const invoice = payment.invoiceId
+    ? await prisma.invoice.findUnique({
+        where: { id: payment.invoiceId },
+        include: { items: true },
+      })
+    : null;
+
+  if (invoice) {
+    const packageUsageCount = await prisma.packageSessionUsage.count({
+      where: {
+        patientPackage: {
+          invoiceId: invoice.id,
+        },
+      },
+    });
+    if (packageUsageCount > 0) {
+      const err = new Error(
+        'Cannot refund an invoice after package sessions from that purchase have been consumed'
+      ) as ApiError;
+      err.statusCode = 400;
+      err.code = 'refund_blocked_package_used';
+      throw err;
+    }
+  }
+
+  await stripe.refunds.create({
+    payment_intent: payment.stripePaymentIntentId,
+  });
+
+  const results = await prisma.$transaction(async (tx) => {
+    const refund = await tx.payment.create({
       data: {
         clinicId: payment.clinicId,
         providerId: payment.providerId ?? null,
@@ -478,15 +515,19 @@ export const refundPayment = async (
         appointmentId: payment.appointmentId,
         patientId: payment.patientId,
         amount: payment.amount.mul(-1),
-        status: 'REFUNDED',
+        status: PaymentStatus.REFUNDED,
         refundForPaymentId: payment.id,
       },
-    }),
-  ];
+    });
 
-  if (payment.appointmentId) {
-    txOperations.push(
-      prisma.appointment.update({
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: PaymentStatus.REFUNDED },
+    });
+
+    let updatedAppointment = null;
+    if (payment.appointmentId) {
+      updatedAppointment = await tx.appointment.update({
         where: { id: payment.appointmentId },
         data: { paymentStatus: PaymentStatus.REFUNDED, updatedById: performedById },
         include: {
@@ -503,13 +544,53 @@ export const refundPayment = async (
           service: { select: { id: true, name: true, duration: true } },
           patient: { select: { id: true, name: true, email: true } },
         },
-      })
-    );
-  }
+      });
+    }
 
-  const results = await prisma.$transaction(txOperations);
-  const refund = results[0] as any;
-  const updatedAppointment = payment.appointmentId ? results[1] : null;
+    if (payment.invoiceId) {
+      await tx.invoice.update({
+        where: { id: payment.invoiceId },
+        data: { status: 'CANCELLED' },
+      });
+
+      await tx.commissionRecord.updateMany({
+        where: {
+          invoiceId: payment.invoiceId,
+          status: 'PENDING',
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      const invoiceProducts = await tx.invoiceItem.findMany({
+        where: { invoiceId: payment.invoiceId, productId: { not: null } },
+      });
+      for (const item of invoiceProducts) {
+        if (item.productId) {
+          await tx.inventoryItem.updateMany({
+            where: { clinicId: payment.clinicId, productId: item.productId },
+            data: { quantityInStock: { increment: item.quantity } },
+          });
+        }
+      }
+
+      await tx.patientPackage.updateMany({
+        where: {
+          invoiceId: payment.invoiceId,
+          usedSessions: 0,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+    }
+
+    return { refund, updatedAppointment };
+  });
+
+  const { refund, updatedAppointment } = results;
 
   await auditService.logAudit({
     clinicId: payment.clinicId,

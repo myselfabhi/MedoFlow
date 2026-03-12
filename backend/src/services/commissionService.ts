@@ -87,6 +87,12 @@ export const calculateCommissions = async (invoiceId: string) => {
   for (const item of invoice.items) {
     if (!item.providerId) continue;
 
+    const existingRecord = await prisma.commissionRecord.findFirst({
+      where: { invoiceItemId: item.id },
+      select: { id: true },
+    });
+    if (existingRecord) continue;
+
     // Find the best matching rule
     // Priority: Provider + Item specific > Provider + ItemType > Global + Item specific > Global + ItemType
     const matchingRule = rules.find(r => 

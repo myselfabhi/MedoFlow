@@ -15,7 +15,7 @@ export const create = asyncHandler(
       err.statusCode = 400;
       throw err;
     }
-    const { patientId, slotHoldId, ...rest } = req.body;
+    const { patientId, slotHoldId, patientPackageId, ...rest } = req.body;
     const resolvedPatientId = (patientId as string) || req.user!.id;
     const bookingSource =
       req.user!.role === 'FRONT_DESK'
@@ -29,6 +29,7 @@ export const create = asyncHandler(
       {
         performedById: req.user!.id,
         slotHoldId: slotHoldId as string | undefined,
+        patientPackageId: patientPackageId as string | undefined,
         bookingSource,
       }
     );

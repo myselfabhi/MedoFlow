@@ -151,6 +151,7 @@ export const getRevenueByProvider = async (clinicId: string) => {
 
   const byProvider = invoices.reduce(
     (acc, inv) => {
+      if (!inv.provider) return acc;
       const name = `${inv.provider.firstName} ${inv.provider.lastName}`;
       if (!acc[name]) acc[name] = { providerName: name, total: 0 };
       acc[name].total += inv.items.reduce(

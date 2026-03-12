@@ -3,6 +3,234 @@ import stripe from '../config/stripe';
 import prisma from '../config/prisma';
 import * as emailService from '../services/emailService';
 import * as commissionService from '../services/commissionService';
+import { PaymentStatus } from '@prisma/client';
+
+const cancelCommissionRecords = async (invoiceId: string) => {
+  await prisma.commissionRecord.updateMany({
+    where: {
+      invoiceId,
+      status: 'PENDING',
+    },
+    data: {
+      status: 'CANCELLED',
+    },
+  });
+};
+
+export const handleAppointmentPaymentIntentSucceeded = async (
+  paymentIntent: any
+) => {
+  const { appointmentId } = paymentIntent.metadata || {};
+  if (!appointmentId) return;
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: {
+      service: true,
+      patient: true,
+      provider: { include: { user: true } },
+      location: true,
+    },
+  });
+
+  if (!appt) return;
+
+  const nextStatus =
+    appt.approvalStatus === 'PENDING'
+      ? 'PENDING_PROVIDER_APPROVAL'
+      : 'CONFIRMED';
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: {
+      paymentStatus: 'PAID',
+      status: nextStatus as any,
+      slotHeldUntil: null,
+      bookingHoldExpiresAt: null,
+    },
+  });
+
+  const pendingPayment = await prisma.payment.findFirst({
+    where: {
+      appointmentId,
+      status: PaymentStatus.PENDING,
+      OR: [
+        { stripePaymentIntentId: paymentIntent.id },
+        { stripePaymentIntentId: null },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (pendingPayment) {
+    await prisma.payment.update({
+      where: { id: pendingPayment.id },
+      data: {
+        status: PaymentStatus.PAID,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeClientSecret: paymentIntent.client_secret ?? null,
+      },
+    });
+  }
+
+  await emailService.sendAppointmentConfirmation({
+    to: appt.patient.email,
+    patientName: appt.patient.name,
+    appointmentDate: appt.startTime.toLocaleString(),
+    serviceName: appt.service.name,
+    providerName: `${appt.provider.firstName} ${appt.provider.lastName}`,
+    locationName: appt.location?.name || 'Clinic',
+  });
+
+  const existingInvoice = await prisma.invoice.findFirst({
+    where: { appointmentId },
+  });
+
+  if (!existingInvoice) {
+    await prisma.invoice.create({
+      data: {
+        clinicId: appt.clinicId,
+        patientId: appt.patientId,
+        providerId: appt.providerId,
+        appointmentId: appt.id,
+        status: 'PAID',
+        subtotal: appt.priceAtBooking,
+        taxAmount: 0,
+        totalAmount: appt.priceAtBooking,
+        items: {
+          create: {
+            serviceId: appt.serviceId,
+            description: appt.service.name,
+            unitPrice: appt.priceAtBooking,
+            quantity: 1,
+            totalPrice: appt.priceAtBooking,
+          },
+        },
+      },
+    });
+  } else if (existingInvoice.status !== 'PAID') {
+    await prisma.invoice.update({
+      where: { id: existingInvoice.id },
+      data: { status: 'PAID' },
+    });
+  }
+
+  const inv = await prisma.invoice.findFirst({ where: { appointmentId } });
+  if (inv) await commissionService.calculateCommissions(inv.id);
+};
+
+export const handleCartCheckoutPaymentIntentSucceeded = async (
+  paymentIntent: any
+) => {
+  const { invoiceId, clinicId, patientId } = paymentIntent.metadata || {};
+  if (!invoiceId || !clinicId || !patientId) return;
+
+  const existingPaidPayment = await prisma.payment.findUnique({
+    where: { stripePaymentIntentId: paymentIntent.id },
+  });
+  if (existingPaidPayment?.status === PaymentStatus.PAID) {
+    return;
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { items: true, patient: true },
+  });
+  if (!invoice) return;
+
+  const wasAlreadyPaid = invoice.status === 'PAID';
+
+  const pendingPayment = existingPaidPayment
+    ? existingPaidPayment
+    : await prisma.payment.findFirst({
+        where: {
+          invoiceId,
+          patientId,
+          clinicId,
+          status: PaymentStatus.PENDING,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+  if (pendingPayment) {
+    await prisma.payment.update({
+      where: { id: pendingPayment.id },
+      data: {
+        status: PaymentStatus.PAID,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeClientSecret: paymentIntent.client_secret ?? null,
+      },
+    });
+  } else {
+    await prisma.payment.create({
+      data: {
+        clinicId,
+        providerId: null,
+        invoiceId,
+        patientId,
+        amount: invoice.totalAmount,
+        status: PaymentStatus.PAID,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeClientSecret: paymentIntent.client_secret ?? null,
+      },
+    });
+  }
+
+  if (wasAlreadyPaid) {
+    return;
+  }
+
+  await prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { status: 'PAID' },
+  });
+
+  for (const item of invoice.items) {
+    if (item.productId) {
+      await prisma.inventoryItem.updateMany({
+        where: { productId: item.productId, clinicId: invoice.clinicId },
+        data: { quantityInStock: { decrement: item.quantity } },
+      });
+    }
+
+    if (item.packageId) {
+      const pkg = await prisma.package.findUnique({ where: { id: item.packageId } });
+      if (pkg) {
+        const existingPackage = await prisma.patientPackage.findFirst({
+          where: {
+            invoiceId: invoice.id,
+            patientId: invoice.patientId,
+            packageId: pkg.id,
+          },
+        });
+
+        if (!existingPackage) {
+          await prisma.patientPackage.create({
+            data: {
+              clinicId: invoice.clinicId,
+              patientId: invoice.patientId,
+              packageId: pkg.id,
+              invoiceId: invoice.id,
+              totalSessions: pkg.totalSessions ?? 0,
+              expiresAt: pkg.expiresInDays
+                ? new Date(Date.now() + pkg.expiresInDays * 24 * 60 * 60 * 1000)
+                : null,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  await commissionService.calculateCommissions(invoiceId);
+
+  await emailService.sendInvoiceEmail({
+    to: invoice.patient.email,
+    patientName: invoice.patient.name,
+    totalAmount: `$${Number(invoice.totalAmount).toFixed(2)}`,
+    invoiceUrl: `${process.env.FRONTEND_URL}/dashboard/patient/invoices/${invoice.id}`,
+  });
+};
 
 export const handleStripeWebhook = async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'] as string;
@@ -19,209 +247,74 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
       return;
     }
   } else {
-    // For local testing without secret
     event = req.body;
   }
 
-  // Handle the event
   switch (event.type) {
-    case 'payment_intent.succeeded':
+    case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as any;
-      const { invoiceId, cartId, appointmentId, type, clinicId, patientId } = paymentIntent.metadata || {};
+      const { type } = paymentIntent.metadata || {};
 
-      if (type === 'APPOINTMENT' && appointmentId) {
-        const appt = await prisma.appointment.findUnique({
-          where: { id: appointmentId },
-          include: { service: true, patient: true, provider: { include: { user: true } }, location: true }
-        });
-
-        if (appt) {
-          const nextStatus = appt.approvalStatus === 'PENDING' 
-            ? 'PENDING_PROVIDER_APPROVAL' 
-            : 'CONFIRMED';
-
-          await prisma.appointment.update({
-            where: { id: appointmentId },
-            data: { 
-              paymentStatus: 'PAID',
-              status: nextStatus as any,
-              slotHeldUntil: null,
-              bookingHoldExpiresAt: null
-            },
-          });
-
-          await prisma.payment.updateMany({
-            where: {
-              appointmentId,
-              status: 'PENDING',
-              OR: [
-                { stripePaymentIntentId: paymentIntent.id },
-                { stripePaymentIntentId: null },
-              ],
-            },
-            data: {
-              status: 'PAID',
-              stripePaymentIntentId: paymentIntent.id,
-              stripeClientSecret: paymentIntent.client_secret ?? null,
-            },
-          });
-
-          // Send confirmation email
-          await emailService.sendAppointmentConfirmation({
-            to: appt.patient.email,
-            patientName: appt.patient.name,
-            appointmentDate: appt.startTime.toLocaleString(),
-            serviceName: appt.service.name,
-            providerName: `${appt.provider.firstName} ${appt.provider.lastName}`,
-            locationName: appt.location?.name || 'Clinic',
-          });
-
-          // Create a basic invoice for this appointment if one doesn't exist
-          const existingInvoice = await prisma.invoice.findFirst({
-            where: { appointmentId }
-          });
-
-          if (!existingInvoice) {
-            await prisma.invoice.create({
-              data: {
-                clinicId: appt.clinicId,
-                patientId: appt.patientId,
-                providerId: appt.providerId,
-                appointmentId: appt.id,
-                status: 'PAID',
-                subtotal: appt.priceAtBooking,
-                taxAmount: 0,
-                totalAmount: appt.priceAtBooking,
-                items: {
-                  create: {
-                    serviceId: appt.serviceId,
-                    description: appt.service.name,
-                    unitPrice: appt.priceAtBooking,
-                    quantity: 1,
-                    totalPrice: appt.priceAtBooking
-                  }
-                }
-              }
-            });
-          } else {
-            await prisma.invoice.update({
-              where: { id: existingInvoice.id },
-              data: { status: 'PAID' }
-            });
-          }
-
-          // Calculate commissions for the appointment
-          const inv = await prisma.invoice.findFirst({ where: { appointmentId } });
-          if (inv) await commissionService.calculateCommissions(inv.id);
-        }
+      if (type === 'APPOINTMENT') {
+        await handleAppointmentPaymentIntentSucceeded(paymentIntent);
       }
 
-      if (type === 'CART_CHECKOUT' && invoiceId) {
-        await prisma.invoice.update({
-          where: { id: invoiceId },
-          data: { status: 'PAID' },
-        });
-
-        // Calculate commissions for the cart checkout
-        await commissionService.calculateCommissions(invoiceId);
-
-        const invoice = await prisma.invoice.findUnique({
-          where: { id: invoiceId },
-          include: { items: true, patient: true },
-        });
-
-        if (invoice) {
-          // Send receipt/invoice email
-          await emailService.sendInvoiceEmail({
-            to: invoice.patient.email,
-            patientName: invoice.patient.name,
-            totalAmount: `$${Number(invoice.totalAmount).toFixed(2)}`,
-            invoiceUrl: `${process.env.FRONTEND_URL}/dashboard/patient/invoices/${invoice.id}`,
-          });
-
-          for (const item of invoice.items) {
-            // 1. Physical Product inventory
-            if (item.productId) {
-              await prisma.inventoryItem.updateMany({
-                where: { productId: item.productId, clinicId: invoice.clinicId },
-                data: { quantityInStock: { decrement: item.quantity } },
-              });
-            }
-
-            // 2. Provision Wellness Packages
-            if (item.packageId) {
-              const pkg = await prisma.package.findUnique({ where: { id: item.packageId } });
-              if (pkg) {
-                await prisma.patientPackage.create({
-                  data: {
-                    clinicId: invoice.clinicId,
-                    patientId: invoice.patientId,
-                    packageId: pkg.id,
-                    invoiceId: invoice.id,
-                    totalSessions: pkg.totalSessions ?? 0,
-                    expiresAt: pkg.expiresInDays 
-                      ? new Date(Date.now() + pkg.expiresInDays * 24 * 60 * 60 * 1000)
-                      : null
-                  }
-                });
-              }
-            }
-
-            // 3. Provision Memberships
-            if (item.membershipId) {
-              const membership = await prisma.membership.findUnique({ where: { id: item.membershipId } });
-              if (membership) {
-                await prisma.patientSubscription.create({
-                  data: {
-                    clinicId: invoice.clinicId,
-                    patientId: invoice.patientId,
-                    membershipId: membership.id,
-                    status: 'ACTIVE',
-                    currentPeriodStart: new Date(),
-                    currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
-                  }
-                });
-              }
-            }
-          }
-        }
+      if (type === 'CART_CHECKOUT') {
+        await handleCartCheckoutPaymentIntentSucceeded(paymentIntent);
       }
       break;
-    
-    case 'invoice.paid':
+    }
+
+    case 'invoice.paid': {
       const invoiceObject = event.data.object as any;
       if (invoiceObject.subscription) {
-        // Find subscription and update its status
         const subId = invoiceObject.subscription;
         await prisma.patientSubscription.updateMany({
           where: { stripeSubscriptionId: subId },
-          data: { 
+          data: {
             status: 'ACTIVE',
             currentPeriodStart: new Date(invoiceObject.period_start * 1000),
             currentPeriodEnd: new Date(invoiceObject.period_end * 1000),
-          }
+          },
         });
       }
       break;
+    }
 
-    case 'customer.subscription.deleted':
+    case 'customer.subscription.deleted': {
       const deletedSub = event.data.object as any;
       await prisma.patientSubscription.updateMany({
         where: { stripeSubscriptionId: deletedSub.id },
-        data: { status: 'CANCELED' }
+        data: { status: 'CANCELED' },
       });
       break;
+    }
 
-    case 'customer.subscription.updated':
+    case 'customer.subscription.updated': {
       const updatedSub = event.data.object as any;
       await prisma.patientSubscription.updateMany({
         where: { stripeSubscriptionId: updatedSub.id },
-        data: { 
+        data: {
           status: updatedSub.status === 'active' ? 'ACTIVE' : 'PAST_DUE',
-          cancelAtPeriodEnd: updatedSub.cancel_at_period_end
-        }
+          cancelAtPeriodEnd: updatedSub.cancel_at_period_end,
+        },
       });
       break;
+    }
+
+    case 'charge.refunded': {
+      const charge = event.data.object as any;
+      const paymentIntentId = charge.payment_intent as string | undefined;
+      if (!paymentIntentId) break;
+
+      const payment = await prisma.payment.findUnique({
+        where: { stripePaymentIntentId: paymentIntentId },
+      });
+      if (!payment?.invoiceId) break;
+
+      await cancelCommissionRecords(payment.invoiceId);
+      break;
+    }
 
     default:
       console.log(`Unhandled event type ${event.type}`);
