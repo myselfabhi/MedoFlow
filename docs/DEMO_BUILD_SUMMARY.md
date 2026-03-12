@@ -114,12 +114,12 @@ No browser E2E tests exist. Critical flows are covered by manual smoke tests.
 ### Demo Accounts
 | Role | Name | Email | Password |
 |------|------|-------|----------|
-| SUPER_ADMIN | Alex Admin | alex@harmony.demo | Demo1234! |
-| PROVIDER | Dr. Sarah Chen | sarah@harmony.demo | Demo1234! |
-| PROVIDER | Dr. Marcus Rivera | marcus@harmony.demo | Demo1234! |
-| FRONT_DESK | Jordan Front | jordan@harmony.demo | Demo1234! |
-| PATIENT | Emma Patient | emma@harmony.demo | Demo1234! |
-| PATIENT | Liam Patient | liam@harmony.demo | Demo1234! |
+| SUPER_ADMIN | Alex Thornton | alex@everwell.demo | Demo1234! |
+| PROVIDER | Dr. Sarah Chen | sarah@everwell.demo | Demo1234! |
+| PROVIDER | Dr. Marcus Rivera | marcus@everwell.demo | Demo1234! |
+| FRONT_DESK | Jordan Walsh | jordan@everwell.demo | Demo1234! |
+| PATIENT | Emma Hartwell | emma@everwell.demo | Demo1234! |
+| PATIENT | Liam Nakamura | liam@everwell.demo | Demo1234! |
 
 ### Services
 | Name | Duration | Price |
@@ -160,7 +160,7 @@ No browser E2E tests exist. Critical flows are covered by manual smoke tests.
 - Front-desk standalone invoices: 1 PAID (Emma, cash), 1 OPEN (Liam — for live Collect demo)
 
 ### Patient State
-- Emma Patient: Active "Wellness Member" subscription; 5-Session Physio Package with 3 sessions remaining
+- Emma Hartwell: Active "Monthly Wellness Membership" subscription; 3-Session Recovery Package with 2 sessions remaining
 - All commission records in PENDING state (leave for admin Mark-as-Paid demo)
 - AI Scribe draft in DRAFT_GENERATED state for one of Emma's upcoming appointments:
 ```json
@@ -180,7 +180,7 @@ No browser E2E tests exist. Critical flows are covered by manual smoke tests.
 > "Medoflow is an integrated clinic management platform. It handles scheduling, clinical documentation, billing, and analytics in one unified system. Let me walk you through the four key roles — admin, provider, front desk, and patient — so you can see how everything connects."
 
 ### Section 1 — Admin View (5–7 min)
-**Account**: Alex Admin — `alex@harmony.demo`
+**Account**: Alex Thornton — `alex@everwell.demo`
 
 **1.1 Analytics Dashboard**
 1. Navigate to **Analytics**
@@ -201,7 +201,7 @@ No browser E2E tests exist. Critical flows are covered by manual smoke tests.
 3. Show membership catalog and Recent Subscription Activity
 
 ### Section 2 — Patient View (5–7 min)
-**Account**: Emma Patient — `emma@harmony.demo`
+**Account**: Emma Hartwell — `emma@everwell.demo`
 
 **2.1 Appointments** — Show upcoming and past appointments with statuses
 
@@ -216,9 +216,9 @@ If Stripe not configured:
 > "The patient selects their service, time, and provider from the public booking page. Once they complete payment through Stripe, the appointment is confirmed instantly. I'll skip the live payment step today, but the full flow is functional."
 
 ### Section 3 — Provider View (7–8 min)
-**Account**: Dr. Sarah Chen — `sarah@harmony.demo`
+**Account**: Dr. Sarah Chen — `sarah@everwell.demo`
 
-**3.1 Calendar** — Show week view, click Emma Patient's appointment
+**3.1 Calendar** — Show week view, click Emma Hartwell's appointment
 
 **3.2 Appointment Detail**
 - Walk through service, date/time, status
@@ -239,17 +239,17 @@ If Stripe not configured:
 > "The provider controls exactly what the patient sees. Internal clinical detail stays internal."
 
 ### Section 4 — Front-Desk View (5–7 min)
-**Account**: Jordan Front — `jordan@harmony.demo`
+**Account**: Jordan Walsh — `jordan@everwell.demo`
 
 **4.1 Billing Operations**
 1. Navigate to **Invoices**
 2. Show finance summary: Total Invoiced, Collected, Open Balances
-3. Find Liam Patient's outstanding invoice → **Collect** → Cash → Record Payment
+3. Find Liam Nakamura's outstanding invoice → **Collect** → Cash → Record Payment
 4. Show success toast and updated invoice status
 
 **4.2 Checkout (walk-in sale)**
 1. Navigate to **Checkout**
-2. Select Liam Patient → add "Resistance Band Set" ($35) → Cash → Submit
+2. Select Liam Nakamura → add "Resistance Band Set" ($35) → Cash → Submit
 3. "The front desk can handle any combination of services, products, and packages at checkout."
 
 ### Section 5 — Closing (2 min)
@@ -283,7 +283,7 @@ Switch back to Alex Admin:
 - [ ] Commission rules active for both providers
 - [ ] 8+ completed appointments with paid invoices (analytics shows >$1,000 revenue)
 - [ ] At least 1 outstanding invoice (for live Collect demo)
-- [ ] Emma Patient: active Wellness Member subscription + 5-Session package with 3 remaining
+- [ ] Emma Hartwell: active "Monthly Wellness Membership" subscription + 3-Session package with 2 remaining
 - [ ] 5+ commission records in PENDING state
 - [ ] AI Scribe draft in DRAFT_GENERATED state
 

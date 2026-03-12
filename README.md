@@ -1,111 +1,72 @@
 # Medoflow
 
-Integrated clinic management platform — scheduling, clinical documentation, billing, analytics, and patient self-serve in one system.
+Integrated clinic management platform — scheduling, clinical documentation, billing, analytics, and patient self-serve in one unified system.
 
 ---
 
-## Running Locally for Demo
+## 🚀 Quick Start for Demo
 
-### Prerequisites
+To get the demo environment running in less than 5 minutes:
 
-- Node.js 18+
-- PostgreSQL (running locally or via Docker)
+1.  **Dependencies**: Run `npm install` in both `backend` and `frontend` directories.
+2.  **Environment**: Copy `.env.example` to `.env` in `backend` and `.env.local` in `frontend`.
+3.  **Database**: Ensure PostgreSQL is running, then run `npx prisma migrate deploy` in the `backend`.
+4.  **Seed Demo Data**: Run `npm run seed:demo` in the `backend`.
+5.  **Run**: Start both servers with `npm run dev`.
 
-### Backend
-
-```bash
-cd backend
-cp .env.example .env   # then fill in values below
-npm install
-npx prisma migrate deploy
-npm run dev
-```
-
-**Minimum `.env` for demo:**
-
-```
-DATABASE_URL=postgresql://user:pass@localhost:5432/medoflow
-JWT_SECRET=any-strong-string-here
-CORS_ORIGIN=http://localhost:3000
-NODE_ENV=development
-
-# Required only if showing payment flows:
-STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-
-# Required only if showing live AI Scribe (use pre-generated draft instead):
-OPENAI_API_KEY=sk-...
-REDIS_URL=redis://localhost:6379
-```
-
-### Frontend
-
-```bash
-cd frontend
-cp .env.example .env.local   # or create it
-# Set: NEXT_PUBLIC_API_URL=http://localhost:4000
-npm install
-npm run dev
-```
-
-App runs at `http://localhost:3000`. Backend at `http://localhost:4000`.
+Detailed setup instructions and all operational commands are in the [**Operations Runbook**](docs/RUNBOOK.md).
 
 ---
 
-## Demo Accounts
+## 🎬 Guided Live Demo Flow
 
-Seed data per `docs/DEMO_BUILD_SUMMARY.md` → Section 4 (Test Data).
+The Medoflow demo universe is pre-seeded with one year of operational history for the **Everwell Longevity Clinic**. Use this 25-minute scripted flow for a high-impact presentation.
 
-| Role | Name | Email | Password |
-|------|------|-------|----------|
-| SUPER_ADMIN | Alex Admin | alex@harmony.demo | Demo1234! |
-| PROVIDER | Dr. Sarah Chen | sarah@harmony.demo | Demo1234! |
-| PROVIDER | Dr. Marcus Rivera | marcus@harmony.demo | Demo1234! |
-| FRONT_DESK | Jordan Front | jordan@harmony.demo | Demo1234! |
-| PATIENT | Emma Patient | emma@harmony.demo | Demo1234! |
-| PATIENT | Liam Patient | liam@harmony.demo | Demo1234! |
+### 1. Admin Oversight — "The Big Picture"
+- **Account**: `alex@everwell.demo` (Thornton)
+- **Flow**:
+  - Open **Analytics**. Show the 15% cancellation rate vs. $8k+ revenue.
+  - Open **Commissions**. Show the ledger of pending payouts for Dr. Sarah Chen.
+  - Open **Memberships**. Show active subscriptions driving predictable revenue.
 
-Stripe test card for payment flows: `4242 4242 4242 4242` (any future expiry, any CVV)
+### 2. Patient Experience — "The Hero Journey"
+- **Account**: `emma@everwell.demo` (Hartwell)
+- **Flow**:
+  - Open **Patient Portal**. Show Emma’s active Wellness Membership and 3-session recovery package.
+  - Open **Checkout/Storefront**. Find Emma's **pre-loaded cart** (Resistance Bands + Wellness Pack) ready for instant checkout.
+  - Open **Appointments**. Show her historical visits and upcoming physiotherapy session.
 
----
+### 3. Provider Workflow — "Clinical Excellence"
+- **Account**: `sarah@everwell.demo` (Dr. Chen)
+- **Flow**:
+  - Open **Calendar**. Locate Emma Hartwell’s upcoming appointment (7 days out).
+  - Open **AI Scribe**. Show the **DRAFT_GENERATED** SOAP note ready for review.
+  - **Action**: Edit, approve, and **Publish Patient Summary**.
 
-## Demo Flows
-
-The guided demo covers four roles in ~30 minutes:
-
-1. **Admin** — Analytics dashboard, commission rules + ledger, memberships overview
-2. **Patient** — Appointments, active membership, self-serve booking (Stripe)
-3. **Provider** — Calendar, appointment detail + patient entitlements, AI Scribe approve + publish
-4. **Front-desk** — Billing operations + collect, walk-in checkout
-
-Full script: `docs/DEMO_BUILD_SUMMARY.md` → Demo Script section
-Pre-demo checklist: `docs/DEMO_BUILD_SUMMARY.md` → Demo Checklist section
-
----
-
-## Deployment (Vercel + Render)
-
-- **Frontend**: Vercel. Root directory: `frontend`. Set `NEXT_PUBLIC_API_URL` to your backend URL.
-- **Backend**: Render Web Service. Root directory: `backend`. Start command: `npx prisma migrate deploy && npm start`.
-- **Database**: Render PostgreSQL addon.
-
-Set `CORS_ORIGIN` on the backend to your Vercel frontend URL after deploy.
-
-Local file uploads are ephemeral on Render — use S3-compatible storage for production audio/file persistence.
+### 4. Front Desk — "Operational Efficiency"
+- **Account**: `jordan@everwell.demo` (Walsh)
+- **Flow**:
+  - Open **Invoices**. Find **Liam Nakamura’s** outstanding invoice.
+  - **Action**: Click "Collect" -> "Cash" to record payment.
+  - Open **Checkout**. Demonstrate a walk-in sale for a "Mobility Roller Kit".
 
 ---
 
-## Tests
+## 🔑 Demo Access
 
-```bash
-cd backend
-npm test
-```
-
-95 tests passing. TypeScript build is clean.
+| Role | Email | Password | Best For |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `alex@everwell.demo` | `Demo1234!` | Analytics & Commissions |
+| **Provider** | `sarah@everwell.demo` | `Demo1234!` | AI Scribe & Clinical Progress |
+| **Front Desk** | `jordan@everwell.demo` | `Demo1234!` | Billing & Point of Sale |
+| **Patient** | `emma@everwell.demo` | `Demo1234!` | Portal & Storefront |
 
 ---
 
-## Known Limitations Before Production
+## 🗺️ Documentation Map
 
-See `docs/POST_ONBOARDING_GAP_PLAN.md` for the complete list of unsupported features, production requirements, and the post-onboarding roadmap.
+- [**Operations Runbook**](docs/RUNBOOK.md) — Exact commands, environment variables, and troubleshooting.
+- [**Demo Universe Seed Output**](docs/DEMO_UNIVERSE_SEED_OUTPUT.md) — Detailed breakdown of every seeded user, invoice, and storyline.
+- [**Analytics Checklist**](docs/DEMO_ANALYTICS_SNAPSHOT_CHECKLIST.md) — A 2-minute verification list to run before starting a live demo.
+- [**Post-Onboarding Gap Plan**](docs/POST_ONBOARDING_GAP_PLAN.md) — The authoritative roadmap for production hardening and unsupported features.
+- [**Demo Build Summary**](docs/DEMO_BUILD_SUMMARY.md) — Technical overview of what was built during the initial implementation.
