@@ -6,7 +6,6 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { getClinicWhere } from '../middleware/clinicScope';
 import { ApiError } from '../types/errors';
 import { BookingSource } from '@prisma/client';
-import stripe from '../config/stripe';
 
 export const create = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -115,34 +114,9 @@ export const getById = asyncHandler(
       where: { appointmentId: id },
       select: { meetLink: true },
     });
-    let clientSecret: string | null = null;
-    if (appointment.paymentStatus === 'PENDING' && appointment.status === 'PENDING_PAYMENT') {
-      const amountToCharge = appointment.paymentRequirementType === 'DEPOSIT' 
-        ? Number(appointment.depositAmount) 
-        : Number(appointment.priceAtBooking);
-      
-      const amountInCents = Math.round(amountToCharge * 100);
-      try {
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: amountInCents,
-          currency: 'usd',
-          metadata: {
-            appointmentId: appointment.id,
-            clinicId: appointment.clinicId,
-            patientId: appointment.patientId,
-            type: 'APPOINTMENT',
-          },
-        });
-        clientSecret = paymentIntent.client_secret;
-      } catch (err) {
-        console.error('Stripe Fetch PaymentIntent Error:', err);
-      }
-    }
-
     const payload = {
       ...appointment,
       meetLink: event?.meetLink ?? null,
-      clientSecret,
     };
     successResponse(res, 200, 'Appointment retrieved', { appointment: payload });
   }

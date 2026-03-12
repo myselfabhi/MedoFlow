@@ -50,6 +50,22 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
             },
           });
 
+          await prisma.payment.updateMany({
+            where: {
+              appointmentId,
+              status: 'PENDING',
+              OR: [
+                { stripePaymentIntentId: paymentIntent.id },
+                { stripePaymentIntentId: null },
+              ],
+            },
+            data: {
+              status: 'PAID',
+              stripePaymentIntentId: paymentIntent.id,
+              stripeClientSecret: paymentIntent.client_secret ?? null,
+            },
+          });
+
           // Send confirmation email
           await emailService.sendAppointmentConfirmation({
             to: appt.patient.email,
@@ -213,4 +229,3 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
 
   res.json({ received: true });
 };
-

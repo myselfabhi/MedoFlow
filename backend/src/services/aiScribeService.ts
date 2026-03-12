@@ -322,7 +322,7 @@ export const approveDraft = async (
     draft.plan ?? '',
   ].join('\n');
 
-  await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
     const version = await tx.visitNoteVersion.create({
       data: {
         visitRecordId: session.visitRecordId,
@@ -353,7 +353,7 @@ export const approveDraft = async (
       data: {
         status: AIScribeStatus.APPROVED,
         patientSummary: patientSummary as object,
-        patientSummaryPublished: true,
+        patientSummaryPublished: false,
       },
     });
   });

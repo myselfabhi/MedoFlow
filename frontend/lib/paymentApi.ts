@@ -6,6 +6,24 @@ export interface PaymentResponse {
   amount: string;
 }
 
+export const getOrCreatePaymentIntent = async (
+  appointmentId: string
+): Promise<{
+  payment: PaymentResponse | null;
+  clientSecret: string | null;
+  reused: boolean;
+}> => {
+  const { data } = await api.post<{
+    success: boolean;
+    data: {
+      payment: PaymentResponse | null;
+      clientSecret: string | null;
+      reused: boolean;
+    };
+  }>(`/payments/${appointmentId}/intent`);
+  return data.data;
+};
+
 export const confirmPayment = async (
   appointmentId: string
 ): Promise<{ payment: PaymentResponse }> => {
@@ -25,4 +43,3 @@ export const failPayment = async (
   }>(`/payments/${appointmentId}/fail`);
   return { payment: data.data.payment };
 };
-

@@ -79,8 +79,14 @@ export default function PatientJoinPage() {
             const s = data.data?.session ?? data.data;
             setSession(s);
             setConsentGranted(s.consentStatus === 'GRANTED');
-        } catch {
-            setError('This consultation link is invalid or has expired.');
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                setError(
+                    err.response?.data?.message ?? 'This consultation link is invalid or has expired.'
+                );
+            } else {
+                setError('This consultation link is invalid or has expired.');
+            }
         } finally {
             setLoading(false);
         }

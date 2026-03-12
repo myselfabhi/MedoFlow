@@ -15,6 +15,7 @@ const corsOrigin = process.env.CORS_ORIGIN;
 const isProduction = process.env.NODE_ENV === 'production';
 app.use(
   cors({
+
     origin: (origin, cb) => {
       const allowed = corsOrigin
         ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)

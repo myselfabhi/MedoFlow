@@ -615,6 +615,8 @@ model Payment {
   appointmentId      String?
   patientId          String
   refundForPaymentId String?
+  stripePaymentIntentId String?    @unique
+  stripeClientSecret    String?
   amount             Decimal       @db.Decimal(10, 2)
   status             PaymentStatus
   createdAt          DateTime      @default(now())
@@ -1058,7 +1060,8 @@ model ConsultationSession {
   recordingStatus   RecordingStatus    @default(NOT_STARTED)
   consentStatus     ConsentStatus      @default(PENDING)
   consentGrantedAt  DateTime?
-  joinToken         String             @unique @default(cuid())
+  joinToken         String             @unique
+  joinTokenExpiresAt DateTime
   recordingUrl      String?
   transcriptText    String?            @db.Text
   transcriptStatus  String             @default("NOT_STARTED")

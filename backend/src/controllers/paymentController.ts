@@ -28,6 +28,23 @@ export const confirm = asyncHandler(
   }
 );
 
+export const intent = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const appointmentId = req.params.appointmentId as string;
+    const where = await getPaymentWhere(req);
+    const result = await paymentService.ensurePaymentIntent(
+      appointmentId,
+      req.user!.id,
+      where
+    );
+    successResponse(res, 200, 'Payment intent ready', {
+      payment: result.payment,
+      clientSecret: result.clientSecret,
+      reused: result.reused,
+    });
+  }
+);
+
 export const fail = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const appointmentId = req.params.appointmentId as string;

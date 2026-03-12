@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import * as consultationApi from '@/lib/consultationApi';
 import * as aiScribeApi from '@/lib/aiScribeApi';
+import { startConsultationRecordingFlow } from '@/lib/consultationRecordingFlow';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 // ---------------------------------------------------------------------------
@@ -160,9 +161,14 @@ export default function ConsultationRoomPage() {
         if (!session) return;
         try {
             setError(null);
-            await consultationApi.startRecording(session.id);
-            await recorder.startRecording();
-            setSession((prev) => prev ? { ...prev, status: 'RECORDING', recordingStatus: 'RECORDING' } : prev);
+            const updated = await startConsultationRecordingFlow({
+                startBrowserCapture: () => recorder.startRecording(),
+                markRecordingStarted: () => consultationApi.startRecording(session.id),
+                rollbackBrowserCapture: async () => {
+                    recorder.cancelRecording();
+                },
+            });
+            setSession(updated);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to start recording';
             setError(msg);

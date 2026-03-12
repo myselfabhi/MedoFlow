@@ -5,6 +5,7 @@
  */
 
 import prisma from '../config/prisma';
+import crypto from 'crypto';
 import { ApiError } from '../types/errors';
 import {
     ConsultationStatus,
@@ -56,6 +57,36 @@ function throwApi(message: string, statusCode: number, code?: string): never {
     throw err;
 }
 
+const JOIN_TOKEN_TTL_HOURS = 24;
+
+export function generateJoinToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+export function getJoinTokenExpiry(now = new Date()): Date {
+    return new Date(now.getTime() + JOIN_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+}
+
+export function isJoinTokenExpired(
+    expiresAt: Date,
+    now = new Date()
+): boolean {
+    return expiresAt.getTime() <= now.getTime();
+}
+
+const rotateJoinToken = async (sessionId: string) => {
+    return prisma.consultationSession.update({
+        where: { id: sessionId },
+        data: {
+            joinToken: generateJoinToken(),
+            joinTokenExpiresAt: getJoinTokenExpiry(),
+        },
+        include: {
+            appointment: { select: { id: true, startTime: true, endTime: true, meetLink: true } },
+        },
+    });
+};
+
 // ---------------------------------------------------------------------------
 // Sanitization — strip sensitive fields for patient view
 // ---------------------------------------------------------------------------
@@ -103,7 +134,12 @@ export const createOrGetSession = async (
         },
         include: { appointment: { select: { id: true, startTime: true, endTime: true, meetLink: true } } },
     });
-    if (existing) return existing;
+    if (existing) {
+        if (isJoinTokenExpired(existing.joinTokenExpiresAt)) {
+            return rotateJoinToken(existing.id);
+        }
+        return existing;
+    }
 
     // Create new session
     const session = await prisma.consultationSession.create({
@@ -113,6 +149,8 @@ export const createOrGetSession = async (
             providerId,
             patientId: appointment.patientId,
             status: ConsultationStatus.READY,
+            joinToken: generateJoinToken(),
+            joinTokenExpiresAt: getJoinTokenExpiry(),
         },
         include: {
             appointment: { select: { id: true, startTime: true, endTime: true, meetLink: true } },
@@ -200,6 +238,9 @@ export const getSessionByToken = async (joinToken: string) => {
         },
     });
     if (!session) throwApi('Invalid or expired consultation link', 404);
+    if (isJoinTokenExpired(session.joinTokenExpiresAt)) {
+        throwApi('Consultation link has expired', 410, 'token_expired');
+    }
     return sanitizeForPatient(session as unknown as Record<string, unknown>);
 };
 

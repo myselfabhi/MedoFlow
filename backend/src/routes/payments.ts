@@ -17,6 +17,13 @@ const setClinicFromUser = (
 };
 
 router.post(
+  '/:appointmentId/intent',
+  authorize(Role.PATIENT, Role.FRONT_DESK),
+  setClinicFromUser,
+  paymentController.intent
+);
+
+router.post(
   '/:appointmentId/confirm',
   authorize(Role.PATIENT, Role.FRONT_DESK),
   setClinicFromUser,

@@ -133,7 +133,7 @@ test('pending approval and pending payment transitions behave correctly', () => 
   });
 
   assert.deepEqual(approvalLifecycle, {
-    status: AppointmentStatus.PENDING_PROVIDER_APPROVAL,
+    status: AppointmentStatus.PENDING_PAYMENT,
     approvalStatus: ApprovalStatus.PENDING,
     paymentStatus: PaymentStatus.PENDING,
   });
@@ -147,5 +147,18 @@ test('pending approval and pending payment transitions behave correctly', () => 
     status: AppointmentStatus.PENDING_PAYMENT,
     approvalStatus: ApprovalStatus.NOT_REQUIRED,
     paymentStatus: PaymentStatus.PENDING,
+  });
+});
+
+test('provider approval is the next appointment status only after payment clears', () => {
+  const lifecycle = resolveAppointmentLifecycle({
+    requiresProviderApproval: true,
+    paymentRequirementType: PaymentRequirementType.NONE,
+  });
+
+  assert.deepEqual(lifecycle, {
+    status: AppointmentStatus.PENDING_PROVIDER_APPROVAL,
+    approvalStatus: ApprovalStatus.PENDING,
+    paymentStatus: PaymentStatus.NONE,
   });
 });

@@ -10,6 +10,7 @@ export interface UseAudioRecorderReturn {
     audioBlob: Blob | null;
     startRecording: () => Promise<void>;
     stopRecording: () => void;
+    cancelRecording: () => void;
     resetRecording: () => void;
 }
 
@@ -32,6 +33,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const startTimeRef = useRef<number>(0);
+    const discardOnStopRef = useRef(false);
 
     // Clean up on unmount
     useEffect(() => {
@@ -67,6 +69,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         setError(null);
         setAudioBlob(null);
         chunksRef.current = [];
+        discardOnStopRef.current = false;
 
         if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia || !navigator.mediaDevices?.getDisplayMedia) {
             fail('Screen and audio recording are not fully supported in this browser');
@@ -129,7 +132,13 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
             recorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: mimeType });
-                setAudioBlob(blob);
+                if (discardOnStopRef.current) {
+                    setAudioBlob(null);
+                    setDuration(0);
+                    discardOnStopRef.current = false;
+                } else {
+                    setAudioBlob(blob);
+                }
                 setIsRecording(false);
                 setIsPaused(false);
 
@@ -190,6 +199,16 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         }
     }, []);
 
+    const cancelRecording = useCallback(() => {
+        discardOnStopRef.current = true;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+            return;
+        }
+        setAudioBlob(null);
+        setDuration(0);
+    }, []);
+
     const resetRecording = useCallback(() => {
         setAudioBlob(null);
         setDuration(0);
@@ -205,6 +224,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         audioBlob,
         startRecording,
         stopRecording,
+        cancelRecording,
         resetRecording,
     };
 }

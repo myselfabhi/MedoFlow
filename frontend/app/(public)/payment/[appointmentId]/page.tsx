@@ -5,7 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { getAppointmentById, type PatientAppointmentDetail } from '@/lib/patientApi';
-import { confirmPayment, failPayment } from '@/lib/paymentApi';
+import {
+  confirmPayment,
+  failPayment,
+  getOrCreatePaymentIntent,
+} from '@/lib/paymentApi';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -20,7 +24,6 @@ type PaymentAppointment = PatientAppointmentDetail & {
   bookingHoldExpiresAt?: string | null;
   priceAtBooking: string;
   service: PatientAppointmentDetail['service'] & { defaultPrice?: string };
-  clientSecret?: string | null;
 };
 
 function formatDateTime(iso: string) {
@@ -78,6 +81,16 @@ export default function PaymentPage() {
   }, [slotExpiry]);
 
   const isExpired = remainingSeconds !== null && remainingSeconds <= 0;
+  const shouldLoadPaymentIntent =
+    appointment?.paymentStatus === 'PENDING' &&
+    appointment?.status === 'PENDING_PAYMENT' &&
+    !isExpired;
+
+  const { data: paymentIntent, isLoading: paymentIntentLoading } = useQuery({
+    queryKey: ['payment', 'intent', appointmentId],
+    queryFn: () => getOrCreatePaymentIntent(appointmentId),
+    enabled: !!appointmentId && !!shouldLoadPaymentIntent,
+  });
 
   const confirmMutation = useMutation({
     mutationFn: () => confirmPayment(appointmentId),
@@ -203,10 +216,14 @@ export default function PaymentPage() {
           )}
 
           <div className="flex flex-col gap-3">
-            {!showExpiredBanner && appointment.clientSecret ? (
-              <Elements stripe={stripePromise} options={{ clientSecret: appointment.clientSecret }}>
+            {!showExpiredBanner && paymentIntentLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+              </div>
+            ) : !showExpiredBanner && paymentIntent?.clientSecret ? (
+              <Elements stripe={stripePromise} options={{ clientSecret: paymentIntent.clientSecret }}>
                 <StripePaymentForm 
-                  clientSecret={appointment.clientSecret}
+                  clientSecret={paymentIntent.clientSecret}
                   buttonLabel={`Pay $${formatAmount(appointment.priceAtBooking)} & Confirm`}
                   onSuccess={() => router.push(`/intake/${appointmentId}`)}
                 />
@@ -253,4 +270,3 @@ export default function PaymentPage() {
     </div>
   );
 }
-

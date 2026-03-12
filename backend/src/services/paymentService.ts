@@ -1,7 +1,173 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
-import { PaymentStatus } from '@prisma/client';
+import {
+  PaymentRequirementType,
+  PaymentStatus,
+} from '@prisma/client';
+import stripe from '../config/stripe';
+
+const getAmountToCharge = (appointment: {
+  paymentRequirementType: PaymentRequirementType;
+  depositAmount: { toString(): string } | null;
+  priceAtBooking: { toString(): string };
+}) => {
+  if (
+    appointment.paymentRequirementType === PaymentRequirementType.DEPOSIT &&
+    appointment.depositAmount
+  ) {
+    return Number(appointment.depositAmount);
+  }
+  return Number(appointment.priceAtBooking);
+};
+
+const getPendingPayment = async (appointmentId: string) => {
+  return prisma.payment.findFirst({
+    where: { appointmentId, status: PaymentStatus.PENDING },
+    orderBy: { createdAt: 'desc' },
+  });
+};
+
+export const ensurePaymentIntent = async (
+  appointmentId: string,
+  performedById: string,
+  where?: { clinicId?: string; patientId?: string }
+) => {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, ...where },
+    select: {
+      id: true,
+      clinicId: true,
+      providerId: true,
+      patientId: true,
+      status: true,
+      paymentStatus: true,
+      paymentRequirementType: true,
+      depositAmount: true,
+      priceAtBooking: true,
+      bookingHoldExpiresAt: true,
+    },
+  });
+
+  if (!appointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (appointment.status !== 'PENDING_PAYMENT') {
+    const err = new Error('Appointment is not pending payment') as ApiError;
+    err.statusCode = 400;
+    err.code = 'invalid_state';
+    throw err;
+  }
+
+  if (
+    appointment.bookingHoldExpiresAt &&
+    appointment.bookingHoldExpiresAt.getTime() <= Date.now()
+  ) {
+    const err = new Error('Slot hold has expired') as ApiError;
+    err.statusCode = 400;
+    err.code = 'expired_hold';
+    throw err;
+  }
+
+  const existing = await getPendingPayment(appointmentId);
+  if (existing?.stripeClientSecret) {
+    return {
+      payment: existing,
+      clientSecret: existing.stripeClientSecret,
+      reused: true,
+    };
+  }
+
+  if (existing?.stripePaymentIntentId) {
+    try {
+      const intent = await stripe.paymentIntents.retrieve(
+        existing.stripePaymentIntentId
+      );
+      const clientSecret = intent.client_secret ?? existing.stripeClientSecret;
+      if (clientSecret && clientSecret !== existing.stripeClientSecret) {
+        await prisma.payment.update({
+          where: { id: existing.id },
+          data: { stripeClientSecret: clientSecret },
+        });
+      }
+      return {
+        payment: {
+          ...existing,
+          stripeClientSecret: clientSecret ?? existing.stripeClientSecret,
+        },
+        clientSecret,
+        reused: true,
+      };
+    } catch (err) {
+      console.error('Stripe PaymentIntent retrieve error:', err);
+    }
+  }
+
+  const amountToCharge = getAmountToCharge(appointment);
+  const amountInCents = Math.round(amountToCharge * 100);
+
+  try {
+    const intent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: 'usd',
+      metadata: {
+        appointmentId: appointment.id,
+        clinicId: appointment.clinicId,
+        patientId: appointment.patientId,
+        type: 'APPOINTMENT',
+      },
+    });
+
+    const payment = existing
+      ? await prisma.payment.update({
+          where: { id: existing.id },
+          data: {
+            stripePaymentIntentId: intent.id,
+            stripeClientSecret: intent.client_secret ?? null,
+          },
+        })
+      : await prisma.payment.create({
+          data: {
+            clinicId: appointment.clinicId,
+            providerId: appointment.providerId,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            amount: amountToCharge,
+            status: PaymentStatus.PENDING,
+            stripePaymentIntentId: intent.id,
+            stripeClientSecret: intent.client_secret ?? null,
+          },
+        });
+
+    await auditService.logAudit({
+      clinicId: appointment.clinicId,
+      entityType: 'Payment',
+      entityId: payment.id,
+      action: existing ? 'PAYMENT_INTENT_REUSED' : 'PAYMENT_INTENT_CREATED',
+      newValue: {
+        appointmentId: appointment.id,
+        stripePaymentIntentId: intent.id,
+      },
+      performedById,
+    });
+
+    return {
+      payment,
+      clientSecret: intent.client_secret ?? null,
+      reused: false,
+    };
+  } catch (err) {
+    console.error('Stripe PaymentIntent create error:', err);
+    return {
+      payment: existing ?? null,
+      clientSecret: null,
+      reused: Boolean(existing),
+    };
+  }
+};
 
 export const confirmPayment = async (
   appointmentId: string,
@@ -45,18 +211,28 @@ export const confirmPayment = async (
     select: { id: true },
   });
 
+  const pendingPayment = await getPendingPayment(appointmentId);
+
   const [payment, updatedAppointment] = await prisma.$transaction([
-    prisma.payment.create({
-      data: {
-        clinicId: appointment.clinicId,
-        providerId: appointment.providerId,
-        invoiceId: invoice?.id ?? null,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        amount,
-        status: PaymentStatus.PAID,
-      },
-    }),
+    pendingPayment
+      ? prisma.payment.update({
+          where: { id: pendingPayment.id },
+          data: {
+            invoiceId: invoice?.id ?? null,
+            status: PaymentStatus.PAID,
+          },
+        })
+      : prisma.payment.create({
+          data: {
+            clinicId: appointment.clinicId,
+            providerId: appointment.providerId,
+            invoiceId: invoice?.id ?? null,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            amount,
+            status: PaymentStatus.PAID,
+          },
+        }),
     prisma.appointment.update({
       where: { id: appointmentId },
       data: {
@@ -127,18 +303,28 @@ export const failPayment = async (
     select: { id: true },
   });
 
+  const pendingPayment = await getPendingPayment(appointmentId);
+
   const [payment, updatedAppointment] = await prisma.$transaction([
-    prisma.payment.create({
-      data: {
-        clinicId: appointment.clinicId,
-        providerId: appointment.providerId,
-        invoiceId: invoice?.id ?? null,
-        appointmentId: appointment.id,
-        patientId: appointment.patientId,
-        amount,
-        status: PaymentStatus.FAILED,
-      },
-    }),
+    pendingPayment
+      ? prisma.payment.update({
+          where: { id: pendingPayment.id },
+          data: {
+            invoiceId: invoice?.id ?? null,
+            status: PaymentStatus.FAILED,
+          },
+        })
+      : prisma.payment.create({
+          data: {
+            clinicId: appointment.clinicId,
+            providerId: appointment.providerId,
+            invoiceId: invoice?.id ?? null,
+            appointmentId: appointment.id,
+            patientId: appointment.patientId,
+            amount,
+            status: PaymentStatus.FAILED,
+          },
+        }),
     prisma.appointment.update({
       where: { id: appointmentId },
       data: { paymentStatus: PaymentStatus.FAILED, updatedById: performedById },
@@ -197,18 +383,27 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
       where: { appointmentId: apt.id, clinicId: apt.clinicId },
       select: { id: true },
     });
+    const pendingPayment = await getPendingPayment(apt.id);
     await prisma.$transaction([
-      prisma.payment.create({
-        data: {
-          clinicId: apt.clinicId,
-          providerId: apt.providerId,
-          invoiceId: invoice?.id ?? null,
-          appointmentId: apt.id,
-          patientId: apt.patientId,
-          amount: apt.priceAtBooking,
-          status: PaymentStatus.FAILED,
-        },
-      }),
+      pendingPayment
+        ? prisma.payment.update({
+            where: { id: pendingPayment.id },
+            data: {
+              invoiceId: invoice?.id ?? null,
+              status: PaymentStatus.FAILED,
+            },
+          })
+        : prisma.payment.create({
+            data: {
+              clinicId: apt.clinicId,
+              providerId: apt.providerId,
+              invoiceId: invoice?.id ?? null,
+              appointmentId: apt.id,
+              patientId: apt.patientId,
+              amount: apt.priceAtBooking,
+              status: PaymentStatus.FAILED,
+            },
+          }),
       prisma.appointment.update({
         where: { id: apt.id },
         data: {

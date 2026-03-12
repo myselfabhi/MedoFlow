@@ -760,6 +760,19 @@ export const createAppointment = async (
           },
         });
         clientSecret = paymentIntent.client_secret ?? undefined;
+
+        await tx.payment.create({
+          data: {
+            clinicId,
+            providerId,
+            appointmentId: appointment.id,
+            patientId,
+            amount: amountToCharge,
+            status: PaymentStatus.PENDING,
+            stripePaymentIntentId: paymentIntent.id,
+            stripeClientSecret: paymentIntent.client_secret ?? null,
+          },
+        });
       } catch (err) {
         console.error('Stripe PaymentIntent Error:', err);
         // We still created the appointment in PENDING_PAYMENT state
