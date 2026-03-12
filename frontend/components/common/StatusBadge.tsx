@@ -13,7 +13,16 @@ export type AppointmentStatus =
   | 'NO_SHOW'
   | 'RESCHEDULED';
 
-export type InvoiceStatus = 'DRAFT' | 'FINALIZED' | 'PENDING_PAYMENT' | 'PAID';
+export type InvoiceStatus =
+  | 'DRAFT'
+  | 'FINALIZED'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'CANCELLED'
+  | 'UNPAID'
+  | 'PARTIALLY_PAID'
+  | 'PARTIALLY_REFUNDED'
+  | 'REFUNDED';
 
 export type TreatmentPlanStatus = 'ACTIVE' | 'COMPLETED' | 'DISCONTINUED';
 
@@ -30,11 +39,16 @@ const APPOINTMENT_MAP: Record<AppointmentStatus, 'outline' | 'warning' | 'accent
   RESCHEDULED: 'neutral',
 };
 
-const INVOICE_MAP: Record<InvoiceStatus, 'outline' | 'warning' | 'accent' | 'success'> = {
+const INVOICE_MAP: Record<InvoiceStatus, 'outline' | 'warning' | 'accent' | 'success' | 'destructive' | 'neutral'> = {
   DRAFT: 'outline',
   FINALIZED: 'accent',
   PENDING_PAYMENT: 'warning',
   PAID: 'success',
+  CANCELLED: 'destructive',
+  UNPAID: 'warning',
+  PARTIALLY_PAID: 'accent',
+  PARTIALLY_REFUNDED: 'neutral',
+  REFUNDED: 'neutral',
 };
 
 const TREATMENT_PLAN_MAP: Record<TreatmentPlanStatus, 'success' | 'neutral' | 'destructive'> = {

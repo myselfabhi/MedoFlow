@@ -35,28 +35,33 @@ export const handleAppointmentPaymentIntentSucceeded = async (
 
   if (!appt) return;
 
+  const existingInvoice = await prisma.invoice.findFirst({
+    where: { appointmentId },
+  });
+  const existingIntentPayment = await prisma.payment.findUnique({
+    where: { stripePaymentIntentId: paymentIntent.id },
+  });
+  const shouldSendConfirmation = appt.paymentStatus !== PaymentStatus.PAID;
+
+  if (
+    existingIntentPayment?.status === PaymentStatus.PAID &&
+    appt.paymentStatus === PaymentStatus.PAID &&
+    existingInvoice?.status === 'PAID'
+  ) {
+    return;
+  }
+
   const nextStatus =
     appt.approvalStatus === 'PENDING'
       ? 'PENDING_PROVIDER_APPROVAL'
       : 'CONFIRMED';
 
-  await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: {
-      paymentStatus: 'PAID',
-      status: nextStatus as any,
-      slotHeldUntil: null,
-      bookingHoldExpiresAt: null,
-    },
-  });
-
   const pendingPayment = await prisma.payment.findFirst({
     where: {
       appointmentId,
-      status: PaymentStatus.PENDING,
       OR: [
         { stripePaymentIntentId: paymentIntent.id },
-        { stripePaymentIntentId: null },
+        { status: PaymentStatus.PENDING },
       ],
     },
     orderBy: { createdAt: 'desc' },
@@ -69,22 +74,43 @@ export const handleAppointmentPaymentIntentSucceeded = async (
         status: PaymentStatus.PAID,
         stripePaymentIntentId: paymentIntent.id,
         stripeClientSecret: paymentIntent.client_secret ?? null,
+        paymentChannel: pendingPayment.paymentChannel ?? 'STRIPE',
+        paymentMethod: pendingPayment.paymentMethod ?? 'CARD',
+        recordedAt: pendingPayment.recordedAt ?? new Date(),
+      },
+    });
+  } else {
+    await prisma.payment.create({
+      data: {
+        clinicId: appt.clinicId,
+        providerId: appt.providerId,
+        invoiceId: existingInvoice?.id ?? null,
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        amount: appt.paymentRequirementType === 'DEPOSIT' && appt.depositAmount
+          ? appt.depositAmount
+          : appt.priceAtBooking,
+        status: PaymentStatus.PAID,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeClientSecret: paymentIntent.client_secret ?? null,
+        paymentChannel: 'STRIPE',
+        paymentMethod: 'CARD',
+        recordedAt: new Date(),
       },
     });
   }
 
-  await emailService.sendAppointmentConfirmation({
-    to: appt.patient.email,
-    patientName: appt.patient.name,
-    appointmentDate: appt.startTime.toLocaleString(),
-    serviceName: appt.service.name,
-    providerName: `${appt.provider.firstName} ${appt.provider.lastName}`,
-    locationName: appt.location?.name || 'Clinic',
-  });
-
-  const existingInvoice = await prisma.invoice.findFirst({
-    where: { appointmentId },
-  });
+  if (appt.paymentStatus !== PaymentStatus.PAID || appt.status === 'PENDING_PAYMENT') {
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        paymentStatus: 'PAID',
+        status: nextStatus as any,
+        slotHeldUntil: null,
+        bookingHoldExpiresAt: null,
+      },
+    });
+  }
 
   if (!existingInvoice) {
     await prisma.invoice.create({
@@ -112,6 +138,17 @@ export const handleAppointmentPaymentIntentSucceeded = async (
     await prisma.invoice.update({
       where: { id: existingInvoice.id },
       data: { status: 'PAID' },
+    });
+  }
+
+  if (shouldSendConfirmation) {
+    await emailService.sendAppointmentConfirmation({
+      to: appt.patient.email,
+      patientName: appt.patient.name,
+      appointmentDate: appt.startTime.toLocaleString(),
+      serviceName: appt.service.name,
+      providerName: `${appt.provider.firstName} ${appt.provider.lastName}`,
+      locationName: appt.location?.name || 'Clinic',
     });
   }
 
@@ -159,6 +196,9 @@ export const handleCartCheckoutPaymentIntentSucceeded = async (
         status: PaymentStatus.PAID,
         stripePaymentIntentId: paymentIntent.id,
         stripeClientSecret: paymentIntent.client_secret ?? null,
+        paymentChannel: pendingPayment.paymentChannel ?? 'STRIPE',
+        paymentMethod: pendingPayment.paymentMethod ?? 'CARD',
+        recordedAt: pendingPayment.recordedAt ?? new Date(),
       },
     });
   } else {
@@ -172,6 +212,9 @@ export const handleCartCheckoutPaymentIntentSucceeded = async (
         status: PaymentStatus.PAID,
         stripePaymentIntentId: paymentIntent.id,
         stripeClientSecret: paymentIntent.client_secret ?? null,
+        paymentChannel: 'STRIPE',
+        paymentMethod: 'CARD',
+        recordedAt: new Date(),
       },
     });
   }

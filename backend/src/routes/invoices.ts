@@ -45,10 +45,22 @@ router.put(
   invoiceController.pay
 );
 
+router.post(
+  '/:id/payments/manual',
+  authorize(Role.PROVIDER, Role.FRONT_DESK, Role.SUPER_ADMIN),
+  invoiceController.recordManualPayment
+);
+
 router.get(
   '/',
   authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
   invoiceController.listByClinic
+);
+
+router.get(
+  '/summary/receivables',
+  authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
+  invoiceController.receivablesSummary
 );
 
 router.get(

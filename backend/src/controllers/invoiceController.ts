@@ -10,7 +10,7 @@ export const create = asyncHandler(
     const clinicId = req.user!.clinicId!;
     const { appointmentId, providerId, patientId, locationId } = req.body;
     
-    if (!providerId) {
+    if (appointmentId && !providerId) {
       const err = new Error('providerId is required') as ApiError;
       err.statusCode = 400;
       throw err;
@@ -25,7 +25,7 @@ export const create = asyncHandler(
     const invoice = await invoiceService.createInvoice(
       appointmentId,
       clinicId,
-      providerId,
+      providerId as string | undefined,
       req.user!.id,
       patientId,
       locationId
@@ -37,10 +37,10 @@ export const create = asyncHandler(
 export const addItem = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const invoiceId = req.params.id as string;
-    const { serviceId, description, unitPrice, quantity } = req.body;
-    if (!serviceId || !description || unitPrice === undefined) {
+    const { serviceId, description, unitPrice, quantity, itemType, itemId } = req.body;
+    if (!serviceId && !(itemType && itemId)) {
       const err = new Error(
-        'serviceId, description, and unitPrice are required'
+        'Either serviceId or itemType + itemId are required'
       ) as ApiError;
       err.statusCode = 400;
       throw err;
@@ -52,11 +52,17 @@ export const addItem = asyncHandler(
       throw err;
     }
     assertClinicAccess(req, invoice.clinicId);
-    const item = await invoiceService.addInvoiceItem(
-      invoiceId,
-      { serviceId, description, unitPrice, quantity },
-      req.user!.id
-    );
+    const item = serviceId
+      ? await invoiceService.addInvoiceItem(
+          invoiceId,
+          { serviceId, description, unitPrice, quantity },
+          req.user!.id
+        )
+      : await invoiceService.addCatalogInvoiceItem(
+          invoiceId,
+          { itemType, itemId, description, unitPrice, quantity },
+          req.user!.id
+        );
     successResponse(res, 201, 'Invoice item added', { item });
   }
 );
@@ -135,6 +141,31 @@ export const pay = asyncHandler(
   }
 );
 
+export const recordManualPayment = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const invoiceId = req.params.id as string;
+    const clinicId = req.user!.clinicId!;
+    const { amount, paymentMethod, notes } = req.body;
+    if (!clinicId) {
+      const err = new Error('Clinic ID is required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    if (amount === undefined || !paymentMethod) {
+      const err = new Error('amount and paymentMethod are required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const result = await invoiceService.recordInvoiceManualPayment(
+      invoiceId,
+      clinicId,
+      req.user!.id,
+      { amount, paymentMethod, notes }
+    );
+    successResponse(res, 200, 'Manual payment recorded', result);
+  }
+);
+
 export const getById = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
@@ -154,8 +185,17 @@ export const listByClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId!;
     const status = req.query.status as string | undefined;
-    const invoices = await invoiceService.getInvoicesByClinic(clinicId, status);
+    const financialStatus = req.query.financialStatus as string | undefined;
+    const invoices = await invoiceService.getInvoicesByClinic(clinicId, status, financialStatus);
     successResponse(res, 200, 'Invoices retrieved', { invoices });
+  }
+);
+
+export const receivablesSummary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.clinicId!;
+    const summary = await invoiceService.getClinicReceivablesSummary(clinicId);
+    successResponse(res, 200, 'Receivables summary retrieved', { summary });
   }
 );
 

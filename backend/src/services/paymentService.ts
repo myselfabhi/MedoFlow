@@ -4,8 +4,10 @@ import * as auditService from './auditService';
 import {
   PaymentRequirementType,
   PaymentStatus,
+  Prisma,
 } from '@prisma/client';
 import stripe from '../config/stripe';
+import { computeInvoiceFinancials, syncInvoiceStatusFromPayments } from './invoiceService';
 
 const getAmountToCharge = (appointment: {
   paymentRequirementType: PaymentRequirementType;
@@ -127,6 +129,8 @@ export const ensurePaymentIntent = async (
           data: {
             stripePaymentIntentId: intent.id,
             stripeClientSecret: intent.client_secret ?? null,
+            paymentChannel: 'STRIPE',
+            paymentMethod: 'CARD',
           },
         })
       : await prisma.payment.create({
@@ -139,6 +143,8 @@ export const ensurePaymentIntent = async (
             status: PaymentStatus.PENDING,
             stripePaymentIntentId: intent.id,
             stripeClientSecret: intent.client_secret ?? null,
+            paymentChannel: 'STRIPE',
+            paymentMethod: 'CARD',
           },
         });
 
@@ -220,6 +226,10 @@ export const confirmPayment = async (
           data: {
             invoiceId: invoice?.id ?? null,
             status: PaymentStatus.PAID,
+            paymentChannel: pendingPayment.paymentChannel ?? 'STRIPE',
+            paymentMethod: pendingPayment.paymentMethod ?? 'CARD',
+            recordedAt: pendingPayment.recordedAt ?? new Date(),
+            recordedById: pendingPayment.recordedById ?? performedById,
           },
         })
       : prisma.payment.create({
@@ -231,6 +241,10 @@ export const confirmPayment = async (
             patientId: appointment.patientId,
             amount,
             status: PaymentStatus.PAID,
+            paymentChannel: 'STRIPE',
+            paymentMethod: 'CARD',
+            recordedAt: new Date(),
+            recordedById: performedById,
           },
         }),
     prisma.appointment.update({
@@ -312,6 +326,8 @@ export const failPayment = async (
           data: {
             invoiceId: invoice?.id ?? null,
             status: PaymentStatus.FAILED,
+            paymentChannel: pendingPayment.paymentChannel ?? 'STRIPE',
+            paymentMethod: pendingPayment.paymentMethod ?? 'CARD',
           },
         })
       : prisma.payment.create({
@@ -323,6 +339,8 @@ export const failPayment = async (
             patientId: appointment.patientId,
             amount,
             status: PaymentStatus.FAILED,
+            paymentChannel: 'STRIPE',
+            paymentMethod: 'CARD',
           },
         }),
     prisma.appointment.update({
@@ -391,6 +409,8 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
             data: {
               invoiceId: invoice?.id ?? null,
               status: PaymentStatus.FAILED,
+              paymentChannel: pendingPayment.paymentChannel ?? 'STRIPE',
+              paymentMethod: pendingPayment.paymentMethod ?? 'CARD',
             },
           })
         : prisma.payment.create({
@@ -402,6 +422,8 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
               patientId: apt.patientId,
               amount: apt.priceAtBooking,
               status: PaymentStatus.FAILED,
+              paymentChannel: 'STRIPE',
+              paymentMethod: 'CARD',
             },
           }),
       prisma.appointment.update({
@@ -438,6 +460,7 @@ export const releaseExpiredPendingPayments = async (): Promise<number> => {
 export const refundPayment = async (
   paymentId: string,
   performedById: string,
+  amountInput?: number | string,
   where?: { clinicId?: string }
 ) => {
   const payment = await prisma.payment.findFirst({
@@ -464,16 +487,42 @@ export const refundPayment = async (
     throw err;
   }
 
-  const existingRefund = await prisma.payment.findFirst({
+  const existingRefund = await prisma.payment.findMany({
     where: {
       refundForPaymentId: payment.id,
       status: PaymentStatus.REFUNDED,
     },
   });
-  if (existingRefund) {
-    const err = new Error('Payment already refunded') as ApiError;
+
+  const refundedSoFar = existingRefund.reduce(
+    (sum, refund) => sum.plus(new Prisma.Decimal(refund.amount).abs()),
+    new Prisma.Decimal(0)
+  );
+  const originalAmount = new Prisma.Decimal(payment.amount);
+  const remainingRefundable = originalAmount.minus(refundedSoFar);
+
+  if (remainingRefundable.lte(0)) {
+    const err = new Error('Payment already fully refunded') as ApiError;
     err.statusCode = 400;
     err.code = 'already_refunded';
+    throw err;
+  }
+
+  const refundAmount = amountInput !== undefined
+    ? new Prisma.Decimal(amountInput)
+    : originalAmount;
+
+  if (refundAmount.lte(0)) {
+    const err = new Error('Refund amount must be greater than zero') as ApiError;
+    err.statusCode = 400;
+    err.code = 'invalid_amount';
+    throw err;
+  }
+
+  if (refundAmount.gt(remainingRefundable)) {
+    const err = new Error('Refund amount exceeds remaining refundable amount') as ApiError;
+    err.statusCode = 400;
+    err.code = 'over_refund';
     throw err;
   }
 
@@ -502,8 +551,22 @@ export const refundPayment = async (
     }
   }
 
-  await stripe.refunds.create({
+  const isPartialRefund = refundAmount.lt(remainingRefundable) || refundAmount.lt(originalAmount);
+  if (
+    isPartialRefund &&
+    invoice?.items.some((item) => Boolean(item.productId || item.packageId))
+  ) {
+    const err = new Error(
+      'Partial refunds are not supported for invoices with products or packages'
+    ) as ApiError;
+    err.statusCode = 400;
+    err.code = 'partial_refund_unsupported';
+    throw err;
+  }
+
+  const stripeRefund = await stripe.refunds.create({
     payment_intent: payment.stripePaymentIntentId,
+    amount: Math.round(Number(refundAmount) * 100),
   });
 
   const results = await prisma.$transaction(async (tx) => {
@@ -514,15 +577,25 @@ export const refundPayment = async (
         invoiceId: payment.invoiceId ?? null,
         appointmentId: payment.appointmentId,
         patientId: payment.patientId,
-        amount: payment.amount.mul(-1),
+        amount: refundAmount.mul(-1),
         status: PaymentStatus.REFUNDED,
         refundForPaymentId: payment.id,
+        stripeRefundId: stripeRefund.id,
+        paymentChannel: payment.paymentChannel ?? 'STRIPE',
+        paymentMethod: payment.paymentMethod ?? 'CARD',
+        recordedById: performedById,
+        recordedAt: new Date(),
+        notes: `Refund against payment ${payment.id}`,
       },
     });
 
     await tx.payment.update({
       where: { id: payment.id },
-      data: { status: PaymentStatus.REFUNDED },
+      data: {
+        status: refundAmount.eq(remainingRefundable)
+          ? PaymentStatus.REFUNDED
+          : PaymentStatus.PARTIALLY_REFUNDED,
+      },
     });
 
     let updatedAppointment = null;
@@ -548,43 +621,42 @@ export const refundPayment = async (
     }
 
     if (payment.invoiceId) {
-      await tx.invoice.update({
-        where: { id: payment.invoiceId },
-        data: { status: 'CANCELLED' },
-      });
+      if (refundAmount.eq(remainingRefundable)) {
+        await tx.commissionRecord.updateMany({
+          where: {
+            invoiceId: payment.invoiceId,
+            status: 'PENDING',
+          },
+          data: {
+            status: 'CANCELLED',
+          },
+        });
 
-      await tx.commissionRecord.updateMany({
-        where: {
-          invoiceId: payment.invoiceId,
-          status: 'PENDING',
-        },
-        data: {
-          status: 'CANCELLED',
-        },
-      });
-
-      const invoiceProducts = await tx.invoiceItem.findMany({
-        where: { invoiceId: payment.invoiceId, productId: { not: null } },
-      });
-      for (const item of invoiceProducts) {
-        if (item.productId) {
-          await tx.inventoryItem.updateMany({
-            where: { clinicId: payment.clinicId, productId: item.productId },
-            data: { quantityInStock: { increment: item.quantity } },
-          });
+        const invoiceProducts = await tx.invoiceItem.findMany({
+          where: { invoiceId: payment.invoiceId, productId: { not: null } },
+        });
+        for (const item of invoiceProducts) {
+          if (item.productId) {
+            await tx.inventoryItem.updateMany({
+              where: { clinicId: payment.clinicId, productId: item.productId },
+              data: { quantityInStock: { increment: item.quantity } },
+            });
+          }
         }
+
+        await tx.patientPackage.updateMany({
+          where: {
+            invoiceId: payment.invoiceId,
+            usedSessions: 0,
+            status: 'ACTIVE',
+          },
+          data: {
+            status: 'CANCELLED',
+          },
+        });
       }
 
-      await tx.patientPackage.updateMany({
-        where: {
-          invoiceId: payment.invoiceId,
-          usedSessions: 0,
-          status: 'ACTIVE',
-        },
-        data: {
-          status: 'CANCELLED',
-        },
-      });
+      await syncInvoiceStatusFromPayments(payment.invoiceId, tx);
     }
 
     return { refund, updatedAppointment };
@@ -601,9 +673,29 @@ export const refundPayment = async (
       refundPaymentId: refund.id,
       originalAmount: Number(payment.amount),
       refundAmount: Number(refund.amount),
+      partial: refundAmount.lt(originalAmount),
     },
     performedById,
   });
+
+  if (payment.invoiceId && payment.appointmentId) {
+    const refreshedInvoice = await prisma.invoice.findUnique({
+      where: { id: payment.invoiceId },
+      include: { payments: true },
+    });
+    if (refreshedInvoice) {
+      const financials = computeInvoiceFinancials(refreshedInvoice);
+      await prisma.appointment.update({
+        where: { id: payment.appointmentId },
+        data: {
+          paymentStatus: financials.outstandingAmount.lte(0)
+            ? PaymentStatus.PAID
+            : PaymentStatus.PENDING,
+          updatedById: performedById,
+        },
+      });
+    }
+  }
 
   return { refund, appointment: updatedAppointment };
 };

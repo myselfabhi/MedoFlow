@@ -771,6 +771,8 @@ export const createAppointment = async (
             status: PaymentStatus.PENDING,
             stripePaymentIntentId: paymentIntent.id,
             stripeClientSecret: paymentIntent.client_secret ?? null,
+            paymentChannel: 'STRIPE',
+            paymentMethod: 'CARD',
           },
         });
       } catch (err) {

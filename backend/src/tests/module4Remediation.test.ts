@@ -23,10 +23,14 @@ const restore = <T extends object, K extends keyof T>(
 
 test('invoice finalize and pay path updates statuses cleanly', async () => {
   const originalFindFirst = prisma.invoice.findFirst;
+  const originalFindUnique = prisma.invoice.findUnique;
   const originalUpdate = prisma.invoice.update;
+  const originalPaymentCreate = prisma.payment.create;
+  const originalTransaction = prisma.$transaction;
   const originalLogAudit = auditService.logAudit;
 
   const updatedStatuses: string[] = [];
+  const payments: any[] = [];
 
   try {
     let currentStatus = 'DRAFT';
@@ -34,8 +38,26 @@ test('invoice finalize and pay path updates statuses cleanly', async () => {
       id: 'invoice-1',
       clinicId: 'clinic-1',
       status: currentStatus,
-      totalAmount: { toNumber: () => 125 },
+      totalAmount: new Prisma.Decimal(125),
       items: [{ id: 'item-1' }],
+      payments,
+      patientId: 'patient-1',
+      providerId: null,
+      appointmentId: null,
+    });
+    (prisma.invoice.findUnique as any) = async () => ({
+      id: 'invoice-1',
+      clinicId: 'clinic-1',
+      status: currentStatus,
+      totalAmount: new Prisma.Decimal(125),
+      items: [],
+      appointment: null,
+      patient: null,
+      provider: null,
+      payments,
+      patientId: 'patient-1',
+      providerId: null,
+      appointmentId: null,
     });
     (prisma.invoice.update as any) = async ({
       data,
@@ -48,13 +70,32 @@ test('invoice finalize and pay path updates statuses cleanly', async () => {
         id: 'invoice-1',
         clinicId: 'clinic-1',
         status: data.status,
-        totalAmount: { toNumber: () => 125 },
+        totalAmount: new Prisma.Decimal(125),
         items: [],
         appointment: null,
         patient: null,
         provider: null,
+        payments,
       };
     };
+    (prisma.payment.create as any) = async ({ data }: any) => {
+      const payment = { id: 'payment-1', ...data };
+      payments.push(payment);
+      return payment;
+    };
+    (prisma.$transaction as any) = async (callback: (tx: any) => Promise<any>) =>
+      callback({
+        payment: {
+          create: prisma.payment.create,
+        },
+        invoice: {
+          findUnique: prisma.invoice.findUnique,
+          update: prisma.invoice.update,
+        },
+        appointment: {
+          update: async () => null,
+        },
+      });
     (auditService.logAudit as any) = async () => {};
 
     const finalized = await invoiceService.finalizeInvoice(
@@ -66,10 +107,15 @@ test('invoice finalize and pay path updates statuses cleanly', async () => {
 
     const paid = await invoiceService.payInvoice('invoice-1', 'clinic-1', 'user-1');
     assert.equal(paid.status, 'PAID');
+    assert.equal(payments.length, 1);
+    assert.equal(payments[0].paymentChannel, 'MANUAL');
     assert.deepEqual(updatedStatuses, ['FINALIZED', 'PAID']);
   } finally {
     restore(prisma.invoice, 'findFirst', originalFindFirst);
+    restore(prisma.invoice, 'findUnique', originalFindUnique);
     restore(prisma.invoice, 'update', originalUpdate);
+    restore(prisma.payment, 'create', originalPaymentCreate);
+    restore(prisma, '$transaction', originalTransaction);
     restore(auditService, 'logAudit', originalLogAudit);
   }
 });
@@ -300,6 +346,7 @@ test('cart webhook payment handling is idempotent and provisions sale side effec
 
 test('stripe-backed refund updates local ledger and restocks inventory', async () => {
   const originalPaymentFindFirst = prisma.payment.findFirst;
+  const originalPaymentFindMany = prisma.payment.findMany;
   const originalInvoiceFindUnique = prisma.invoice.findUnique;
   const originalUsageCount = prisma.packageSessionUsage.count;
   const originalStripeRefundCreate = stripe.refunds.create;
@@ -312,26 +359,30 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
   let inventoryRestocked = false;
   let packageCancelled = false;
   let commissionsCancelled = false;
+  const invoicePayments: any[] = [
+    {
+      id: 'payment-1',
+      amount: new Prisma.Decimal(120),
+      status: 'PAID',
+      refundForPaymentId: null,
+    },
+  ];
 
   try {
-    let refundLookup = false;
-    (prisma.payment.findFirst as any) = async ({ where }: any) => {
-      if (where?.refundForPaymentId) {
-        refundLookup = true;
-        return null;
-      }
-      return {
-        id: 'payment-1',
-        clinicId: 'clinic-1',
-        providerId: null,
-        invoiceId: 'invoice-1',
-        appointmentId: null,
-        patientId: 'patient-1',
-        amount: { mul: (n: number) => -120 * Math.abs(n) },
-        status: 'PAID',
-        stripePaymentIntentId: 'pi_paid_1',
-      };
-    };
+    (prisma.payment.findFirst as any) = async () => ({
+      id: 'payment-1',
+      clinicId: 'clinic-1',
+      providerId: null,
+      invoiceId: 'invoice-1',
+      appointmentId: null,
+      patientId: 'patient-1',
+      amount: new Prisma.Decimal(120),
+      status: 'PAID',
+      stripePaymentIntentId: 'pi_paid_1',
+      paymentChannel: 'STRIPE',
+      paymentMethod: 'CARD',
+    });
+    (prisma.payment.findMany as any) = async () => [];
     (prisma.invoice.findUnique as any) = async () => ({
       id: 'invoice-1',
       items: [{ id: 'item-1', productId: 'product-1', quantity: 2 }],
@@ -344,12 +395,15 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
     (prisma.$transaction as any) = async (callback: (tx: any) => Promise<any>) =>
       callback({
         payment: {
-          create: async () => {
+          create: async ({ data }: any) => {
             refundRowCreated = true;
-            return { id: 'refund-1', amount: -120 };
+            const refund = { id: 'refund-1', ...data };
+            invoicePayments.push(refund);
+            return refund;
           },
           update: async () => {
             originalPaymentRefunded = true;
+            invoicePayments[0].status = 'REFUNDED';
             return { id: 'payment-1' };
           },
         },
@@ -357,6 +411,12 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
           update: async () => null,
         },
         invoice: {
+          findUnique: async () => ({
+            id: 'invoice-1',
+            status: invoiceCancelled ? 'CANCELLED' : 'PAID',
+            totalAmount: new Prisma.Decimal(120),
+            payments: invoicePayments,
+          }),
           update: async () => {
             invoiceCancelled = true;
             return { id: 'invoice-1' };
@@ -386,11 +446,13 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
       });
     (auditService.logAudit as any) = async () => {};
 
-    const result = await paymentService.refundPayment('payment-1', 'user-1', {
-      clinicId: 'clinic-1',
-    });
+    const result = await paymentService.refundPayment(
+      'payment-1',
+      'user-1',
+      undefined,
+      { clinicId: 'clinic-1' }
+    );
 
-    assert.equal(refundLookup, true);
     assert.equal(refundRowCreated, true);
     assert.equal(originalPaymentRefunded, true);
     assert.equal(invoiceCancelled, true);
@@ -400,6 +462,7 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
     assert.equal((result.refund as any).id, 'refund-1');
   } finally {
     restore(prisma.payment, 'findFirst', originalPaymentFindFirst);
+    restore(prisma.payment, 'findMany', originalPaymentFindMany);
     restore(prisma.invoice, 'findUnique', originalInvoiceFindUnique);
     restore(prisma.packageSessionUsage, 'count', originalUsageCount);
     restore(stripe.refunds, 'create', originalStripeRefundCreate);
@@ -410,31 +473,406 @@ test('stripe-backed refund updates local ledger and restocks inventory', async (
 
 test('duplicate refund is rejected safely', async () => {
   const originalPaymentFindFirst = prisma.payment.findFirst;
+  const originalPaymentFindMany = prisma.payment.findMany;
 
   try {
-    let callCount = 0;
-    (prisma.payment.findFirst as any) = async ({ where }: any) => {
-      callCount += 1;
-      if (where?.refundForPaymentId) {
-        return { id: 'refund-existing', status: 'REFUNDED' };
-      }
-      return {
+    let refundLookupCount = 0;
+    (prisma.payment.findFirst as any) = async () => ({
         id: 'payment-1',
         clinicId: 'clinic-1',
         patientId: 'patient-1',
         amount: 100,
         status: 'PAID',
         stripePaymentIntentId: 'pi_1',
-      };
+      });
+    (prisma.payment.findMany as any) = async () => {
+      refundLookupCount += 1;
+      return [{ id: 'refund-existing', status: 'REFUNDED', amount: -100 }];
     };
 
     await assert.rejects(
-      () => paymentService.refundPayment('payment-1', 'user-1', { clinicId: 'clinic-1' }),
+      () =>
+        paymentService.refundPayment('payment-1', 'user-1', undefined, {
+          clinicId: 'clinic-1',
+        }),
       (err: any) => err?.code === 'already_refunded' && err?.statusCode === 400
     );
-    assert.equal(callCount >= 2, true);
+    assert.equal(refundLookupCount, 1);
   } finally {
     restore(prisma.payment, 'findFirst', originalPaymentFindFirst);
+    restore(prisma.payment, 'findMany', originalPaymentFindMany);
+  }
+});
+
+test('partial refund succeeds within remaining refundable amount for service-only invoice', async () => {
+  const originalPaymentFindFirst = prisma.payment.findFirst;
+  const originalPaymentFindMany = prisma.payment.findMany;
+  const originalInvoiceFindUnique = prisma.invoice.findUnique;
+  const originalUsageCount = prisma.packageSessionUsage.count;
+  const originalStripeRefundCreate = stripe.refunds.create;
+  const originalTransaction = prisma.$transaction;
+  const originalLogAudit = auditService.logAudit;
+
+  let originalPaymentStatus = 'PAID';
+  let refundAmountCreated = 0;
+  let commissionsCancelled = false;
+  let inventoryTouched = false;
+  let packageTouched = false;
+
+  try {
+    (prisma.payment.findFirst as any) = async () => ({
+      id: 'payment-1',
+      clinicId: 'clinic-1',
+      providerId: 'provider-1',
+      invoiceId: 'invoice-1',
+      appointmentId: null,
+      patientId: 'patient-1',
+      amount: new Prisma.Decimal(100),
+      status: 'PAID',
+      stripePaymentIntentId: 'pi_1',
+      paymentChannel: 'STRIPE',
+      paymentMethod: 'CARD',
+    });
+    (prisma.payment.findMany as any) = async () => [];
+    (prisma.invoice.findUnique as any) = async () => ({
+      id: 'invoice-1',
+      items: [{ id: 'item-1', serviceId: 'service-1', productId: null, packageId: null, quantity: 1 }],
+    });
+    (prisma.packageSessionUsage.count as any) = async () => 0;
+    (stripe.refunds.create as any) = async ({ amount }: any) => {
+      assert.equal(amount, 3000);
+      return { id: 're_partial_1' };
+    };
+    (prisma.$transaction as any) = async (callback: (tx: any) => Promise<any>) =>
+      callback({
+        payment: {
+          create: async ({ data }: any) => {
+            refundAmountCreated = Number(data.amount);
+            return { id: 'refund-1', ...data };
+          },
+          update: async ({ data }: any) => {
+            originalPaymentStatus = data.status;
+            return { id: 'payment-1' };
+          },
+        },
+        appointment: {
+          update: async () => null,
+        },
+        invoice: {
+          findUnique: async () => ({
+            id: 'invoice-1',
+            status: 'FINALIZED',
+            totalAmount: new Prisma.Decimal(100),
+            payments: [
+              { amount: new Prisma.Decimal(100), status: originalPaymentStatus, refundForPaymentId: null },
+              { amount: new Prisma.Decimal(-30), status: 'REFUNDED', refundForPaymentId: 'payment-1' },
+            ],
+          }),
+          update: async () => ({ id: 'invoice-1' }),
+        },
+        commissionRecord: {
+          updateMany: async () => {
+            commissionsCancelled = true;
+            return { count: 1 };
+          },
+        },
+        invoiceItem: {
+          findMany: async () => [],
+        },
+        inventoryItem: {
+          updateMany: async () => {
+            inventoryTouched = true;
+            return { count: 1 };
+          },
+        },
+        patientPackage: {
+          updateMany: async () => {
+            packageTouched = true;
+            return { count: 1 };
+          },
+        },
+      });
+    (auditService.logAudit as any) = async () => {};
+
+    const result = await paymentService.refundPayment(
+      'payment-1',
+      'user-1',
+      30,
+      { clinicId: 'clinic-1' }
+    );
+
+    assert.equal(Number(result.refund.amount), -30);
+    assert.equal(refundAmountCreated, -30);
+    assert.equal(originalPaymentStatus, 'PARTIALLY_REFUNDED');
+    assert.equal(commissionsCancelled, false);
+    assert.equal(inventoryTouched, false);
+    assert.equal(packageTouched, false);
+  } finally {
+    restore(prisma.payment, 'findFirst', originalPaymentFindFirst);
+    restore(prisma.payment, 'findMany', originalPaymentFindMany);
+    restore(prisma.invoice, 'findUnique', originalInvoiceFindUnique);
+    restore(prisma.packageSessionUsage, 'count', originalUsageCount);
+    restore(stripe.refunds, 'create', originalStripeRefundCreate);
+    restore(prisma, '$transaction', originalTransaction);
+    restore(auditService, 'logAudit', originalLogAudit);
+  }
+});
+
+test('over-refund is rejected safely', async () => {
+  const originalPaymentFindFirst = prisma.payment.findFirst;
+  const originalPaymentFindMany = prisma.payment.findMany;
+
+  try {
+    (prisma.payment.findFirst as any) = async () => ({
+      id: 'payment-1',
+      clinicId: 'clinic-1',
+      patientId: 'patient-1',
+      amount: new Prisma.Decimal(100),
+      status: 'PAID',
+      stripePaymentIntentId: 'pi_1',
+    });
+    (prisma.payment.findMany as any) = async () => [
+      { id: 'refund-1', amount: new Prisma.Decimal(-40), status: 'REFUNDED' },
+    ];
+
+    await assert.rejects(
+      () =>
+        paymentService.refundPayment('payment-1', 'user-1', 70, {
+          clinicId: 'clinic-1',
+        }),
+      (err: any) => err?.code === 'over_refund' && err?.statusCode === 400
+    );
+  } finally {
+    restore(prisma.payment, 'findFirst', originalPaymentFindFirst);
+    restore(prisma.payment, 'findMany', originalPaymentFindMany);
+  }
+});
+
+test('manual invoice payment records ledger state and leaves partial balance visible', async () => {
+  const originalFindFirst = prisma.invoice.findFirst;
+  const originalFindUnique = prisma.invoice.findUnique;
+  const originalPaymentCreate = prisma.payment.create;
+  const originalTransaction = prisma.$transaction;
+  const originalLogAudit = auditService.logAudit;
+
+  const payments: any[] = [];
+
+  try {
+    (prisma.invoice.findFirst as any) = async () => ({
+      id: 'invoice-1',
+      clinicId: 'clinic-1',
+      patientId: 'patient-1',
+      providerId: null,
+      appointmentId: null,
+      status: 'FINALIZED',
+      totalAmount: new Prisma.Decimal(100),
+      payments,
+    });
+    (prisma.invoice.findUnique as any) = async () => ({
+      id: 'invoice-1',
+      clinicId: 'clinic-1',
+      patientId: 'patient-1',
+      providerId: null,
+      appointmentId: null,
+      status: 'FINALIZED',
+      totalAmount: new Prisma.Decimal(100),
+      items: [],
+      appointment: null,
+      patient: null,
+      provider: null,
+      payments,
+    });
+    (prisma.payment.create as any) = async ({ data }: any) => {
+      const payment = { id: `payment-${payments.length + 1}`, ...data };
+      payments.push(payment);
+      return payment;
+    };
+    (prisma.$transaction as any) = async (callback: (tx: any) => Promise<any>) =>
+      callback({
+        payment: {
+          create: prisma.payment.create,
+        },
+        invoice: {
+          findUnique: prisma.invoice.findUnique,
+          update: async () => ({ id: 'invoice-1' }),
+        },
+        appointment: {
+          update: async () => null,
+        },
+      });
+    (auditService.logAudit as any) = async () => {};
+
+    const result = await invoiceService.recordInvoiceManualPayment(
+      'invoice-1',
+      'clinic-1',
+      'front-desk-1',
+      { amount: 40, paymentMethod: 'CASH', notes: 'Collected at desk' }
+    );
+
+    assert.equal(result.payment.paymentChannel, 'MANUAL');
+    assert.equal(result.payment.paymentMethod, 'CASH');
+    assert.equal(result.invoice?.financialStatus, 'PARTIALLY_PAID');
+    assert.equal(Number(result.invoice?.totalPaid), 40);
+    assert.equal(Number(result.invoice?.outstandingAmount), 60);
+  } finally {
+    restore(prisma.invoice, 'findFirst', originalFindFirst);
+    restore(prisma.invoice, 'findUnique', originalFindUnique);
+    restore(prisma.payment, 'create', originalPaymentCreate);
+    restore(prisma, '$transaction', originalTransaction);
+    restore(auditService, 'logAudit', originalLogAudit);
+  }
+});
+
+test('receivables summary computes outstanding and partial states from invoice ledger', async () => {
+  const originalFindMany = prisma.invoice.findMany;
+
+  try {
+    (prisma.invoice.findMany as any) = async () => [
+      {
+        id: 'invoice-unpaid',
+        status: 'FINALIZED',
+        totalAmount: new Prisma.Decimal(100),
+        payments: [],
+      },
+      {
+        id: 'invoice-partial',
+        status: 'FINALIZED',
+        totalAmount: new Prisma.Decimal(100),
+        payments: [{ amount: new Prisma.Decimal(25), status: 'PAID' }],
+      },
+      {
+        id: 'invoice-refunded',
+        status: 'CANCELLED',
+        totalAmount: new Prisma.Decimal(100),
+        payments: [
+          { amount: new Prisma.Decimal(100), status: 'REFUNDED' },
+          { amount: new Prisma.Decimal(-100), status: 'REFUNDED' },
+        ],
+      },
+    ];
+
+    const summary = await invoiceService.getClinicReceivablesSummary('clinic-1');
+
+    assert.equal(Number(summary.totalOutstandingAmount), 175);
+    assert.equal(summary.outstandingInvoiceCount, 2);
+    assert.equal(summary.unpaidCount, 1);
+    assert.equal(summary.partiallyPaidCount, 1);
+    assert.equal(summary.refundedCount, 1);
+  } finally {
+    restore(prisma.invoice, 'findMany', originalFindMany);
+  }
+});
+
+test('appointment payment webhook is idempotent across repeated success events', async () => {
+  const originalAppointmentFindUnique = prisma.appointment.findUnique;
+  const originalAppointmentUpdate = prisma.appointment.update;
+  const originalInvoiceFindFirst = prisma.invoice.findFirst;
+  const originalInvoiceUpdate = prisma.invoice.update;
+  const originalPaymentFindUnique = prisma.payment.findUnique;
+  const originalPaymentFindFirst = prisma.payment.findFirst;
+  const originalPaymentUpdate = prisma.payment.update;
+  const originalPaymentCreate = prisma.payment.create;
+  const originalSendConfirmation = emailService.sendAppointmentConfirmation;
+  const originalCalculateCommissions = commissionService.calculateCommissions;
+
+  let appointmentPaymentStatus = 'PENDING';
+  let appointmentStatus = 'PENDING_PAYMENT';
+  let invoiceStatus = 'FINALIZED';
+  let existingIntentPaid = false;
+  let paymentUpdates = 0;
+  let paymentCreates = 0;
+  let appointmentUpdates = 0;
+  let invoiceUpdates = 0;
+  let emailCalls = 0;
+  let commissionCalls = 0;
+
+  try {
+    (prisma.appointment.findUnique as any) = async () => ({
+      id: 'appointment-1',
+      clinicId: 'clinic-1',
+      providerId: 'provider-1',
+      patientId: 'patient-1',
+      serviceId: 'service-1',
+      paymentRequirementType: 'FULL',
+      depositAmount: null,
+      priceAtBooking: new Prisma.Decimal(75),
+      approvalStatus: 'APPROVED',
+      paymentStatus: appointmentPaymentStatus,
+      status: appointmentStatus,
+      startTime: new Date('2026-03-12T10:00:00.000Z'),
+      service: { name: 'Consultation' },
+      patient: { email: 'patient@example.com', name: 'Patient One' },
+      provider: { firstName: 'Abhi', lastName: 'Verma', user: { name: 'Abhi Verma' } },
+      location: { name: 'Online' },
+    });
+    (prisma.invoice.findFirst as any) = async () => ({
+      id: 'invoice-1',
+      status: invoiceStatus,
+    });
+    (prisma.payment.findUnique as any) = async () =>
+      existingIntentPaid ? { id: 'payment-1', status: 'PAID', stripePaymentIntentId: 'pi_1' } : null;
+    (prisma.payment.findFirst as any) = async () => ({
+      id: 'payment-1',
+      status: existingIntentPaid ? 'PAID' : 'PENDING',
+      paymentChannel: 'STRIPE',
+      paymentMethod: 'CARD',
+      recordedAt: null,
+    });
+    (prisma.payment.update as any) = async () => {
+      existingIntentPaid = true;
+      paymentUpdates += 1;
+      return { id: 'payment-1' };
+    };
+    (prisma.payment.create as any) = async () => {
+      paymentCreates += 1;
+      return { id: 'payment-created' };
+    };
+    (prisma.appointment.update as any) = async () => {
+      appointmentPaymentStatus = 'PAID';
+      appointmentStatus = 'CONFIRMED';
+      appointmentUpdates += 1;
+      return { id: 'appointment-1' };
+    };
+    (prisma.invoice.update as any) = async () => {
+      invoiceStatus = 'PAID';
+      invoiceUpdates += 1;
+      return { id: 'invoice-1' };
+    };
+    (emailService.sendAppointmentConfirmation as any) = async () => {
+      emailCalls += 1;
+    };
+    (commissionService.calculateCommissions as any) = async () => {
+      commissionCalls += 1;
+    };
+
+    await webhookController.handleAppointmentPaymentIntentSucceeded({
+      id: 'pi_1',
+      metadata: { appointmentId: 'appointment-1' },
+      client_secret: 'secret_1',
+    });
+    await webhookController.handleAppointmentPaymentIntentSucceeded({
+      id: 'pi_1',
+      metadata: { appointmentId: 'appointment-1' },
+      client_secret: 'secret_1',
+    });
+
+    assert.equal(paymentUpdates, 1);
+    assert.equal(paymentCreates, 0);
+    assert.equal(appointmentUpdates, 1);
+    assert.equal(invoiceUpdates, 1);
+    assert.equal(emailCalls, 1);
+    assert.equal(commissionCalls, 1);
+  } finally {
+    restore(prisma.appointment, 'findUnique', originalAppointmentFindUnique);
+    restore(prisma.appointment, 'update', originalAppointmentUpdate);
+    restore(prisma.invoice, 'findFirst', originalInvoiceFindFirst);
+    restore(prisma.invoice, 'update', originalInvoiceUpdate);
+    restore(prisma.payment, 'findUnique', originalPaymentFindUnique);
+    restore(prisma.payment, 'findFirst', originalPaymentFindFirst);
+    restore(prisma.payment, 'update', originalPaymentUpdate);
+    restore(prisma.payment, 'create', originalPaymentCreate);
+    restore(emailService, 'sendAppointmentConfirmation', originalSendConfirmation);
+    restore(commissionService, 'calculateCommissions', originalCalculateCommissions);
   }
 });
 

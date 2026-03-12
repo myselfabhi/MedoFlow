@@ -3,48 +3,63 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getInvoices,
-  payInvoice,
+  getReceivablesSummary,
+  recordManualInvoicePayment,
+  refundPayment,
   type Invoice,
+  type InvoicePayment,
 } from '@/lib/invoiceApi';
 import {
   AppCard,
+  AppCardContent,
   AppCardHeader,
   AppCardTitle,
-  AppCardContent,
   AppButton,
   AppPageHeader,
   AppEmptyState,
+  AppModal,
 } from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useAppToast } from '@/hooks/useAppToast';
 
-const STATUS_OPTIONS = [
-  { value: 'ALL', label: 'All' },
+const DOC_STATUS_OPTIONS = [
+  { value: 'ALL', label: 'All documents' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'FINALIZED', label: 'Finalized' },
-  { value: 'PAID', label: 'Paid' },
+  { value: 'PAID', label: 'Paid document' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-function formatDate(iso: string) {
+const FINANCE_STATUS_OPTIONS = [
+  { value: 'ALL', label: 'All balances' },
+  { value: 'UNPAID', label: 'Unpaid' },
+  { value: 'PARTIALLY_PAID', label: 'Partially paid' },
+  { value: 'PAID', label: 'Paid' },
+  { value: 'PARTIALLY_REFUNDED', label: 'Partially refunded' },
+  { value: 'REFUNDED', label: 'Refunded' },
+];
+
+const MANUAL_PAYMENT_METHODS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CHECK', label: 'Check' },
+  { value: 'CARD_PRESENT', label: 'Card (manual/offline)' },
+  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+function formatCurrency(amount?: string | number | null) {
+  return `$${Number(amount ?? 0).toFixed(2)}`;
+}
+
+function formatDate(iso?: string | null) {
+  if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -52,23 +67,12 @@ function formatDate(iso: string) {
   });
 }
 
-function formatPatient(inv: Invoice) {
-  if (inv.patient?.name) return inv.patient.name;
-  return '—';
-}
-
-function formatProvider(inv: Invoice) {
-  if (inv.provider) {
-    return `${inv.provider.firstName} ${inv.provider.lastName}`;
-  }
-  return '—';
-}
-
-function formatAppointmentDate(inv: Invoice) {
-  if (inv.appointment?.startTime) {
-    return formatDate(inv.appointment.startTime);
-  }
-  return '—';
+function refundableRemaining(payment: InvoicePayment, allPayments: InvoicePayment[]) {
+  const paymentAmount = Number(payment.amount);
+  const refunded = allPayments
+    .filter((entry) => entry.refundForPaymentId === payment.id)
+    .reduce((sum, entry) => sum + Math.abs(Number(entry.amount)), 0);
+  return Math.max(paymentAmount - refunded, 0);
 }
 
 export default function FrontDeskInvoicesPage() {
@@ -76,35 +80,96 @@ export default function FrontDeskInvoicesPage() {
   const router = useRouter();
   const toast = useAppToast();
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
   const clinicId = user?.clinicId ?? undefined;
+  const [docStatusFilter, setDocStatusFilter] = React.useState('ALL');
+  const [financeStatusFilter, setFinanceStatusFilter] = React.useState('ALL');
+  const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = React.useState('CASH');
+  const [paymentAmount, setPaymentAmount] = React.useState('');
+  const [paymentNotes, setPaymentNotes] = React.useState('');
+  const [refundInvoice, setRefundInvoice] = React.useState<Invoice | null>(null);
+  const [refundPaymentId, setRefundPaymentId] = React.useState('');
+  const [refundAmount, setRefundAmount] = React.useState('');
 
-  const isAllowed =
-    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
+  const isAllowed = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', statusFilter],
-    queryFn: () =>
-      getInvoices(statusFilter === 'ALL' ? undefined : statusFilter),
+    queryKey: ['front-desk-invoices', docStatusFilter, financeStatusFilter],
+    queryFn: () => getInvoices(docStatusFilter === 'ALL' ? undefined : docStatusFilter),
     enabled: !!clinicId,
   });
 
-  const payMutation = useMutation({
-    mutationFn: (invoiceId: string) => payInvoice(invoiceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success('Invoice marked as paid');
-    },
-    onError: () => toast.error('Failed to mark invoice as paid'),
+  const { data: receivables } = useQuery({
+    queryKey: ['receivables-summary'],
+    queryFn: () => getReceivablesSummary(),
+    enabled: !!clinicId,
   });
 
-  if (!clinicId && isAllowed) {
+  const filteredInvoices = React.useMemo(
+    () =>
+      financeStatusFilter === 'ALL'
+        ? invoices
+        : invoices.filter((invoice) => invoice.financialStatus === financeStatusFilter),
+    [financeStatusFilter, invoices]
+  );
+
+  const collectMutation = useMutation({
+    mutationFn: (payload: { invoiceId: string; amount: number; paymentMethod: string; notes?: string }) =>
+      recordManualInvoicePayment(payload.invoiceId, {
+        amount: payload.amount,
+        paymentMethod: payload.paymentMethod,
+        notes: payload.notes,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['front-desk-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      toast.success('Manual payment recorded');
+      setPaymentInvoice(null);
+      setPaymentAmount('');
+      setPaymentNotes('');
+    },
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message || 'Failed to record manual payment'),
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: (payload: { paymentId: string; amount?: number }) =>
+      refundPayment(payload.paymentId, payload.amount ? { amount: payload.amount } : undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['front-desk-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables-summary'] });
+      toast.success('Refund recorded');
+      setRefundInvoice(null);
+      setRefundPaymentId('');
+      setRefundAmount('');
+    },
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message || 'Failed to refund payment'),
+  });
+
+  const eligibleRefundPayments = React.useMemo(() => {
+    if (!refundInvoice?.payments) return [];
+    return refundInvoice.payments.filter((payment) => {
+      const amount = Number(payment.amount);
+      return amount > 0 && refundableRemaining(payment, refundInvoice.payments ?? []) > 0;
+    });
+  }, [refundInvoice]);
+
+  React.useEffect(() => {
+    if (!refundInvoice) return;
+    if (eligibleRefundPayments.length > 0 && !refundPaymentId) {
+      setRefundPaymentId(eligibleRefundPayments[0].id);
+    }
+  }, [eligibleRefundPayments, refundInvoice, refundPaymentId]);
+
+  if (!isAllowed) {
+    return null;
+  }
+
+  if (!clinicId) {
     return (
       <div className="space-y-6">
-        <AppPageHeader
-          title="Invoices"
-          description="Manage clinic invoices and billing"
-        />
+        <AppPageHeader title="Billing Operations" description="Front-desk billing and AR" />
         <AppEmptyState
           title="No clinic assigned"
           description="You are not assigned to a clinic. Contact your administrator."
@@ -113,157 +178,281 @@ export default function FrontDeskInvoicesPage() {
     );
   }
 
-  if (!isAllowed) {
-    return (
-      <div className="space-y-6">
-        <AppPageHeader
-          title="Invoices"
-          description="Manage clinic invoices and billing"
-        />
-        <AppCard>
-          <AppCardContent>
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-6 text-center">
-              <p className="text-sm text-danger">
-                Access denied. This page is for front desk staff only.
-              </p>
-              <Link
-                href="/dashboard"
-                className="mt-3 inline-block text-sm text-accent hover:underline"
-              >
-                ← Back to dashboard
-              </Link>
-            </div>
-          </AppCardContent>
-        </AppCard>
-      </div>
-    );
-  }
+  const submitManualPayment = () => {
+    if (!paymentInvoice) return;
+    const amount =
+      paymentAmount.trim().length > 0
+        ? Number(paymentAmount)
+        : Number(paymentInvoice.outstandingAmount);
+    collectMutation.mutate({
+      invoiceId: paymentInvoice.id,
+      amount,
+      paymentMethod,
+      notes: paymentNotes.trim() || undefined,
+    });
+  };
+
+  const submitRefund = () => {
+    if (!refundPaymentId) {
+      toast.error('Select a payment to refund');
+      return;
+    }
+    refundMutation.mutate({
+      paymentId: refundPaymentId,
+      amount: refundAmount.trim().length > 0 ? Number(refundAmount) : undefined,
+    });
+  };
 
   return (
     <div className="space-y-6">
       <AppPageHeader
-        title="Invoices"
-        description="Manage clinic invoices and billing"
+        title="Billing Operations"
+        description="Outstanding balances, invoice collection, and refunds"
       />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Outstanding AR</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent>
+            <div className="text-3xl font-bold text-slate-900">
+              {formatCurrency(receivables?.totalOutstandingAmount)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {receivables?.outstandingInvoiceCount ?? 0} invoices still need collection
+            </p>
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Partial States</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="space-y-2 text-sm text-slate-700">
+            <div>Partially paid: {receivables?.partiallyPaidCount ?? 0}</div>
+            <div>Partially refunded: {receivables?.partiallyRefundedCount ?? 0}</div>
+            <div>Refunded: {receivables?.refundedCount ?? 0}</div>
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Quick Actions</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="space-y-3">
+            <AppButton asChild className="w-full">
+              <Link href="/dashboard/front-desk/pos">Open front-desk checkout</Link>
+            </AppButton>
+            <div className="text-sm text-slate-600">
+              Use checkout for new walk-in invoices. Use the table below for collection and refunds on existing invoices.
+            </div>
+          </AppCardContent>
+        </AppCard>
+      </div>
 
       <AppCard>
         <AppCardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <AppCardTitle>Invoices</AppCardTitle>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Select value={docStatusFilter} onValueChange={setDocStatusFilter}>
+                <SelectTrigger className="w-[190px]">
+                  <SelectValue placeholder="Document status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOC_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={financeStatusFilter} onValueChange={setFinanceStatusFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Financial status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FINANCE_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </AppCardHeader>
         <AppCardContent>
           {isLoading ? (
-            <div className="flex min-h-[200px] items-center justify-center">
+            <div className="flex min-h-[240px] items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
             </div>
+          ) : filteredInvoices.length === 0 ? (
+            <AppEmptyState
+              title="No invoices found"
+              description="Create a front-desk checkout or finalize appointment invoices to see them here."
+            />
           ) : (
-            <div className="w-full overflow-x-auto">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-200/80 hover:bg-transparent">
-                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Patient
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Provider
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Appointment Date
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Status
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Total
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Actions
-                    </TableHead>
+                    <TableHead>Patient</TableHead>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Appt Date</TableHead>
+                    <TableHead>Document</TableHead>
+                    <TableHead>Finance</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Refunded</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.length === 0 ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell
-                        colSpan={6}
-                        className="h-48 p-0 align-top"
-                      >
-                        <AppEmptyState
-                          title="No invoices found"
-                          description="Create an invoice from an appointment to get started."
-                          actionLabel="View appointments"
-                          onAction={() =>
-                            router.push('/dashboard/appointments')
-                          }
-                        />
+                  {filteredInvoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">{invoice.patient?.name ?? '—'}</TableCell>
+                      <TableCell>
+                        {invoice.provider
+                          ? `${invoice.provider.firstName} ${invoice.provider.lastName}`
+                          : 'Walk-in / non-provider'}
                       </TableCell>
-                    </TableRow>
-                  ) : (
-                    invoices.map((inv: Invoice) => (
-                      <TableRow
-                        key={inv.id}
-                        className="border-slate-200/60 hover:bg-slate-50/50"
-                      >
-                        <TableCell className="px-4 py-3 font-medium text-slate-900">
-                          {formatPatient(inv)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-slate-600">
-                          {formatProvider(inv)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-slate-600">
-                          {formatAppointmentDate(inv)}
-                        </TableCell>
-                        <TableCell className="px-4 py-3">
-                          <StatusBadge status={inv.status} variant="invoice" />
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-right text-slate-600">
-                          {inv.totalAmount ?? '0.00'}
-                        </TableCell>
-                        <TableCell className="px-4 py-3 text-right">
-                          {inv.status === 'FINALIZED' && (
-                            <AppButton
-                              size="sm"
-                              onClick={() => payMutation.mutate(inv.id)}
-                              disabled={payMutation.isPending}
-                            >
-                              Mark Paid
+                      <TableCell>{formatDate(invoice.appointment?.startTime)}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={invoice.status} variant="invoice" />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={invoice.financialStatus} variant="invoice" />
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.totalAmount)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.totalPaid)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.totalRefunded)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.outstandingAmount)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {Number(invoice.outstandingAmount) > 0 && invoice.status !== 'DRAFT' && invoice.status !== 'CANCELLED' && (
+                            <AppButton size="sm" onClick={() => setPaymentInvoice(invoice)}>
+                              Collect
                             </AppButton>
                           )}
-                          {inv.status === 'DRAFT' && (
+                          {(invoice.payments ?? []).some(
+                            (payment) =>
+                              Number(payment.amount) > 0 &&
+                              refundableRemaining(payment, invoice.payments ?? []) > 0
+                          ) && (
+                            <AppButton size="sm" variant="outline" onClick={() => setRefundInvoice(invoice)}>
+                              Refund
+                            </AppButton>
+                          )}
+                          {invoice.status === 'DRAFT' && invoice.appointmentId && (
                             <AppButton size="sm" variant="outline" asChild>
-                              <Link
-                                href={`/dashboard/provider/appointments/${inv.appointmentId}`}
-                              >
+                              <Link href={`/dashboard/provider/appointments/${invoice.appointmentId}`}>
                                 Open
                               </Link>
                             </AppButton>
                           )}
-                          {inv.status === 'PAID' && (
-                            <StatusBadge status="PAID" variant="invoice" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
           )}
         </AppCardContent>
       </AppCard>
+
+      <AppModal
+        open={Boolean(paymentInvoice)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPaymentInvoice(null);
+            setPaymentAmount('');
+            setPaymentNotes('');
+          }
+        }}
+        title="Record Manual Payment"
+        description={
+          paymentInvoice
+            ? `Outstanding balance: ${formatCurrency(paymentInvoice.outstandingAmount)}`
+            : undefined
+        }
+        primaryAction={{
+          label: collectMutation.isPending ? 'Recording...' : 'Record Payment',
+          onClick: submitManualPayment,
+          disabled: collectMutation.isPending,
+        }}
+        content={
+          <div className="space-y-4">
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger>
+                <SelectValue placeholder="Payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                {MANUAL_PAYMENT_METHODS.map((method) => (
+                  <SelectItem key={method.value} value={method.value}>
+                    {method.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={paymentAmount}
+              onChange={(event) => setPaymentAmount(event.target.value)}
+              placeholder="Amount (leave blank for full outstanding)"
+              inputMode="decimal"
+            />
+            <Input
+              value={paymentNotes}
+              onChange={(event) => setPaymentNotes(event.target.value)}
+              placeholder="Optional notes"
+            />
+          </div>
+        }
+      />
+
+      <AppModal
+        open={Boolean(refundInvoice)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRefundInvoice(null);
+            setRefundPaymentId('');
+            setRefundAmount('');
+          }
+        }}
+        title="Refund Payment"
+        description="Choose a recorded payment and optionally enter a partial refund amount."
+        primaryAction={{
+          label: refundMutation.isPending ? 'Refunding...' : 'Refund Payment',
+          onClick: submitRefund,
+          disabled: refundMutation.isPending,
+        }}
+        content={
+          <div className="space-y-4">
+            <Select value={refundPaymentId} onValueChange={setRefundPaymentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment" />
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleRefundPayments.map((payment) => (
+                  <SelectItem key={payment.id} value={payment.id}>
+                    {formatCurrency(payment.amount)} • {payment.paymentMethod ?? payment.paymentChannel ?? 'Payment'} • refundable {formatCurrency(refundableRemaining(payment, refundInvoice?.payments ?? []))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={refundAmount}
+              onChange={(event) => setRefundAmount(event.target.value)}
+              placeholder="Refund amount (leave blank for full remaining refundable)"
+              inputMode="decimal"
+            />
+            <p className="text-sm text-slate-600">
+              Partial refunds are only supported on flows where proportional side-effect reversal is safe.
+            </p>
+          </div>
+        }
+      />
     </div>
   );
 }

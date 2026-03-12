@@ -65,9 +65,11 @@ export const refund = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const paymentId = req.params.paymentId as string;
     const where = req.clinicId ? { clinicId: req.clinicId } : undefined;
+    const amount = req.body?.amount as number | string | undefined;
     const result = await paymentService.refundPayment(
       paymentId,
       req.user!.id,
+      amount,
       where
     );
     successResponse(res, 200, 'Payment refunded', {

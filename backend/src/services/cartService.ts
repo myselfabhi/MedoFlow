@@ -219,6 +219,8 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
           status: PaymentStatus.PENDING,
           stripePaymentIntentId: paymentIntent.id,
           stripeClientSecret: paymentIntent.client_secret ?? null,
+          paymentChannel: 'STRIPE',
+          paymentMethod: 'CARD',
         },
       }),
       prisma.cart.update({
