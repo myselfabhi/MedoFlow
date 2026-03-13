@@ -42,6 +42,11 @@ export const createTreatmentPlan = async (
   clinicId: string,
   performedById: string
 ) => {
+  if (!data.providerId) {
+    const err = new Error('Provider ID is required') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
   const provider = await prisma.provider.findFirst({
     where: { id: data.providerId, clinicId, isActive: true },
   });

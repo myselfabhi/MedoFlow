@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import stripe from '../config/stripe';
 import { computeInvoiceFinancials, syncInvoiceStatusFromPayments } from './invoiceService';
+import * as commissionService from './commissionService';
 
 const getAmountToCharge = (appointment: {
   paymentRequirementType: PaymentRequirementType;
@@ -283,6 +284,120 @@ export const confirmPayment = async (
     },
     performedById,
   });
+
+  return { payment, appointment: updatedAppointment };
+};
+
+export const demoConfirmPayment = async (
+  appointmentId: string,
+  performedById: string,
+  where?: { clinicId?: string; patientId?: string }
+) => {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, ...where },
+    include: {
+      service: true,
+      patient: true,
+      provider: { include: { user: true } },
+      location: true,
+    },
+  });
+
+  if (!appointment) {
+    const err = new Error('Appointment not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const amount = appointment.paymentRequirementType === 'DEPOSIT' && appointment.depositAmount
+    ? appointment.depositAmount
+    : appointment.priceAtBooking;
+
+  const nextStatus =
+    appointment.approvalStatus === 'PENDING'
+      ? 'PENDING_PROVIDER_APPROVAL'
+      : 'CONFIRMED';
+
+  const [payment, updatedAppointment] = await prisma.$transaction([
+    prisma.payment.create({
+      data: {
+        clinicId: appointment.clinicId,
+        providerId: appointment.providerId,
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        recordedById: performedById,
+        amount,
+        status: PaymentStatus.PAID,
+        paymentChannel: 'DEMO',
+        paymentMethod: 'DEMO_MODE',
+        recordedAt: new Date(),
+      },
+    }),
+    prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        paymentStatus: PaymentStatus.PAID,
+        status: nextStatus as any,
+        slotHeldUntil: null,
+        bookingHoldExpiresAt: null,
+      },
+      include: {
+        clinic: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+        provider: {
+          include: {
+            disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+            user: { select: { id: true, name: true } },
+          },
+        },
+        service: { select: { id: true, name: true, duration: true } },
+        patient: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
+
+  // Create invoice if not exists
+  const existingInvoice = await prisma.invoice.findFirst({
+    where: { appointmentId },
+  });
+
+  let invoiceId = existingInvoice?.id;
+
+  if (!existingInvoice) {
+    const invoice = await prisma.invoice.create({
+      data: {
+        clinicId: appointment.clinicId,
+        patientId: appointment.patientId,
+        providerId: appointment.providerId,
+        locationId: appointment.locationId,
+        appointmentId: appointment.id,
+        status: 'PAID',
+        subtotal: appointment.priceAtBooking,
+        taxAmount: 0,
+        totalAmount: appointment.priceAtBooking,
+        items: {
+          create: {
+            serviceId: appointment.serviceId,
+            providerId: appointment.providerId,
+            description: appointment.service.name,
+            unitPrice: appointment.priceAtBooking,
+            quantity: 1,
+            totalPrice: appointment.priceAtBooking,
+          },
+        },
+      },
+    });
+    invoiceId = invoice.id;
+  } else {
+    await prisma.invoice.update({
+      where: { id: existingInvoice.id },
+      data: { status: 'PAID' },
+    });
+  }
+
+  if (invoiceId) {
+    await commissionService.calculateCommissions(invoiceId);
+  }
 
   return { payment, appointment: updatedAppointment };
 };

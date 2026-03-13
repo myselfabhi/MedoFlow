@@ -159,6 +159,20 @@ export const process = asyncHandler(
   }
 );
 
+export const simulate = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const sessionId = req.params.id as string;
+    const { providerId, clinicId } = await providerScope(req);
+
+    const session = await aiScribeService.simulateSession(
+      sessionId,
+      providerId,
+      clinicId
+    );
+    successResponse(res, 200, 'Session simulated successfully', { session });
+  }
+);
+
 export const getSessionStatus = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const sessionId = req.params.id as string;

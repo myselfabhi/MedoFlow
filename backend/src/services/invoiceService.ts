@@ -55,12 +55,29 @@ export const createInvoice = async (
     throw err;
   }
 
+  let finalProviderId = providerId;
+  if (!finalProviderId) {
+    const fallbackProvider = await prisma.provider.findFirst({
+      where: { clinicId, isActive: true },
+      select: { id: true }
+    });
+    if (fallbackProvider) {
+      finalProviderId = fallbackProvider.id;
+    }
+  }
+
+  if (!finalProviderId) {
+    const err = new Error('A provider is required for billing operations') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
   const invoice = await prisma.invoice.create({
     data: {
       clinicId,
       appointmentId: appointmentId ?? null,
       patientId: finalPatientId,
-      providerId: providerId ?? null,
+      providerId: finalProviderId,
       locationId: finalLocationId ?? null,
       status: 'DRAFT',
       subtotal: ZERO,
@@ -85,6 +102,23 @@ export const createInvoice = async (
   });
 
   return invoice;
+};
+
+export const getInvoicesByPatient = async (
+  patientId: string,
+  clinicId: string
+) => {
+  const invoices = await prisma.invoice.findMany({
+    where: { patientId, clinicId, status: { not: 'CANCELLED' } },
+    include: {
+      items: {
+        include: { product: true, service: true, package: true, membership: true },
+      },
+      payments: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return invoices.map((invoice) => enrichInvoice(invoice));
 };
 
 const FINANCIAL_PAYMENT_STATUSES: PaymentStatus[] = [

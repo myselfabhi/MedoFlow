@@ -62,7 +62,7 @@ export function CreatePlanModal({
     const [goals, setGoals] = useState<string[]>([]);
     const [newGoal, setNewGoal] = useState('');
     const isEditMode = !!editingPlan;
-    const showProviderPicker = user?.role === 'FRONT_DESK';
+    const showProviderPicker = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
     // Disciplines list
     const { data: disciplines = [] } = useQuery<Discipline[]>({

@@ -96,8 +96,8 @@ export default function InvoiceDetailPage() {
         <AppEmptyState
           title="Invoice Not Found"
           description="The invoice you are looking for does not exist or has been removed."
-          actionLabel="Back to Invoices"
-          onAction={() => router.push('/dashboard/front-desk/invoices')}
+          actionLabel="Go Back"
+          onAction={() => router.back()}
         />
       </PageContainer>
     );

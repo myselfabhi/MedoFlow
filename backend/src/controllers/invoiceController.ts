@@ -198,6 +198,15 @@ export const listByClinic = asyncHandler(
   }
 );
 
+export const getMyInvoices = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const patientId = req.user!.id;
+    const clinicId = req.user!.clinicId!;
+    const invoices = await invoiceService.getInvoicesByPatient(patientId, clinicId);
+    successResponse(res, 200, 'My invoices retrieved', { invoices });
+  }
+);
+
 export const receivablesSummary = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId!;

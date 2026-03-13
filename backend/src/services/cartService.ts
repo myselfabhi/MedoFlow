@@ -1,9 +1,10 @@
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
-import { CartItemType, CartStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { CartItemType, CartStatus, PaymentStatus, Prisma, SubscriptionStatus } from '@prisma/client';
 
 import stripe from '../config/stripe';
 import { recalculateInvoiceTotals } from './invoiceService';
+import * as commissionService from './commissionService';
 
 const unsupportedMembershipError = () => {
   const err = new Error(
@@ -151,12 +152,26 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
     totalAmount = totalAmount.plus(item.unitPrice.times(item.quantity));
   }
 
+  // Find a fallback provider since the database requires providerId on Invoices
+  // In a retail/cart context, we assign the first active provider of the clinic.
+  const fallbackProvider = await prisma.provider.findFirst({
+    where: { clinicId, isActive: true },
+    select: { id: true }
+  });
+
+  if (!fallbackProvider) {
+    const err = new Error('No active provider found for this clinic to assign billing') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
   // Create an invoice from the cart
   const invoice = await prisma.invoice.create({
     data: {
       clinicId,
       patientId,
-      providerId: undefined,
+      providerId: fallbackProvider.id,
+      locationId: null,
       status: 'DRAFT',
       subtotal: totalAmount,
       taxAmount: 0,
@@ -167,6 +182,7 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
           productId: item.productId,
           packageId: item.packageId,
           membershipId: item.membershipId,
+          providerId: fallbackProvider.id,
           description: `Cart Item: ${item.itemType}`,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
@@ -212,7 +228,7 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
       prisma.payment.create({
         data: {
           clinicId,
-          providerId: undefined,
+          providerId: fallbackProvider.id,
           invoiceId: updatedInvoice.id,
           patientId,
           amount: updatedInvoice.totalAmount,
@@ -240,4 +256,149 @@ export const checkoutCart = async (clinicId: string, patientId: string) => {
     invoice: updatedInvoice,
     clientSecret,
   };
+};
+
+export const demoCheckoutCart = async (clinicId: string, patientId: string) => {
+  const cart = await prisma.cart.findFirst({
+    where: { clinicId, patientId, status: 'ACTIVE' },
+    include: { items: true },
+  });
+
+  if (!cart || cart.items.length === 0) {
+    const err = new Error('Cart is empty or not found') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  let totalAmount = new Prisma.Decimal(0);
+  for (const item of cart.items) {
+    totalAmount = totalAmount.plus(item.unitPrice.times(item.quantity));
+  }
+
+  // Find a fallback provider since the database requires providerId on Invoices
+  const fallbackProvider = await prisma.provider.findFirst({
+    where: { clinicId, isActive: true },
+    select: { id: true }
+  });
+
+  if (!fallbackProvider) {
+    const err = new Error('No active provider found for this clinic to assign billing') as ApiError;
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Create a PAID invoice
+  const invoice = await prisma.invoice.create({
+    data: {
+      clinicId,
+      patientId,
+      providerId: fallbackProvider.id,
+      locationId: null,
+      appointmentId: null,
+      status: 'PAID',
+      subtotal: totalAmount,
+      taxAmount: 0,
+      totalAmount,
+      items: {
+        create: cart.items.map(item => ({
+          serviceId: item.serviceId,
+          productId: item.productId,
+          packageId: item.packageId,
+          membershipId: item.membershipId,
+          providerId: fallbackProvider.id,
+          disciplineId: null,
+          description: `Demo Cart Item: ${item.itemType}`,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          totalPrice: item.unitPrice.times(item.quantity),
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  // Create a PAID payment record
+  await prisma.payment.create({
+    data: {
+      clinicId,
+      invoiceId: invoice.id,
+      patientId,
+      providerId: fallbackProvider.id,
+      appointmentId: null,
+      amount: totalAmount,
+      status: PaymentStatus.PAID,
+      paymentChannel: 'DEMO',
+      paymentMethod: 'DEMO_MODE',
+      recordedAt: new Date(),
+    },
+  });
+
+
+  // Create a PAID payment record
+  await prisma.payment.create({
+    data: {
+      clinicId,
+      invoiceId: invoice.id,
+      patientId,
+      providerId: null,
+      appointmentId: null,
+      amount: totalAmount,
+      status: PaymentStatus.PAID,
+      paymentChannel: 'DEMO',
+      paymentMethod: 'DEMO_MODE',
+      recordedAt: new Date(),
+    },
+  });
+
+  // Fulfill items
+  for (const item of cart.items) {
+    if (item.productId) {
+      await prisma.inventoryItem.updateMany({
+        where: { productId: item.productId, clinicId },
+        data: { quantityInStock: { decrement: item.quantity } },
+      });
+    }
+
+    if (item.packageId) {
+      const pkg = await prisma.package.findUnique({ where: { id: item.packageId } });
+      if (pkg) {
+        await prisma.patientPackage.create({
+          data: {
+            clinicId,
+            patientId,
+            packageId: pkg.id,
+            invoiceId: invoice.id,
+            totalSessions: pkg.totalSessions ?? 0,
+            expiresAt: pkg.expiresInDays
+              ? new Date(Date.now() + pkg.expiresInDays * 24 * 60 * 60 * 1000)
+              : null,
+          },
+        });
+      }
+    }
+
+    if (item.membershipId) {
+      await prisma.patientSubscription.create({
+        data: {
+          clinicId,
+          patientId,
+          membershipId: item.membershipId,
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        },
+      });
+    }
+  }
+
+  // Update cart status
+  await prisma.cart.update({
+    where: { id: cart.id },
+    data: { status: 'CHECKED_OUT' },
+  });
+
+  // Calculate commissions
+  await commissionService.calculateCommissions(invoice.id);
+
+  return { invoice };
 };

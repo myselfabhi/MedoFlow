@@ -67,3 +67,13 @@ export const checkout = asyncHandler(
     successResponse(res, 200, 'Checkout initiated', result);
   }
 );
+
+export const demoCheckout = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.user!.clinicId!;
+    const patientId = req.user!.id;
+    
+    const result = await cartService.demoCheckoutCart(clinicId, patientId);
+    successResponse(res, 200, 'Demo Checkout successful', result);
+  }
+);

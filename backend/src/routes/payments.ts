@@ -31,6 +31,13 @@ router.post(
 );
 
 router.post(
+  '/:appointmentId/demo-confirm',
+  authorize(Role.PATIENT, Role.FRONT_DESK),
+  setClinicFromUser,
+  paymentController.demoConfirm
+);
+
+router.post(
   '/:appointmentId/fail',
   authorize(Role.PATIENT, Role.FRONT_DESK),
   setClinicFromUser,

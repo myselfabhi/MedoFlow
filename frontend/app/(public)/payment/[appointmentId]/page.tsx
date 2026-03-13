@@ -9,6 +9,7 @@ import {
   confirmPayment,
   failPayment,
   getOrCreatePaymentIntent,
+  demoConfirmPayment,
 } from '@/lib/paymentApi';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { loadStripe } from '@stripe/stripe-js';
@@ -99,6 +100,13 @@ export default function PaymentPage() {
     },
   });
 
+  const demoConfirmMutation = useMutation({
+    mutationFn: () => demoConfirmPayment(appointmentId),
+    onSuccess: () => {
+      router.push(`/intake/${appointmentId}`);
+    },
+  });
+
   const failMutation = useMutation({
     mutationFn: () => failPayment(appointmentId),
     onSuccess: () => {
@@ -106,7 +114,7 @@ export default function PaymentPage() {
     },
   });
 
-  const isSubmitting = confirmMutation.isPending || failMutation.isPending;
+  const isSubmitting = confirmMutation.isPending || failMutation.isPending || demoConfirmMutation.isPending;
 
   if (isLoading || !appointment) {
     if (error) {
@@ -248,18 +256,26 @@ export default function PaymentPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => confirmMutation.mutate()}
+                    onClick={() => demoConfirmMutation.mutate()}
                     disabled={isSubmitting || showExpiredBanner}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
-                    {isSubmitting ? (
+                    {demoConfirmMutation.isPending ? (
                       <>
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         Processing...
                       </>
                     ) : (
-                      'Confirm payment (Simulation)'
+                      'Demo: Simulate Payment'
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => confirmMutation.mutate()}
+                    disabled={isSubmitting || showExpiredBanner}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  >
+                    Confirm & Proceed
                   </button>
                 </div>
               </div>

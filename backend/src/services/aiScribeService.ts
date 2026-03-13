@@ -73,6 +73,51 @@ export const createSession = async (
   return session;
 };
 
+export const simulateSession = async (
+  sessionId: string,
+  providerId: string,
+  clinicId: string
+) => {
+  const session = await getSessionById(sessionId, providerId, clinicId);
+  if (!session) {
+    const err = new Error('Session not found') as ApiError;
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const mockTranscript = `
+Provider: Hello Emma, how are you feeling today after your last session?
+Patient: I'm doing better, but my lower back is still quite stiff in the mornings.
+Provider: I see. Does the stiffness go away after you start moving, or does it persist throughout the day?
+Patient: It usually gets better after about 30 minutes of walking around, but if I sit for too long at work, it comes back.
+Provider: Understood. Let's take a look at your range of motion today. Please lean forward... Okay, there's some restriction in the lumbar region.
+Patient: Yeah, right there is where it feels tight.
+Provider: We'll continue with the manual therapy we started last week, but I also want to add some specific core stabilization exercises to your home program.
+Patient: That sounds good. I've been doing the stretches you gave me.
+Provider: Great. Let's aim for 3 sets of 10 repetitions for the new exercises, twice a day. I'll see you again in 4 days.
+  `.trim();
+
+  const mockSoap: SoapDraft = {
+    subjective: "Patient reports morning stiffness in the lower back that improves after 30 minutes of activity but recurs with prolonged sitting. Patient has been compliant with previously prescribed stretches.",
+    objective: "Physical exam reveals restricted lumbar range of motion during forward flexion. Palpation identifies tightness in the paraspinal muscles.",
+    assessment: "Progressing well with rehab for lumbar strain. Stiffness indicates a need for increased core stability to support spinal alignment during sedentary work.",
+    plan: "1. Manual therapy (myofascial release) to lumbar region. 2. Added core stabilization exercises (Dead Bug and Bird-Dog) to HEP: 3x10, twice daily. 3. Follow-up appointment in 4 days."
+  };
+
+  const updated = await prisma.aIScribeSession.update({
+    where: { id: sessionId },
+    data: {
+      status: AIScribeStatus.DRAFT_GENERATED,
+      transcript: mockTranscript,
+      aiDraft: mockSoap as any,
+      processingStartedAt: new Date(),
+      processingCompletedAt: new Date(),
+    },
+  });
+
+  return updated;
+};
+
 export const uploadAudio = async (
   sessionId: string,
   providerId: string,

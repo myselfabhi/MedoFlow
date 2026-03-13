@@ -15,6 +15,7 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 export default function CheckoutPage() {
   const [cart, setCart] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoSubmitting, setIsDemoSubmitting] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const router = useRouter();
 
@@ -38,6 +39,20 @@ export default function CheckoutPage() {
       setClientSecret(res.data.data.clientSecret);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to initiate checkout');
+    }
+  };
+
+  const handleDemoPayment = async () => {
+    if (isDemoSubmitting) return;
+    try {
+      setIsDemoSubmitting(true);
+      await api.post('/carts/checkout-demo');
+      toast.success('Demo Payment successful!');
+      router.push('/dashboard/patient/billing');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Demo Payment failed');
+    } finally {
+      setIsDemoSubmitting(false);
     }
   };
 
@@ -90,14 +105,24 @@ export default function CheckoutPage() {
           <CardHeader>
             <CardTitle>Payment Details</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {!clientSecret ? (
-              <Button 
-                className="w-full h-14 text-lg" 
-                onClick={handleInitiateCheckout}
-              >
-                Continue to Payment
-              </Button>
+              <div className="space-y-4">
+                <Button 
+                  className="w-full h-14 text-lg" 
+                  onClick={handleInitiateCheckout}
+                >
+                  Continue to Payment
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="w-full h-14 text-lg border-primary-600 text-primary-600 hover:bg-primary-50 font-bold"
+                  onClick={handleDemoPayment}
+                  disabled={isDemoSubmitting}
+                >
+                  {isDemoSubmitting ? 'Processing Demo...' : 'Demo: Simulate Payment'}
+                </Button>
+              </div>
             ) : (
               <Elements stripe={stripePromise} options={{ clientSecret }}>
                 <StripePaymentForm 

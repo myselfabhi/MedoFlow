@@ -6,6 +6,7 @@ import * as consultationApi from '@/lib/consultationApi';
 import * as aiScribeApi from '@/lib/aiScribeApi';
 import { startConsultationRecordingFlow } from '@/lib/consultationRecordingFlow';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useAppToast } from '@/hooks/useAppToast';
 
 // UI System Components
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -94,6 +95,30 @@ export default function ConsultationRoomPage() {
     const initialized = useRef(false);
 
     const recorder = useAudioRecorder();
+    const toast = useAppToast();
+
+    const handleSimulateClinicalConversation = async () => {
+        if (!aiScribeSession || !session) return;
+        try {
+            setTranscribing(true);
+            const updated = await aiScribeApi.simulateSession(aiScribeSession.id);
+            setAiScribeSession(updated);
+            setTranscript({ 
+                sessionId: session.id,
+                transcript: updated.transcript || '',
+                transcriptStatus: 'COMPLETED',
+                aiScribeStatus: 'DRAFT_GENERATED',
+                aiDraft: updated.aiDraft,
+                timeline: updated.timeline,
+                errorMessage: null
+            });
+            toast.success('Clinical conversation simulated!');
+        } catch (err) {
+            toast.error('Failed to simulate conversation');
+        } finally {
+            setTranscribing(false);
+        }
+    };
 
     // ----- Load or create session -----
     const initSession = useCallback(async () => {
@@ -410,6 +435,17 @@ export default function ConsultationRoomPage() {
                                     {recorder.audioBlob && !uploading && !transcribing && session.recordingStatus !== 'STORED' && (
                                         <AppButton onClick={handleUploadAndTranscribe} variant="primary">
                                             Upload & Transcribe
+                                        </AppButton>
+                                    )}
+
+                                    {/* Demo Simulator */}
+                                    {!recorder.isRecording && !uploading && !transcribing && aiScribeSession?.status === 'RECORDING' && (
+                                        <AppButton 
+                                            onClick={handleSimulateClinicalConversation} 
+                                            variant="outline"
+                                            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold"
+                                        >
+                                            Demo: Simulate Conversation
                                         </AppButton>
                                     )}
 

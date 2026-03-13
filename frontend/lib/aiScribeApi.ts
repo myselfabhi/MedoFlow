@@ -147,6 +147,18 @@ export const processSession = async (
   return data.data.session;
 };
 
+export const simulateSession = async (
+  sessionId: string,
+  clinicId?: string
+): Promise<AIScribeSession> => {
+  const body = clinicId ? { clinicId } : {};
+  const { data } = await api.post<{
+    success: boolean;
+    data: { session: AIScribeSession };
+  }>(`/ai-scribe/session/${sessionId}/simulate`, body);
+  return data.data.session;
+};
+
 export const updateDraft = async (
   sessionId: string,
   draft: Partial<SoapDraft>,

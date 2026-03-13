@@ -58,6 +58,12 @@ router.get(
 );
 
 router.get(
+  '/my',
+  authorize(Role.PATIENT),
+  invoiceController.getMyInvoices
+);
+
+router.get(
   '/summary/receivables',
   authorize(Role.FRONT_DESK, Role.SUPER_ADMIN),
   invoiceController.receivablesSummary

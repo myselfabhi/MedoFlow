@@ -94,7 +94,7 @@ function ProviderMeetingsPageContent() {
     mutationFn: (eventId: string) => startScribeFromMeeting(eventId),
     onSuccess: (data) => {
       router.push(
-        `/dashboard/provider/visits/${data.visitRecord.id}/scribe?appointmentId=${data.visitRecord.appointmentId}`
+        `/dashboard/provider/appointments/${data.visitRecord.appointmentId}/consultation`
       );
     },
   });

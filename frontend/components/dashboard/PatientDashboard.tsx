@@ -195,7 +195,7 @@ export function PatientDashboard() {
                   </div>
                   <ChevronRight className="h-4 w-4 text-slate-300" />
                 </Link>
-                <Link href="/dashboard/front-desk/invoices" className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                <Link href="/dashboard/patient/billing" className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">
                     <CreditCard className="h-4 w-4 text-slate-400" />
                     <span className="text-sm font-medium text-slate-700">Billing History</span>

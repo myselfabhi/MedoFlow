@@ -277,3 +277,11 @@ export const getPatientEntitlements = async (
   }>(`/patients/${patientId}/entitlements`);
   return data.data.entitlements;
 };
+
+export const getMyInvoices = async (): Promise<any[]> => {
+  const { data } = await api.get<{
+    success: boolean;
+    data: { invoices: any[] };
+  }>('/invoices/my');
+  return data.data.invoices;
+};

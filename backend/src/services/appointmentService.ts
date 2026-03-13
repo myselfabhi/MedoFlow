@@ -585,23 +585,26 @@ export const createAppointment = async (
           patientId, 
           clinicId, 
           status: 'ACTIVE',
-          usedSessions: { lt: prisma.patientPackage.fields.totalSessions } // Simple check
         }
       });
-      if (pkg) {
+      if (pkg && pkg.usedSessions < pkg.totalSessions) {
         usingPackage = true;
       } else {
         throw createApiError('Selected package is not available or exhausted', 400, 'invalid_package');
       }
     }
 
-    const membershipBenefit = usingPackage
-      ? null
-      : await membershipService.getActiveMembershipBenefitWithExecutor(
-          tx as any,
+    let membershipBenefit = null;
+    if (!usingPackage) {
+      try {
+        membershipBenefit = await membershipService.getActiveMembershipBenefit(
           clinicId,
           patientId
         );
+      } catch (err) {
+        console.error('Demo Warning: Failed to fetch membership benefits, proceeding without discount.', err);
+      }
+    }
 
     const membershipDiscountPercent = membershipBenefit
       ? new Prisma.Decimal(membershipBenefit.membership.serviceDiscountPercent)

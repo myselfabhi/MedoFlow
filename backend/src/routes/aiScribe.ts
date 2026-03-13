@@ -47,6 +47,12 @@ router.post(
   aiScribeController.process
 );
 
+router.post(
+  '/session/:id/simulate',
+  authorize(Role.PROVIDER),
+  aiScribeController.simulate
+);
+
 router.put(
   '/session/:id/draft',
   authorize(Role.PROVIDER),

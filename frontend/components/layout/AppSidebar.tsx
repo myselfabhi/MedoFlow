@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarPlus,
   Users,
   BarChart3,
   ClipboardList,
@@ -40,6 +41,13 @@ const patientSections: SidebarSection[] = [
     items: [
       { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
       { href: '/dashboard/patient/appointments', label: 'Visits', icon: Calendar },
+      { href: '/dashboard/patient/billing', label: 'Billing & History', icon: Receipt },
+    ]
+  },
+  {
+    title: 'Actions',
+    items: [
+      { href: '/store', label: 'Book Appointment', icon: CalendarPlus },
     ]
   },
   {

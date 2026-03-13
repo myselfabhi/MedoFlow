@@ -177,38 +177,46 @@ export const getMembershipOperationalSummary = async (clinicId: string) => {
   };
 };
 
-type PrismaLike = Omit<
-  typeof prisma,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'
->;
+type PrismaLike = Prisma.TransactionClient | typeof prisma;
 
 export const getActiveMembershipBenefitWithExecutor = async (
   executor: PrismaLike,
   clinicId: string,
   patientId: string
 ) => {
-  const subscriptions = await executor.patientSubscription.findMany({
-    where: {
-      clinicId,
-      patientId,
-      status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING] },
-      currentPeriodEnd: { gt: new Date() },
-    },
-    include: { membership: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  try {
+    const subscriptions = (await (executor as any).patientSubscription.findMany({
+      where: {
+        clinicId,
+        patientId,
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING] },
+        currentPeriodEnd: { gt: new Date() },
+      },
+      include: { 
+        membership: {
+          select: { id: true, name: true, serviceDiscountPercent: true }
+        } 
+      },
+      orderBy: { createdAt: 'desc' },
+    })) as any[];
 
-  const eligible = subscriptions.filter((subscription) =>
-    new Prisma.Decimal(subscription.membership.serviceDiscountPercent).gt(ZERO)
-  );
+    if (!subscriptions || subscriptions.length === 0) return null;
 
-  if (eligible.length === 0) return null;
+    const eligible = subscriptions.filter((subscription) =>
+      subscription.membership && new Prisma.Decimal(subscription.membership.serviceDiscountPercent).gt(ZERO)
+    );
 
-  return eligible.sort((left, right) =>
-    new Prisma.Decimal(right.membership.serviceDiscountPercent)
-      .minus(left.membership.serviceDiscountPercent)
-      .toNumber()
-  )[0];
+    if (eligible.length === 0) return null;
+
+    return eligible.sort((left, right) =>
+      new Prisma.Decimal(right.membership.serviceDiscountPercent)
+        .minus(left.membership.serviceDiscountPercent)
+        .toNumber()
+    )[0];
+  } catch (err) {
+    console.error('Active Membership Benefit Query Error:', err);
+    return null;
+  }
 };
 
 export const getActiveMembershipBenefit = async (clinicId: string, patientId: string) =>

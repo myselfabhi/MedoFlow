@@ -34,6 +34,16 @@ export const confirmPayment = async (
   return { payment: data.data.payment };
 };
 
+export const demoConfirmPayment = async (
+  appointmentId: string
+): Promise<{ payment: PaymentResponse }> => {
+  const { data } = await api.post<{
+    success: boolean;
+    data: { payment: PaymentResponse };
+  }>(`/payments/${appointmentId}/demo-confirm`);
+  return { payment: data.data.payment };
+};
+
 export const failPayment = async (
   appointmentId: string
 ): Promise<{ payment: PaymentResponse }> => {

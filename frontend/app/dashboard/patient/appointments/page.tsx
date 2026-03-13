@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { getMyAppointments, type PatientAppointment } from '@/lib/patientApi';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import {
@@ -23,6 +24,7 @@ function formatDateTime(iso: string) {
 
 export default function PatientAppointmentsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { data: appointments, isLoading, error } = useQuery({
     queryKey: ['patient', 'appointments'],
     queryFn: () => getMyAppointments(),
@@ -47,6 +49,8 @@ export default function PatientAppointmentsPage() {
     );
   }
 
+  const bookHref = user?.clinicId ? `/clinic/${user.clinicId}` : '/';
+
   return (
     <PageContainer className="space-y-8">
       <AppPageHeader
@@ -54,7 +58,7 @@ export default function PatientAppointmentsPage() {
         description="View and manage your health consultations"
         actions={
           <AppButton size="sm" asChild>
-            <Link href="/">Book New Appointment</Link>
+            <Link href={bookHref}>Book New Appointment</Link>
           </AppButton>
         }
       />
