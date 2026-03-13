@@ -2,14 +2,14 @@
 
 import React, { useState, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-import api, { setAccessToken } from '@/lib/api';
-import { getClinic } from '@/lib/clinicApi';
+import Link from 'next/link';
+import {
+  getClinic,
+} from '@/lib/clinicApi';
 import { getClinicServices } from '@/lib/serviceApi';
 import { getClinicProviders, getAvailability } from '@/lib/providerApi';
 import {
@@ -21,61 +21,74 @@ import {
 } from '@/lib/appointmentApi';
 import { getMyEntitlements } from '@/lib/patientApi';
 import { createRecurringSeries, type RecurringConflict } from '@/lib/recurringApi';
-import { LoginModal } from '@/components/LoginModal';
-import { WaitlistModal } from '@/components/WaitlistModal';
-import { RecurringConflictModal } from '@/components/RecurringConflictModal';
 import {
   AppCard,
-  AppCardContent,
   AppCardHeader,
-  AppCardFooter,
+  AppCardContent,
   AppButton,
   AppInput,
   AppFormField,
+  StickySummaryPanel
 } from '@/components/ui-system';
-import type { TimeSlot } from '@/lib/types/booking';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppToast } from '@/hooks/useAppToast';
+import { 
+  Calendar, 
+  Clock, 
+  User, 
+  MapPin, 
+  ArrowRight, 
+  ArrowLeft, 
+  CheckCircle2, 
+  ShieldCheck,
+  Search,
+  Package as PackageIcon,
+  CreditCard,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
 
 const patientSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email'),
-  phone: z.string().optional(),
+  name: z.string().min(1, 'Full name is required'),
+  email: z.string().email('Valid email is required'),
+  phone: z.string().min(10, 'Phone number is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 type PatientFormData = z.infer<typeof patientSchema>;
 
-const STEPS = ['Provider', 'Date', 'Time', 'Patient', 'Confirm'];
-const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
+type TimeSlot = {
+  providerId: string;
+  locationId: string | null;
+  serviceId: string;
+  timezone: string;
+  start: string;
+  end: string;
+};
 
-export default function BookingPage() {
+const STEPS = ['Select Provider', 'Choose Time', 'Your Details', 'Review'];
+
+function BookingPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { login, isAuthenticated, user } = useAuth();
+  const toast = useAppToast();
+  
   const serviceId = params.serviceId as string;
   const clinicId = searchParams.get('clinicId') || '';
   const providerShortcutId = searchParams.get('providerId');
 
   const [step, setStep] = useState(0);
-  const [providerId, setProviderId] = useState<string | null>(null);
+  const [providerId, setProviderId] = useState<string | null>(providerShortcutId);
   const [providerSearch, setProviderSearch] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [patientExists, setPatientExists] = useState<boolean | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringSessions, setRecurringSessions] = useState<number>(4);
-  const [recurringEndDate, setRecurringEndDate] = useState<string>('');
-  const [recurringUseEndDate, setRecurringUseEndDate] = useState(false);
-  const [recurringConflictModal, setRecurringConflictModal] = useState<{
-    conflicts: RecurringConflict[];
-    createdCount: number;
-  } | null>(null);
   const [slotHoldId, setSlotHoldId] = useState<string | null>(null);
   const [holdingSlot, setHoldingSlot] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
@@ -110,49 +123,18 @@ export default function BookingPage() {
     enabled: !!isAuthenticated && !!user && user.role === 'PATIENT',
   });
   const patientPackages = patientEntitlements?.packages ?? [];
-  const activeMembershipBenefit = patientEntitlements?.activeMembershipBenefit ?? null;
 
   const service = services?.find((s) => s.id === serviceId);
-  const membershipDiscountedPrice =
-    service && activeMembershipBenefit
-      ? Math.max(
-          Number(service.defaultPrice) *
-            (1 - Number(activeMembershipBenefit.serviceDiscountPercent) / 100),
-          0
-        )
-      : null;
-  const launchLocation =
-    locations?.find((location) =>
-      ONLINE_LOCATION_NAMES.includes(location.name.trim().toLowerCase())
-    ) ??
-    locations?.[0] ??
-    null;
   const providersForService = providers?.filter((p) =>
     p.providerServices.some((ps) => ps.serviceId === serviceId)
   );
 
-  React.useEffect(() => {
-    if (providerShortcutId && providersForService?.some((provider) => provider.id === providerShortcutId)) {
-      setProviderId(providerShortcutId);
-      setStep((current) => (current === 0 ? 1 : current));
-    }
-  }, [providerShortcutId, providersForService]);
+  const selectedProvider = providers?.find(p => p.id === (selectedSlot?.providerId || providerId));
 
-  React.useEffect(() => {
-    setBookingError(null);
-  }, [selectedDate, providerId]);
-
-  const { data: slots, isLoading: slotsLoading, isError: slotsError } = useQuery({
-    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any', launchLocation?.id || 'any'],
-    queryFn: () =>
-      getAvailability(
-        clinicId,
-        serviceId,
-        selectedDate,
-        providerId || undefined,
-        launchLocation?.id
-      ),
-    enabled: !!clinicId && !!serviceId && !!selectedDate && (locations?.length ?? 0) > 0,
+  const { data: slots, isLoading: slotsLoading } = useQuery({
+    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any'],
+    queryFn: () => getAvailability(clinicId, serviceId, selectedDate, providerId || undefined),
+    enabled: !!clinicId && !!serviceId && !!selectedDate,
   });
 
   const {
@@ -162,308 +144,103 @@ export default function BookingPage() {
     formState: { errors },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '' },
+    defaultValues: { name: user?.name || '', email: user?.email || '', phone: '', password: '' },
   });
 
-  const email = watch('email');
-
-  const checkEmail = useCallback(async () => {
-    if (!email || !email.includes('@')) return;
+  const checkEmail = async () => {
+    const email = watch('email');
+    if (!email || !z.string().email().safeParse(email).success) return;
     setCheckingEmail(true);
-    setPatientExists(null);
     try {
       const exists = await checkPatientExists(email);
       setPatientExists(exists);
-      if (exists) setShowLoginModal(true);
     } finally {
       setCheckingEmail(false);
     }
-  }, [email]);
+  };
 
-  const releaseCurrentHold = useCallback(async () => {
-    if (!slotHoldId || !clinicId) return;
-    try {
-      await releaseSlotHold(slotHoldId, clinicId);
-    } catch {
-      // Best-effort release; server also expires old holds.
-    } finally {
-      setSlotHoldId(null);
-    }
-  }, [slotHoldId, clinicId]);
-
-  React.useEffect(() => {
-    return () => {
-      if (slotHoldId && clinicId) {
-        void releaseSlotHold(slotHoldId, clinicId);
-      }
-    };
-  }, [slotHoldId, clinicId]);
-
-  // When user changes provider or date, release any hold and clear selected time so they must pick again.
-  const prevProviderRef = React.useRef(providerId);
-  const prevDateRef = React.useRef(selectedDate);
-  React.useEffect(() => {
-    if (prevProviderRef.current !== providerId || prevDateRef.current !== selectedDate) {
-      prevProviderRef.current = providerId;
-      prevDateRef.current = selectedDate;
-      setSelectedSlot(null);
-      if (slotHoldId && clinicId) {
-        void releaseSlotHold(slotHoldId, clinicId);
+  const releaseCurrentHold = async () => {
+    if (slotHoldId) {
+      try {
+        await releaseSlotHold(slotHoldId, clinicId);
         setSlotHoldId(null);
-      }
-    }
-  }, [providerId, selectedDate, slotHoldId, clinicId]);
-
-  const handleLoginSubmit = useCallback(
-    async (loginEmail: string, password: string) => {
-      setLoginError(null);
-      try {
-        await login(loginEmail, password);
-        setShowLoginModal(false);
-      } catch {
-        setLoginError('Invalid email or password. Please try again.');
-      }
-    },
-    [login]
-  );
-
-  const doCreateAppointment = useCallback(
-    async (patientId: string) => {
-      if (!selectedSlot) {
-        throw new Error('No time slot selected. Please go back and choose a time.');
-      }
-      const { appointment } = await createAppointment({
-        clinicId,
-        ...(selectedSlot.locationId && { locationId: selectedSlot.locationId }),
-        providerId: selectedSlot.providerId,
-        serviceId,
-        patientId,
-        startTime: selectedSlot.start,
-        endTime: selectedSlot.end,
-        ...(slotHoldId && { slotHoldId }),
-        ...(selectedPackageId && { patientPackageId: selectedPackageId }),
-      });
-      if (appointment.status === 'PENDING_PAYMENT') {
-        router.push(`/payment/${appointment.id}`);
-      } else {
-        router.push('/dashboard/appointments');
-      }
-    },
-    [
-      clinicId,
-      locations,
-      providerId,
-      providersForService,
-      router,
-      selectedSlot,
-      serviceId,
-      slotHoldId,
-    ]
-  );
-
-  const doCreateRecurringSeries = useCallback(
-    async (patientId: string): Promise<{ appointments: unknown[]; conflicts: RecurringConflict[] }> => {
-      if (!selectedSlot) {
-        throw new Error('No time slot selected. Please go back and choose a time.');
-      }
-      const payload = {
-        clinicId,
-        ...(selectedSlot.locationId && { locationId: selectedSlot.locationId }),
-        providerId: selectedSlot.providerId,
-        serviceId,
-        patientId,
-        startTime: selectedSlot.start,
-        endTime: selectedSlot.end,
-        frequency: 'WEEKLY' as const,
-        ...(recurringUseEndDate && recurringEndDate
-          ? { endDate: recurringEndDate }
-          : { numberOfSessions: Math.max(2, recurringSessions) }),
-      };
-      const result = await createRecurringSeries(payload);
-      if (result.conflicts.length > 0) {
-        return result;
-      }
-      const first = result.appointments[0] as { status?: string; id?: string } | undefined;
-      if (first?.status === 'PENDING_PAYMENT' && first?.id) {
-        router.push(`/payment/${first.id}`);
-      } else {
-        router.push('/dashboard/appointments');
-      }
-      return result;
-    },
-    [
-      clinicId,
-      locations,
-      providerId,
-      providersForService,
-      recurringEndDate,
-      recurringSessions,
-      recurringUseEndDate,
-      router,
-      selectedSlot,
-      serviceId,
-    ]
-  );
-
-  const appointmentMutation = useMutation({
-    mutationFn: async (data: {
-      patientId?: string;
-      name?: string;
-      email?: string;
-      password?: string;
-      recurring?: boolean;
-    }) => {
-      const runWithPatient = async (pid: string) => {
-        if (data.recurring && isRecurring) {
-          return doCreateRecurringSeries(pid);
-        }
-        await doCreateAppointment(pid);
-        return { appointments: [], conflicts: [] };
-      };
-      if (data.patientId) return runWithPatient(data.patientId);
-      if (!data.email || !data.password) throw new Error('Email and password required');
-
-      const tryLoginFirst = async (): Promise<string | null> => {
-        try {
-          const { data: loginRes } = await api.post<{
-            success: boolean;
-            data: { accessToken: string; user: { id: string } };
-          }>('/auth/login', { email: data.email, password: data.password });
-          setAccessToken(loginRes.data.accessToken);
-          return loginRes.data.user.id;
-        } catch {
-          return null;
-        }
-      };
-
-      const existingUserId = await tryLoginFirst();
-      if (existingUserId) {
-        return runWithPatient(existingUserId);
-      }
-
-      try {
-        await api.post('/auth/register', {
-          name: data.name,
-          email: data.email,
-          password: data.password,
-          role: 'PATIENT',
-        });
-      } catch (err: unknown) {
-        const axErr = err as { response?: { data?: { message?: string } } };
-        if (axErr.response?.data?.message === 'Email already registered') {
-          throw new Error(
-            'This email is already registered. Please log in with your existing account to continue.'
-          );
-        }
-        throw err;
-      }
-
-      const { data: loginRes } = await api.post<{
-        success: boolean;
-        data: { accessToken: string; user: { id: string } };
-      }>('/auth/login', { email: data.email, password: data.password });
-      setAccessToken(loginRes.data.accessToken);
-      return runWithPatient(loginRes.data.user.id);
-    },
-  });
-
-  const handleBookingResult = useCallback(
-    (result: { appointments: unknown[]; conflicts: RecurringConflict[] } | void) => {
-      if (result?.conflicts?.length) {
-        setRecurringConflictModal({
-          conflicts: result.conflicts,
-          createdCount: result.appointments?.length ?? 0,
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-    },
-    [queryClient]
-  );
-
-  const onSubmit = async (data: PatientFormData) => {
-    setBookingError(null);
-    try {
-      let result: { appointments: unknown[]; conflicts: RecurringConflict[] } | void;
-      if (isAuthenticated && user) {
-        result = await appointmentMutation.mutateAsync({
-          patientId: user.id,
-          recurring: isRecurring,
-        });
-      } else if (patientExists) {
-        const { data: meRes } = await api.get<{ success: boolean; data: { user: { id: string } } }>(
-          '/auth/me'
-        );
-        result = await appointmentMutation.mutateAsync({
-          patientId: meRes.data.user.id,
-          recurring: isRecurring,
-        });
-      } else {
-        result = await appointmentMutation.mutateAsync({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-          recurring: isRecurring,
-        });
-      }
-      handleBookingResult(result);
-    } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
-      const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
-      const code = axErr.response?.data?.code;
-      if ((axErr.response?.status === 409 || axErr.response?.status === 400) && code === 'expired_hold') {
-        setBookingError('Your slot hold expired. Please select the time again.');
-      } else if (axErr.response?.status === 400 && code === 'invalid_slot') {
-        setBookingError('This slot is no longer available. Please select another.');
-      } else if (axErr.response?.status === 409) {
-        setBookingError('This slot was just booked. Please select another.');
-      } else if (msg.includes('already registered') || msg.includes('log in with your existing')) {
-        setBookingError(msg);
-        setShowLoginModal(true);
-      } else {
-        setBookingError(msg);
+      } catch (err) {
+        console.error('Failed to release hold', err);
       }
     }
   };
 
-  const handleConfirmAuthenticated = async () => {
-    if (!user) return;
-    setBookingError(null);
+  const handleSlotSelect = async (slot: TimeSlot) => {
+    if (holdingSlot) return;
+    setHoldingSlot(true);
     try {
-      const result = await appointmentMutation.mutateAsync({
-        patientId: user.id,
-        recurring: isRecurring,
+      await releaseCurrentHold();
+      const hold = await createSlotHold({
+        clinicId,
+        providerId: slot.providerId,
+        serviceId,
+        locationId: slot.locationId || locations?.[0]?.id || '',
+        timezone: slot.timezone,
+        startTime: slot.start,
+        endTime: slot.end,
       });
-      handleBookingResult(result);
-    } catch (err: unknown) {
-      const axErr = err as { response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
-      const msg = axErr.response?.data?.message || axErr.message || 'Booking failed. Please try again.';
-      const code = axErr.response?.data?.code;
-      if ((axErr.response?.status === 409 || axErr.response?.status === 400) && code === 'expired_hold') {
-        setBookingError('Your slot hold expired. Please select the time again.');
-      } else if (axErr.response?.status === 400 && code === 'invalid_slot') {
-        setBookingError('This slot is no longer available. Please select another.');
-      } else if (axErr.response?.status === 409) {
-        setBookingError('This slot was just booked. Please select another.');
+      setSlotHoldId(hold.id);
+      setSelectedSlot(slot);
+      if (isAuthenticated) {
+        setStep(3);
       } else {
-        setBookingError(msg);
+        setStep(2);
       }
+    } catch (err) {
+      toast.error('Failed to hold slot. It may have just been taken.');
+    } finally {
+      setHoldingSlot(false);
     }
   };
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const formatTime = (d: string) =>
-    new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const handlePatientFormSubmit = async (data: PatientFormData) => {
+    if (patientExists === true) {
+      try {
+        await login(data.email, data.password);
+        setStep(3);
+      } catch (err) {
+        toast.error('Invalid password. Please try again.');
+      }
+    } else {
+      setStep(3);
+    }
+  };
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, 4));
-  const prevStep = () => setStep((s) => Math.max(s - 1, 0));
+  const handleBooking = async () => {
+    try {
+      const { appointment, clientSecret } = await createAppointment({
+        clinicId,
+        locationId: selectedSlot?.locationId || locations?.[0]?.id || '',
+        providerId: selectedSlot!.providerId,
+        serviceId,
+        patientId: user?.id || '',
+        startTime: selectedSlot!.start,
+        endTime: selectedSlot!.end,
+        slotHoldId: slotHoldId || undefined,
+        patientPackageId: selectedPackageId || undefined,
+      });
 
-  const providerName = providerId
-    ? `${providersForService?.find((p) => p.id === providerId)?.firstName || ''} ${providersForService?.find((p) => p.id === providerId)?.lastName || ''}`
-    : 'Any Available';
-  const selectedSlotProvider = selectedSlot
-    ? providersForService?.find((provider) => provider.id === selectedSlot.providerId)
-    : null;
+      if (clientSecret) {
+        router.push(`/payment/${appointment.id}?clientSecret=${clientSecret}`);
+      } else {
+        toast.success('Appointment booked successfully!');
+        router.push('/dashboard/patient/appointments');
+      }
+    } catch (err) {
+      toast.error('Booking failed. Please try again.');
+    }
+  };
+
+  const nextStep = () => setStep(s => Math.min(s + 1, 3));
+  const prevStep = () => setStep(s => Math.max(s - 1, 0));
+
+  const formatTime = (d: string) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   if (!clinicId) {
     return (
@@ -479,598 +256,275 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-      <div className="mb-8">
-        <div className="flex gap-1">
-          {STEPS.map((s, i) => (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i <= step ? 'bg-primary-600' : 'bg-gray-200'
-              }`}
-            />
-          ))}
-        </div>
-        <p className="mt-3 text-sm text-gray-500">
-          Step {step + 1} of 5: {STEPS[step]}
-        </p>
-      </div>
-
-      <AppCard>
-        <AppCardHeader>
-          <h1 className="text-xl font-semibold text-slate-900">
-            Book {service?.name || 'Service'}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {service?.duration} min · ${service?.defaultPrice}
-          </p>
-          {service?.recommendedProducts && service.recommendedProducts.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider w-full">Recommended Products</span>
-              {service.recommendedProducts.map(p => (
-                <div key={p.id} className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs border border-slate-200">
-                  {p.name}
-                </div>
-              ))}
-            </div>
-          )}
-        </AppCardHeader>
-        <AppCardContent className="space-y-6">
-          {step === 0 && (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="font-medium text-gray-900">Select Provider</h2>
-                <div className="relative w-full sm:w-64">
-                  <input
-                    type="text"
-                    placeholder="Search for your provider..."
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
-                    value={providerSearch}
-                    onChange={(e) => setProviderSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-3">
-                {(!providerSearch || 'any available'.includes(providerSearch.toLowerCase())) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProviderId(null);
-                      nextStep();
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
-                      !providerId
-                        ? 'border-primary-600 bg-primary-50/50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="font-medium">Any Available</span>
-                  </button>
-                )}
-                {providersForService
-                  ?.filter((p) =>
-                    `${p.firstName} ${p.lastName}`
-                      .toLowerCase()
-                      .includes(providerSearch.toLowerCase())
-                  )
-                  .map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setProviderId(p.id);
-                        nextStep();
-                      }}
-                      className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all ${
-                        providerId === p.id
-                          ? 'border-primary-600 bg-primary-50/50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="font-medium">
-                        {p.firstName} {p.lastName}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {p.disciplines?.length
-                          ? p.disciplines.map((pd) => pd.discipline.name).join(' · ')
-                          : p.discipline?.name ?? ''}
-                      </span>
-                    </button>
-                  ))}
-                {providersForService?.filter((p) =>
-                  `${p.firstName} ${p.lastName}`
-                    .toLowerCase()
-                    .includes(providerSearch.toLowerCase())
-                ).length === 0 && !'any available'.includes(providerSearch.toLowerCase()) && (
-                  <p className="text-center text-sm text-gray-500 py-4">
-                    No providers found matching &quot;{providerSearch}&quot;
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 1 && (
-            <div className="space-y-4">
-              <h2 className="font-medium text-gray-900">Select Date</h2>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="block w-full rounded-lg border border-gray-300 px-4 py-3"
-              />
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4">
-              <h2 className="font-medium text-gray-900">Select Time</h2>
-              {bookingError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  {bookingError}
-                </div>
-              )}
-              {(locations?.length ?? 0) === 0 ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-800">
-                  <p className="font-medium">No location set up yet</p>
-                  <p className="mt-1 text-amber-700">
-                    Even for online-only care, the clinic needs one location (e.g. &quot;Virtual&quot; or &quot;Online&quot;) so appointment times and timezones are set correctly. Ask the clinic to add a location in their dashboard under Locations.
-                  </p>
-                </div>
-              ) : slotsError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">
-                  Unable to load available times. Please try another date or contact the clinic.
-                </div>
-              ) : slotsLoading ? (
-                <div className="flex justify-center py-12">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {slots?.map((slot) => (
-                    <button
-                      key={`${slot.providerId}-${slot.locationId}-${slot.start}`}
-                      type="button"
-                      onClick={async () => {
-                        if (holdingSlot) return;
-                        setHoldingSlot(true);
-                        setBookingError(null);
-                        try {
-                          await releaseCurrentHold();
-                          const hold = await createSlotHold({
-                            clinicId,
-                            providerId: slot.providerId,
-                            serviceId,
-                            ...(slot.locationId && {
-                              locationId: slot.locationId,
-                            }),
-                            timezone: slot.timezone,
-                            startTime: slot.start,
-                            endTime: slot.end,
-                          });
-                          setSlotHoldId(hold.id);
-                          setSelectedSlot(slot);
-                          nextStep();
-                        } catch (err: unknown) {
-                          const message =
-                            err && typeof err === 'object' && 'response' in err
-                              ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-                              : null;
-                          setBookingError(
-                            message || 'Unable to lock this slot. Please pick another time.'
-                          );
-                        } finally {
-                          setHoldingSlot(false);
-                        }
-                      }}
-                      className={`rounded-lg border-2 p-3 text-sm font-medium transition-all ${
-                        selectedSlot?.start === slot.start
-                          ? 'border-primary-600 bg-primary-50/50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div>{formatTime(slot.start)}</div>
-                      <div className="mt-1 text-[11px] font-normal text-gray-500">
-                        {providersForService?.find((provider) => provider.id === slot.providerId)?.firstName}{' '}
-                        {providersForService?.find((provider) => provider.id === slot.providerId)?.lastName}
+    <div className="bg-slate-50 min-h-screen">
+      <div className="container mx-auto px-4 py-12 lg:px-8">
+        <div className="grid gap-12 lg:grid-cols-3 items-start">
+          
+          <div className="lg:col-span-2 space-y-8">
+            <div className="space-y-2">
+              <Link href="/" className="inline-flex items-center text-sm text-slate-500 hover:text-primary-600 transition-colors">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to clinic
+              </Link>
+              <h1 className="text-3xl font-black text-slate-900">Book {service?.name || 'Consultation'}</h1>
+              
+              <div className="flex items-center gap-4 pt-4">
+                {STEPS.map((s, i) => (
+                  <React.Fragment key={s}>
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
+                        i < step ? "bg-emerald-500 text-white" : 
+                        i === step ? "bg-primary-600 text-white" : "bg-slate-200 text-slate-500"
+                      )}>
+                        {i < step ? <CheckCircle2 className="h-5 w-5" /> : i + 1}
                       </div>
-                    </button>
-                  ))}
-                  {slots?.length === 0 && (
-                    <div className="col-span-full space-y-3 text-center">
-                      <p className="text-sm text-gray-500">
-                        No slots available. Try another date.
-                      </p>
-                      {providerId && providersForService && providersForService.length > 0 ? (
+                      <span className={cn(
+                        "text-sm font-medium hidden sm:inline",
+                        i === step ? "text-slate-900" : "text-slate-400"
+                      )}>{s}</span>
+                    </div>
+                    {i < STEPS.length - 1 && <div className="h-px w-8 bg-slate-200 hidden sm:block" />}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            <AppCard className="border-none shadow-xl rounded-3xl overflow-hidden bg-white min-h-[500px]">
+              <AppCardContent className="p-8 lg:p-12">
+                
+                {step === 0 && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <h2 className="text-xl font-bold text-slate-900">Select a Provider</h2>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <AppInput 
+                          placeholder="Search clinician..." 
+                          className="pl-10 w-full sm:w-64 rounded-full"
+                          value={providerSearch}
+                          onChange={(e) => setProviderSearch(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4">
+                      {(!providerSearch || 'any available'.includes(providerSearch.toLowerCase())) && (
                         <button
-                          type="button"
-                          onClick={() => setShowWaitlistModal(true)}
-                          className="rounded-lg border-2 border-primary-600 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100"
+                          onClick={() => { setProviderId(null); nextStep(); }}
+                          className={cn(
+                            "flex items-center justify-between p-6 rounded-2xl border-2 transition-all text-left",
+                            !providerId ? "border-primary-600 bg-primary-50/30" : "border-slate-100 hover:border-slate-200"
+                          )}
                         >
-                          Join waitlist
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                              <User className="h-6 w-6 text-slate-400" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">Any Available Provider</p>
+                              <p className="text-sm text-slate-500">Fastest clinical access</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-slate-300" />
                         </button>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          Select a specific provider to join the waitlist.
-                        </p>
                       )}
-                    </div>
-                  )}
-                </div>
-              )}
-              {holdingSlot && (
-                <p className="text-xs text-primary-700">
-                  Locking slot for checkout...
-                </p>
-              )}
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-4">
-              <h2 className="font-medium text-gray-900">Patient Details</h2>
-              {isAuthenticated && user ? (
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <p className="text-sm text-gray-700">Booking as {user.email}</p>
-                  <div className="mt-4 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={prevStep}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={nextStep}
-                      className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit(nextStep)} className="space-y-4">
-                  <AppFormField label="Name" error={errors.name?.message}>
-                    <AppInput
-                      {...register('name')}
-                      className={errors.name ? 'border-danger' : ''}
-                    />
-                  </AppFormField>
-                  <AppFormField
-                    label="Email"
-                    error={errors.email?.message}
-                    description={
-                      patientExists === true
-                        ? 'Existing patient. Sign in to continue.'
-                        : checkingEmail
-                          ? 'Checking...'
-                          : undefined
-                    }
-                  >
-                    <AppInput
-                      {...register('email')}
-                      type="email"
-                      onBlur={checkEmail}
-                      className={errors.email ? 'border-danger' : ''}
-                    />
-                  </AppFormField>
-                  <AppFormField label="Phone">
-                    <AppInput {...register('phone')} type="tel" />
-                  </AppFormField>
-                  <AppFormField
-                    label={patientExists === true ? 'Password (to confirm identity)' : 'Password (for new account)'}
-                    error={errors.password?.message}
-                  >
-                    <AppInput
-                      {...register('password')}
-                      type="password"
-                      className={errors.password ? 'border-danger' : ''}
-                    />
-                  </AppFormField>
-                  <div className="flex gap-3 pt-2">
-                    <AppButton type="button" variant="outline" onClick={prevStep}>
-                      Back
-                    </AppButton>
-                    <AppButton type="submit">
-                      Next
-                    </AppButton>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-4">
-              <h2 className="font-medium text-gray-900">Confirm Booking</h2>
-              {!selectedSlot && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  No time slot selected. Please go back and choose a time.
-                </div>
-              )}
-              <div className="rounded-lg bg-gray-50 p-5 text-sm">
-                <p>
-                  <strong>Clinic:</strong> {clinic?.name}
-                </p>
-                <p>
-                  <strong>Service:</strong> {service?.name}
-                </p>
-                <p>
-                  <strong>Provider:</strong>{' '}
-                  {selectedSlotProvider
-                    ? `${selectedSlotProvider.firstName} ${selectedSlotProvider.lastName}`
-                    : providerName}
-                </p>
-                <p>
-                  <strong>Date & Time:</strong> {selectedDate && formatDate(selectedDate)} at{' '}
-                  {selectedSlot && formatTime(selectedSlot.start)}
-                </p>
-                <p>
-                  <strong>Location:</strong>{' '}
-                  {selectedSlot?.locationId && locations?.length
-                    ? locations.find((l) => l.id === selectedSlot.locationId)?.name ?? launchLocation?.name ?? 'Clinic location'
-                    : launchLocation?.name ?? 'Clinic location'}
-                </p>
-                <p>
-                  <strong>Price:</strong> ${service?.defaultPrice}
-                </p>
-                {!isAuthenticated && (
-                  <p>
-                    <strong>Patient:</strong> {watch('name')} ({watch('email')})
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-900">
-                    Make this a recurring appointment
-                  </span>
-                </label>
-                {isRecurring && (
-                  <div className="ml-7 space-y-4 border-l-2 border-gray-100 pl-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Frequency
-                      </label>
-                      <select
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        value="WEEKLY"
-                        disabled
-                      >
-                        <option value="WEEKLY">Weekly</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="recurringMode"
-                          checked={!recurringUseEndDate}
-                          onChange={() => setRecurringUseEndDate(false)}
-                          className="border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm text-gray-700">Number of sessions</span>
-                      </label>
-                      {!recurringUseEndDate && (
-                        <input
-                          type="number"
-                          min={2}
-                          max={52}
-                          value={recurringSessions}
-                          onChange={(e) =>
-                            setRecurringSessions(Math.min(52, Math.max(2, parseInt(e.target.value, 10) || 2)))
-                          }
-                          className="block w-full max-w-[8rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="recurringMode"
-                          checked={recurringUseEndDate}
-                          onChange={() => setRecurringUseEndDate(true)}
-                          className="border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm text-gray-700">End date</span>
-                      </label>
-                      {recurringUseEndDate && (
-                        <input
-                          type="date"
-                          value={recurringEndDate}
-                          onChange={(e) => setRecurringEndDate(e.target.value)}
-                          min={selectedDate || new Date().toISOString().split('T')[0]}
-                          className="block w-full max-w-[12rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        />
-                      )}
+                      {providersForService?.filter(p => 
+                        `${p.firstName} ${p.lastName}`.toLowerCase().includes(providerSearch.toLowerCase())
+                      ).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => { setProviderId(p.id); nextStep(); }}
+                          className={cn(
+                            "flex items-center justify-between p-6 rounded-2xl border-2 transition-all text-left",
+                            providerId === p.id ? "border-primary-600 bg-primary-50/30" : "border-slate-100 hover:border-slate-200"
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border-2 border-white shadow-sm">
+                              <User className="h-6 w-6 text-slate-400" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{p.firstName} {p.lastName}</p>
+                              <p className="text-sm text-slate-500">
+                                {p.disciplines?.[0]?.discipline.name || 'Specialist'}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-slate-300" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
-              </div>
 
-              {isAuthenticated && activeMembershipBenefit && !selectedPackageId && (
-                <div className="space-y-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
-                  <h3 className="text-sm font-semibold text-emerald-900">Membership discount applied</h3>
-                  <p className="text-xs text-emerald-700">
-                    {activeMembershipBenefit.membershipName} applies{' '}
-                    {Number(activeMembershipBenefit.serviceDiscountPercent).toFixed(0)}% off this service when no package session is used.
-                  </p>
-                  {membershipDiscountedPrice !== null && (
-                    <div className="text-sm text-emerald-800">
-                      Estimated bookable price: ${membershipDiscountedPrice.toFixed(2)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isAuthenticated && patientPackages && patientPackages.length > 0 && !isRecurring && (
-                <div className="space-y-3 rounded-lg border border-primary-100 bg-primary-50/30 p-4">
-                  <h3 className="text-sm font-semibold text-primary-900">Use a wellness package?</h3>
-                  <p className="text-xs text-primary-700 mb-2">
-                    You have active packages. Package coverage takes precedence over membership discounts and reduces this visit charge to $0.00.
-                  </p>
-                  <div className="space-y-2">
-                    <label className="flex cursor-pointer items-center gap-3">
-                      <input
-                        type="radio"
-                        name="packageSelection"
-                        checked={selectedPackageId === null}
-                        onChange={() => setSelectedPackageId(null)}
-                        className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="text-sm text-gray-700">Pay today (${service?.defaultPrice})</span>
-                    </label>
-                    {patientPackages.map((pkg) => (
-                      <label key={pkg.id} className="flex cursor-pointer items-center gap-3">
-                        <input
-                          type="radio"
-                          name="packageSelection"
-                          checked={selectedPackageId === pkg.id}
-                          onChange={() => setSelectedPackageId(pkg.id)}
-                          className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                {step === 1 && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="grid lg:grid-cols-2 gap-12">
+                      <div className="space-y-6">
+                        <h2 className="text-xl font-bold text-slate-900">Choose Date</h2>
+                        <input 
+                          type="date" 
+                          className="w-full p-4 rounded-2xl border-2 border-slate-100 focus:border-primary-600 outline-none transition-all"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
                         />
-                        <span className="text-sm text-gray-700">
-                          {pkg.package.name} ({pkg.totalSessions - pkg.usedSessions} sessions left)
-                        </span>
-                      </label>
-                    ))}
+                      </div>
+                      <div className="space-y-6">
+                        <h2 className="text-xl font-bold text-slate-900">Available Times</h2>
+                        {slotsLoading ? (
+                          <div className="grid grid-cols-3 gap-3">
+                            {[1,2,3,4,5,6].map(i => <div key={i} className="h-12 bg-slate-100 animate-pulse rounded-xl" />)}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-3">
+                            {slots?.map((slot, i) => (
+                              <button
+                                key={i}
+                                onClick={() => handleSlotSelect(slot)}
+                                className="p-3 rounded-xl border-2 border-slate-100 hover:border-primary-600 hover:bg-primary-50/30 transition-all text-sm font-bold text-slate-700"
+                              >
+                                {formatTime(slot.start)}
+                              </button>
+                            ))}
+                            {slots?.length === 0 && (
+                              <p className="col-span-3 text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">No availability on this date.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <AppButton variant="ghost" onClick={prevStep} className="rounded-full">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Change Provider
+                    </AppButton>
                   </div>
-                </div>
-              )}
+                )}
 
-              {bookingError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  {bookingError}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={prevStep} className="rounded-lg border px-4 py-2">
-                  Back
-                </button>
-                {isAuthenticated ? (
-                  <button
-                    type="button"
-                    onClick={handleConfirmAuthenticated}
-                    disabled={
-                      !selectedSlot ||
-                      appointmentMutation.isPending ||
-                      Boolean(
-                        isRecurring &&
-                          recurringUseEndDate &&
-                          (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate))
-                      )
-                    }
-                    className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
-                  >
-                    {appointmentMutation.isPending ? (
-                      <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Booking...
-                      </>
-                    ) : (
-                      isRecurring ? 'Confirm recurring booking' : 'Confirm Booking'
+                {step === 2 && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                    <h2 className="text-xl font-bold text-slate-900">Patient Information</h2>
+                    <form onSubmit={handleSubmit(handlePatientFormSubmit)} className="space-y-6 max-w-lg mx-auto">
+                      <AppFormField label="Full Name" error={errors.name?.message}>
+                        <AppInput {...register('name')} placeholder="e.g. John Doe" className="rounded-xl h-12" />
+                      </AppFormField>
+                      <AppFormField label="Email Address" error={errors.email?.message}>
+                        <AppInput 
+                          {...register('email')} 
+                          type="email" 
+                          placeholder="john@example.com" 
+                          className="rounded-xl h-12" 
+                          onBlur={checkEmail}
+                        />
+                      </AppFormField>
+                      <AppFormField label="Phone Number" error={errors.phone?.message}>
+                        <AppInput {...register('phone')} placeholder="+1 (555) 000-0000" className="rounded-xl h-12" />
+                      </AppFormField>
+                      
+                      {patientExists !== null && (
+                        <div className={cn(
+                          "p-4 rounded-2xl border text-sm",
+                          patientExists ? "bg-blue-50 border-blue-100 text-blue-800" : "bg-emerald-50 border-emerald-100 text-emerald-800"
+                        )}>
+                          {patientExists ? (
+                            <div className="flex gap-3">
+                              <ShieldCheck className="h-5 w-5 shrink-0" />
+                              <p><strong>Welcome back!</strong> We found an existing account. Enter your password to continue.</p>
+                            </div>
+                          ) : (
+                            <div className="flex gap-3">
+                              <User className="h-5 w-5 shrink-0" />
+                              <p><strong>New Account:</strong> We'll create a clinical profile for you. Please set a password.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <AppFormField label={patientExists ? "Account Password" : "Set Profile Password"} error={errors.password?.message}>
+                        <AppInput {...register('password')} type="password" placeholder="••••••••" className="rounded-xl h-12" />
+                      </AppFormField>
+
+                      <div className="flex items-center gap-4 pt-4">
+                        <AppButton variant="outline" type="button" onClick={prevStep} className="flex-1 rounded-full h-12">
+                          Back
+                        </AppButton>
+                        <AppButton type="submit" className="flex-1 rounded-full h-12 shadow-lg">
+                          Continue <ArrowRight className="ml-2 h-4 w-4" />
+                        </AppButton>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {step === 3 && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 text-center">
+                    <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600 mb-6">
+                      <CheckCircle2 className="h-10 w-10" />
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-900">Review & Confirm</h2>
+                    <p className="text-slate-500 max-w-md mx-auto">Please review your appointment details. By confirming, you agree to our clinic's cancellation policy.</p>
+                    
+                    {isAuthenticated && patientPackages && patientPackages.length > 0 && (
+                      <div className="max-w-md mx-auto p-6 bg-primary-50 rounded-3xl border border-primary-100 space-y-4 text-left">
+                        <h3 className="font-bold text-primary-900 flex items-center gap-2">
+                          <PackageIcon className="h-5 w-5" /> Use Wellness Package?
+                        </h3>
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-3 p-3 bg-white rounded-xl cursor-pointer hover:border-primary-300 border-2 border-transparent transition-all">
+                            <input type="radio" name="pkg" checked={!selectedPackageId} onChange={() => setSelectedPackageId(null)} className="h-4 w-4 text-primary-600" />
+                            <span className="text-sm font-medium">Standard Checkout (${service?.defaultPrice})</span>
+                          </label>
+                          {patientPackages.map(pkg => (
+                            <label key={pkg.id} className="flex items-center gap-3 p-3 bg-white rounded-xl cursor-pointer hover:border-primary-300 border-2 border-transparent transition-all">
+                              <input type="radio" name="pkg" checked={selectedPackageId === pkg.id} onChange={() => setSelectedPackageId(pkg.id)} className="h-4 w-4 text-primary-600" />
+                              <div className="text-sm">
+                                <p className="font-bold">{pkg.package.name}</p>
+                                <p className="text-xs text-slate-500">{pkg.totalSessions - pkg.usedSessions} sessions remaining</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </button>
-                ) : (
-                  <form onSubmit={handleSubmit(onSubmit)} className="inline">
-                    <button
-                      type="submit"
-                      disabled={
-                        !selectedSlot ||
-                        appointmentMutation.isPending ||
-                        Boolean(
-                          isRecurring &&
-                            recurringUseEndDate &&
-                            (!recurringEndDate || (selectedDate && recurringEndDate < selectedDate))
-                        )
-                      }
-                      className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white disabled:opacity-50"
-                    >
-                      {appointmentMutation.isPending ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Booking...
-                        </>
-                      ) : (
-                        isRecurring ? 'Confirm recurring booking' : 'Confirm Booking'
-                      )}
-                    </button>
-                  </form>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4 justify-center pt-8">
+                      <AppButton variant="outline" onClick={prevStep} className="w-full sm:w-auto px-10 rounded-full h-14">
+                        Back
+                      </AppButton>
+                      <AppButton className="w-full sm:w-auto px-12 rounded-full h-14 text-lg font-bold shadow-2xl" onClick={handleBooking}>
+                        {selectedPackageId ? 'Confirm with Package' : 'Proceed to Payment'} <ArrowRight className="ml-2 h-4 w-4" />
+                      </AppButton>
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
-          )}
-        </AppCardContent>
 
-        {/* Sticky step navigation - always visible at bottom */}
-        {(step === 1 || step === 2) && (
-          <AppCardFooter className="sticky bottom-0 z-10 flex-wrap gap-3 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <button
-              type="button"
-              onClick={prevStep}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back
-            </button>
-            {step === 1 && (
-              <button
-                type="button"
-                onClick={nextStep}
-                disabled={!selectedDate}
-                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            )}
-          </AppCardFooter>
-        )}
-      </AppCard>
+              </AppCardContent>
+            </AppCard>
+          </div>
 
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => {
-          setShowLoginModal(false);
-          setLoginError(null);
-        }}
-        email={email}
-        onSubmit={handleLoginSubmit}
-        isLoading={false}
-        error={loginError}
-      />
-      <WaitlistModal
-        isOpen={showWaitlistModal}
-        onClose={() => setShowWaitlistModal(false)}
-        clinicId={clinicId}
-        providerId={providerId || ''}
-        serviceId={serviceId}
-        locationId={launchLocation?.id}
-        timezone={launchLocation?.timezone}
-        defaultPreferredDate={selectedDate}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['waitlist'] })}
-      />
-      {recurringConflictModal && (
-        <RecurringConflictModal
-          isOpen={!!recurringConflictModal}
-          onClose={() => setRecurringConflictModal(null)}
-          conflicts={recurringConflictModal.conflicts}
-          createdCount={recurringConflictModal.createdCount}
-          onProceedPartial={() => {
-            setRecurringConflictModal(null);
-            router.push('/dashboard/appointments');
-          }}
-          onCancel={() => setRecurringConflictModal(null)}
-        />
-      )}
+          <div className="lg:col-span-1">
+            <StickySummaryPanel 
+              title="Booking Summary"
+              items={[
+                { label: 'Service', value: service?.name || '---' },
+                { label: 'Provider', value: selectedProvider ? `${selectedProvider.firstName} ${selectedProvider.lastName}` : (providerId ? 'Selected' : 'Any Available') },
+                { label: 'Duration', value: service ? `${service.duration} min` : '---' },
+                { label: 'Date', value: selectedDate ? formatDate(selectedDate) : '---' },
+                { label: 'Time', value: selectedSlot ? formatTime(selectedSlot.start) : '---' },
+                { label: 'Price', value: `$${service?.defaultPrice || '0.00'}`, isTotal: true },
+              ]}
+              footer="Transparent pricing. No hidden fees."
+            />
+          </div>
+
+        </div>
+      </div>
     </div>
+  );
+}
+
+export default function BookingPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <BookingPageContent />
+    </React.Suspense>
   );
 }

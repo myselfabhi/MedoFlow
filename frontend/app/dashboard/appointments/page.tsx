@@ -18,11 +18,17 @@ import {
   AppButton,
   AppPageHeader,
   AppEmptyState,
+  AppTable,
+  KPIStatCard
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { Calendar, User, Clock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
@@ -32,8 +38,7 @@ export default function AppointmentsPage() {
   const { user } = useAuth();
   const isProvider = user?.role === 'PROVIDER';
   const isPatient = user?.role === 'PATIENT';
-  const isStaffOrAdmin =
-    user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
+  const isStaffOrAdmin = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: appointments = [], isLoading, error } = useQuery({
     queryKey: ['appointments', user?.role],
@@ -43,104 +48,112 @@ export default function AppointmentsPage() {
       if (isStaffOrAdmin) return getClinicAppointments();
       return [] as (PatientAppointment | ProviderAppointment)[];
     },
-    enabled:
-      isPatient ||
-      isProvider ||
-      (isStaffOrAdmin && !!user?.clinicId),
+    enabled: isPatient || isProvider || (isStaffOrAdmin && !!user?.clinicId),
   });
 
-  const showClinicView = isStaffOrAdmin;
-
-  const subtitle =
-    isPatient
-      ? 'View your appointments'
-      : showClinicView
-        ? 'All clinic appointments'
-        : 'View your scheduled appointments';
+  const subtitle = isPatient
+    ? 'View and manage your upcoming visits and care history.'
+    : 'Clinical schedule and appointment management console.';
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
-        title="Appointments"
+        title="Clinical Schedule"
         description={subtitle}
       />
 
-      <AppCard>
-        <AppCardHeader>
-          <AppCardTitle>Appointments</AppCardTitle>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <KPIStatCard 
+          label="Total Bookings"
+          value={appointments.length}
+          icon={Calendar}
+          iconClassName="text-blue-600 bg-blue-50"
+        />
+        <KPIStatCard 
+          label="Completed Visits"
+          value={appointments.filter(a => a.status === 'COMPLETED').length}
+          icon={CheckCircle2}
+          iconClassName="text-emerald-600 bg-emerald-50"
+        />
+        <KPIStatCard 
+          label="Pending Items"
+          value={appointments.filter(a => a.status.includes('PENDING')).length}
+          icon={AlertCircle}
+          iconClassName="text-amber-600 bg-amber-50"
+        />
+      </div>
+
+      <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+        <AppCardHeader className="bg-white border-b-0 py-6 px-8 flex items-center justify-between">
+          <AppCardTitle className="text-lg font-bold">Appointment Registry</AppCardTitle>
         </AppCardHeader>
-        <AppCardContent>
+        <AppCardContent className="p-0">
           {isLoading ? (
-            <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+            <div className="p-12 flex justify-center">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
             </div>
-          ) : error ? (
-            <p className="text-sm text-destructive">Failed to load appointments.</p>
-          ) : !appointments.length ? (
-            <AppEmptyState
-              title="No appointments yet"
-              description={
-                isPatient
-                  ? 'Book your first appointment to get started.'
-                  : 'No scheduled appointments.'
-              }
-              actionLabel={isPatient ? 'Book appointment' : undefined}
-              onAction={isPatient ? () => window.location.assign('/') : undefined}
-            />
+          ) : appointments.length === 0 ? (
+            <div className="p-12">
+              <AppEmptyState
+                title="No appointments found"
+                description={isPatient ? 'Book your first visit to get started.' : 'The clinical schedule is currently empty.'}
+                actionLabel={isPatient ? 'Book Appointment' : undefined}
+                onAction={isPatient ? () => window.location.assign('/') : undefined}
+              />
+            </div>
           ) : (
-            <div className="space-y-4">
-              {(appointments as (PatientAppointment | ProviderAppointment)[]).map(
-                (apt: PatientAppointment | ProviderAppointment) => (
-                  <div
-                    key={apt.id}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-subtle"
-                  >
+            <AppTable
+              columns={[
+                {
+                  key: 'service',
+                  header: 'Visit Details',
+                  render: (apt) => (
                     <div>
-                      <p className="font-medium text-foreground">
-                        {apt.service.name}
-                        {(isProvider || showClinicView) &&
-                          'patient' in apt &&
-                          apt.patient && (
-                            <span className="ml-2 text-sm font-normal text-muted-foreground">
-                              · {apt.patient.name}
-                            </span>
-                          )}
-                      </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        {isPatient && 'provider' in apt && apt.provider && (
-                          <span>
-                            {apt.provider.firstName} {apt.provider.lastName} ·{' '}
-                          </span>
-                        )}
-                        {showClinicView && 'provider' in apt && apt.provider && (
-                          <span>
-                            {apt.provider.firstName} {apt.provider.lastName} ·{' '}
-                          </span>
-                        )}
-                        <span>{formatDateTime(apt.startTime)}</span>
-                        {showClinicView && (
-                          <StatusBadge status={apt.status} variant="appointment" />
-                        )}
-                      </div>
+                      <p className="font-bold text-slate-900">{apt.service.name}</p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Clock className="h-3 w-3" /> {formatDateTime(apt.startTime)}</p>
                     </div>
-                    <AppButton variant="outline" size="sm" asChild>
-                      <Link
-                        href={
-                          isPatient
-                            ? `/dashboard/patient/appointments/${apt.id}`
-                            : `/dashboard/provider/appointments/${apt.id}`
-                        }
-                      >
-                        View
-                      </Link>
-                    </AppButton>
-                  </div>
-                )
-              )}
-            </div>
+                  ),
+                },
+                {
+                  key: 'party',
+                  header: isPatient ? 'Provider' : 'Patient',
+                  render: (apt) => (
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">
+                        {isPatient ? (apt as any).provider?.lastName?.[0] : (apt as any).patient?.name?.[0]}
+                      </div>
+                      <p className="text-sm font-medium text-slate-700">
+                        {isPatient ? `Dr. ${(apt as any).provider?.lastName}` : (apt as any).patient?.name}
+                      </p>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (apt) => <StatusBadge status={apt.status} variant="appointment" />,
+                },
+                {
+                  key: 'actions',
+                  header: '',
+                  className: 'text-right',
+                  render: (apt) => (
+                    <div className="flex justify-end pr-4">
+                      <AppButton variant="ghost" size="sm" className="rounded-full font-bold text-primary-600" asChild>
+                        <Link href={isPatient ? `/dashboard/patient/appointments/${apt.id}` : `/dashboard/provider/appointments/${apt.id}`}>
+                          View Details <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </AppButton>
+                    </div>
+                  ),
+                }
+              ]}
+              data={appointments.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())}
+              keyExtractor={(apt) => apt.id}
+            />
           )}
         </AppCardContent>
       </AppCard>
-    </div>
+    </PageContainer>
   );
 }

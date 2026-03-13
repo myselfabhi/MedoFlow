@@ -13,8 +13,20 @@ import {
   AppCardContent,
   AppButton,
   AppPageHeader,
+  KPIStatCard
 } from '@/components/ui-system';
-import { Calendar, CreditCard, FileText, CalendarDays } from 'lucide-react';
+import { PageContainer } from '@/components/layout';
+import { 
+  Calendar, 
+  CreditCard, 
+  FileText, 
+  CalendarDays, 
+  ArrowRight, 
+  Activity,
+  Video,
+  User,
+  Clock
+} from 'lucide-react';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', {
@@ -38,12 +50,6 @@ export function ProviderDashboard() {
     enabled: !!clinicId,
   });
 
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', 'PENDING_PAYMENT'],
-    queryFn: () => getInvoices('PENDING_PAYMENT'),
-    enabled: !!clinicId,
-  });
-
   const { data: plans = [], isLoading: plansLoading } = useQuery({
     queryKey: ['treatment-plans', 'ACTIVE'],
     queryFn: () => getTreatmentPlans('ACTIVE'),
@@ -55,101 +61,188 @@ export function ProviderDashboard() {
     return d >= today && d <= todayEnd;
   });
 
-  const nextFive = todayAppointments
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-    .slice(0, 5);
+  const upcomingToday = todayAppointments
+    .filter(a => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-  const isLoading = appointmentsLoading || invoicesLoading || plansLoading;
+  const currentAppointment = upcomingToday.find(a => {
+    const now = new Date();
+    return new Date(a.startTime) <= now && new Date(a.endTime) >= now;
+  }) || upcomingToday.find(a => new Date(a.startTime) > new Date());
+
+  const isLoading = appointmentsLoading || plansLoading;
 
   return (
-    <div className="space-y-6">
-      <AppPageHeader title="Dashboard" description="Welcome back" />
+    <PageContainer className="space-y-8">
+      <AppPageHeader 
+        title={`Welcome, ${user?.name?.split(' ')[0] || 'Provider'}`} 
+        description="Here is what your clinical day looks like." 
+      />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <AppCard>
-          <AppCardContent className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Today&apos;s Appointments
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">
-                {isLoading ? '—' : todayAppointments.length}
-              </p>
-            </div>
-            <CalendarDays className="h-8 w-8 text-muted-foreground/50" />
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardContent className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Pending Payments
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">
-                {isLoading ? '—' : invoices.length}
-              </p>
-            </div>
-            <CreditCard className="h-8 w-8 text-muted-foreground/50" />
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardContent className="flex flex-row items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Active Treatment Plans
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">
-                {isLoading ? '—' : plans.length}
-              </p>
-            </div>
-            <FileText className="h-8 w-8 text-muted-foreground/50" />
-          </AppCardContent>
-        </AppCard>
+        <KPIStatCard 
+          label="Today's Volume"
+          value={isLoading ? '...' : upcomingToday.length}
+          icon={CalendarDays}
+          description="Scheduled consultations"
+          iconClassName="text-blue-600 bg-blue-50"
+        />
+        <KPIStatCard 
+          label="Active Plans"
+          value={isLoading ? '...' : plans.length}
+          icon={Activity}
+          description="Patients under your care"
+          iconClassName="text-purple-600 bg-purple-50"
+        />
+        <KPIStatCard 
+          label="Next Break"
+          value="12:30 PM"
+          icon={Clock}
+          description="Based on your schedule"
+          iconClassName="text-amber-600 bg-amber-50"
+        />
       </div>
 
-      <AppCard>
-        <AppCardHeader className="flex flex-row items-center justify-between">
-          <AppCardTitle>Today&apos;s Schedule</AppCardTitle>
-          <AppButton asChild size="sm" variant="outline">
-            <Link href="/dashboard/provider/calendar">
-              <Calendar className="mr-2 h-4 w-4" />
-              Open Calendar
-            </Link>
-          </AppButton>
-        </AppCardHeader>
-        <AppCardContent>
-          {isLoading ? (
-            <div className="flex min-h-[120px] items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-accent" />
-            </div>
-          ) : nextFive.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No appointments today</p>
-          ) : (
-            <ul className="space-y-2">
-              {nextFive.map((apt) => (
-                <li
-                  key={apt.id}
-                  className="flex items-center justify-between rounded-lg border border-border px-4 py-3 transition-colors hover:bg-subtle"
-                >
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {apt.patient?.name ?? 'Patient'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {apt.service?.name ?? '—'} · {formatTime(apt.startTime)}
-                    </p>
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Main Schedule */}
+        <div className="lg:col-span-2 space-y-6">
+          <AppCard className="border-none shadow-sm overflow-hidden">
+            <AppCardHeader className="flex flex-row items-center justify-between bg-slate-50/50 border-b-0 py-6">
+              <AppCardTitle className="text-xl font-bold">Clinical Queue</AppCardTitle>
+              <AppButton asChild size="sm" variant="outline" className="bg-white">
+                <Link href="/dashboard/provider/calendar">Full Calendar</Link>
+              </AppButton>
+            </AppCardHeader>
+            <AppCardContent className="p-0">
+              {isLoading ? (
+                <div className="p-12 flex justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+                </div>
+              ) : upcomingToday.length === 0 ? (
+                <div className="p-12 text-center text-slate-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p>No appointments scheduled for today.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {upcomingToday.map((apt) => (
+                    <div
+                      key={apt.id}
+                      className={cn(
+                        "flex items-center justify-between px-6 py-5 transition-colors hover:bg-slate-50",
+                        currentAppointment?.id === apt.id && "bg-primary-50/30"
+                      )}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="text-sm font-bold text-slate-400 w-16 pt-1">
+                          {formatTime(apt.startTime)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 flex items-center gap-2">
+                            {apt.patient?.name ?? 'Patient'}
+                            {currentAppointment?.id === apt.id && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+                                Current
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm text-slate-500 mt-0.5">
+                            {apt.service?.name ?? 'General Consultation'} · {(apt.service as any)?.duration || 30} min
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {apt.meetLink && (
+                          <AppButton variant="ghost" size="icon" className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50" asChild>
+                            <a href={apt.meetLink} target="_blank" rel="noopener noreferrer">
+                              <Video className="h-4 w-4" />
+                            </a>
+                          </AppButton>
+                        )}
+                        <AppButton size="sm" className="rounded-full shadow-sm" asChild>
+                          <Link href={`/dashboard/provider/appointments/${apt.id}`}>
+                            Open Charts
+                          </Link>
+                        </AppButton>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AppCardContent>
+          </AppCard>
+        </div>
+
+        {/* Side Actions / Insights */}
+        <div className="space-y-6">
+          <AppCard className="bg-primary-600 text-white overflow-hidden">
+            <AppCardContent className="p-8 space-y-6">
+              <h3 className="text-lg font-bold">Ready for Scribe?</h3>
+              <p className="text-primary-100 text-sm leading-relaxed">
+                Use Medoflow AI Scribe to automatically document your consultations and generate SOAP notes in seconds.
+              </p>
+              <AppButton className="w-full bg-white text-primary-600 hover:bg-primary-50 border-none rounded-full font-bold">
+                Learn how it works
+              </AppButton>
+            </AppCardContent>
+          </AppCard>
+
+          <AppCard>
+            <AppCardHeader>
+              <AppCardTitle>Quick Links</AppCardTitle>
+            </AppCardHeader>
+            <AppCardContent className="p-0">
+              <div className="grid grid-cols-1 divide-y divide-slate-100">
+                <Link href="/dashboard/provider/calendar" className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700">My Schedule</span>
                   </div>
-                  <AppButton variant="ghost" size="sm" asChild>
-                    <Link href={`/dashboard/provider/appointments/${apt.id}`}>
-                      View
-                    </Link>
-                  </AppButton>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppCardContent>
-      </AppCard>
-    </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </Link>
+                <Link href="/dashboard/provider/patients" className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <User className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700">My Patients</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </Link>
+                <Link href="/dashboard/analytics" className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Activity className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700">Personal Performance</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </Link>
+              </div>
+            </AppCardContent>
+          </AppCard>
+        </div>
+      </div>
+    </PageContainer>
+  );
+}
+
+// Helper for conditional classes
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
+function ChevronRight(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-9-6" />
+    </svg>
   );
 }

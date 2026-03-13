@@ -18,6 +18,7 @@ import {
   AppButton,
   AppBadge,
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 
 const statusConfig: Record<
   WaitlistStatus,
@@ -68,7 +69,7 @@ export default function PatientWaitlistPage() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <PageContainer className="space-y-6">
         <AppPageHeader title="My waitlist" description="View and manage your waitlist entries" />
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
           Failed to load waitlist. Please try again.
@@ -79,12 +80,12 @@ export default function PatientWaitlistPage() {
         >
           ← Back to appointments
         </Link>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title="My waitlist"
         description="View and manage your waitlist entries. Claim offered slots before they expire."
@@ -184,6 +185,6 @@ export default function PatientWaitlistPage() {
       >
         ← Back to appointments
       </Link>
-    </div>
+    </PageContainer>
   );
 }

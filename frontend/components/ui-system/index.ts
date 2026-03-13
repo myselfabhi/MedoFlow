@@ -10,5 +10,7 @@ export { AppModal } from './AppModal';
 export { AppPageHeader } from './AppPageHeader';
 export { AppSection } from './AppSection';
 export { AppEmptyState } from './AppEmptyState';
+export { KPIStatCard } from './KPIStatCard';
+export { StickySummaryPanel } from './StickySummaryPanel';
 export { theme } from './theme';
 export type { Theme } from './theme';

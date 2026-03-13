@@ -70,7 +70,15 @@ const ALL_MAP: Record<string, 'success' | 'warning' | 'destructive' | 'accent' |
 };
 
 function formatLabel(status: string): string {
-  return status.replace(/_/g, ' ');
+  const customLabels: Record<string, string> = {
+    PENDING_PROVIDER_APPROVAL: 'Pending Approval',
+    PENDING_PAYMENT: 'Awaiting Payment',
+    FINAL: 'Finalized',
+    DRAFT: 'Draft',
+    PARTIALLY_REFUNDED: 'Partial Refund',
+    CARD_PRESENT: 'Card (Manual)',
+  };
+  return customLabels[status] || status.replace(/_/g, ' ');
 }
 
 interface StatusBadgeProps {

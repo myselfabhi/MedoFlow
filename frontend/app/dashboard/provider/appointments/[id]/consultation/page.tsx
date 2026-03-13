@@ -7,6 +7,14 @@ import * as aiScribeApi from '@/lib/aiScribeApi';
 import { startConsultationRecordingFlow } from '@/lib/consultationRecordingFlow';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
+// UI System Components
+import { PageContainer } from '@/components/layout/PageContainer';
+import { AppCard, AppCardHeader, AppCardTitle, AppCardContent } from '@/components/ui-system/AppCard';
+import { AppModal } from '@/components/ui-system/AppModal';
+import { AppFormField } from '@/components/ui-system/AppFormField';
+import { AppButton } from '@/components/ui-system/AppButton';
+import { Textarea } from '@/components/ui/textarea';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -44,19 +52,19 @@ function statusLabel(status: string): string {
 function statusColor(status: string): string {
     const colors: Record<string, string> = {
         READY: 'bg-blue-100 text-blue-800',
-        LIVE: 'bg-green-100 text-green-800',
+        LIVE: 'bg-emerald-100 text-emerald-800',
         RECORDING: 'bg-red-100 text-red-800',
-        ENDED: 'bg-gray-100 text-gray-800',
-        PROCESSING: 'bg-yellow-100 text-yellow-800',
+        ENDED: 'bg-slate-100 text-slate-800',
+        PROCESSING: 'bg-amber-100 text-amber-800',
         TRANSCRIPT_READY: 'bg-emerald-100 text-emerald-800',
         FAILED: 'bg-red-100 text-red-800',
-        GRANTED: 'bg-green-100 text-green-800',
-        PENDING: 'bg-yellow-100 text-yellow-800',
+        GRANTED: 'bg-emerald-100 text-emerald-800',
+        PENDING: 'bg-amber-100 text-amber-800',
         STORED: 'bg-emerald-100 text-emerald-800',
-        DRAFT_GENERATED: 'bg-indigo-100 text-indigo-800',
-        APPROVED: 'bg-green-100 text-green-800',
+        DRAFT_GENERATED: 'bg-blue-100 text-blue-800',
+        APPROVED: 'bg-emerald-100 text-emerald-800',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-slate-100 text-slate-800';
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +91,7 @@ export default function ConsultationRoomPage() {
         plan: ''
     });
     const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
-    const initialized = useRef(false); // Add ref to prevent double initialization
+    const initialized = useRef(false);
 
     const recorder = useAudioRecorder();
 
@@ -97,7 +105,7 @@ export default function ConsultationRoomPage() {
             const s = await consultationApi.startConsultation(appointmentId);
             setSession(s);
         } catch (err: unknown) {
-            initialized.current = false; // Allow retry on failure
+            initialized.current = false;
             const msg = err instanceof Error ? err.message : 'Failed to start consultation';
             setError(msg);
         } finally {
@@ -118,7 +126,7 @@ export default function ConsultationRoomPage() {
         } catch {
             // ignore
         }
-    }, [session?.id]); // Note: changed dependency to session?.id to avoid stale closures
+    }, [session?.id]);
 
     // ----- Poll for session status (like consent) -----
     useEffect(() => {
@@ -219,7 +227,6 @@ export default function ConsultationRoomPage() {
                 const aiSession = await aiScribeApi.getSession(result.aiScribeSessionId);
                 setAiScribeSession(aiSession);
 
-                // Prepopulate the editable modal state
                 const draft = aiSession.aiDraft as Record<string, string> | null;
                 setDraftForm({
                     subjective: draft?.subjective || '',
@@ -251,10 +258,7 @@ export default function ConsultationRoomPage() {
     const handleApproveDraft = async () => {
         if (!aiScribeSession) return;
         try {
-            // First update the draft to save manual user edits
             await aiScribeApi.updateDraft(aiScribeSession.id, draftForm);
-
-            // Then approve the session
             const approved = await aiScribeApi.approveSession(aiScribeSession.id);
             setAiScribeSession(approved);
             setShowDraftModal(false);
@@ -270,99 +274,63 @@ export default function ConsultationRoomPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
+                <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
             </div>
         );
     }
 
     if (error && !session) {
         return (
-            <div className="max-w-2xl mx-auto p-8">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                    <h2 className="text-lg font-semibold text-red-800 mb-2">Error</h2>
-                    <p className="text-red-700 mb-4">{error}</p>
-                    <button
-                        onClick={() => router.back()}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                    >
-                        Go Back
-                    </button>
-                </div>
-            </div>
+            <PageContainer>
+                <AppCard className="max-w-2xl mx-auto border-red-200">
+                    <AppCardContent className="p-8 text-center bg-red-50/50">
+                        <h2 className="text-lg font-semibold text-red-800 mb-2">Error</h2>
+                        <p className="text-red-700 mb-6">{error}</p>
+                        <AppButton variant="danger" onClick={() => router.back()}>
+                            Go Back
+                        </AppButton>
+                    </AppCardContent>
+                </AppCard>
+            </PageContainer>
         );
     }
 
     if (!session) return null;
 
     return (
-        <div className="max-w-5xl mx-auto p-6 space-y-6">
-            {/* Session Header */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Consultation Room</h1>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Patient: <span className="font-medium text-gray-700">{session.patient?.name ?? 'Unknown'}</span>
-                            {session.provider && (
-                                <> · Provider: <span className="font-medium text-gray-700">{session.provider.firstName} {session.provider.lastName}</span></>
-                            )}
-                        </p>
-                        {session.appointment && (
-                            <p className="text-sm text-gray-400 mt-0.5">
-                                Appointment: {new Date(session.appointment.startTime).toLocaleString()}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {session.appointment?.meetLink && (
-                            <a
-                                href={session.appointment.meetLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg shadow hover:bg-blue-700 transition flex items-center gap-2"
-                            >
+        <PageContainer>
+            {/* Page Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Consultation Room</h1>
+                    <p className="text-slate-500 text-sm mt-1">
+                        Secure AI-assisted clinical documentation
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <AppButton variant="outline" onClick={() => router.back()}>
+                        ← Back
+                    </AppButton>
+                    {session.appointment?.meetLink && (
+                        <AppButton asChild variant="primary">
+                            <a href={session.appointment.meetLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                 </svg>
                                 Join Video Call
                             </a>
-                        )}
-                        <button
-                            onClick={() => router.back()}
-                            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
-                        >
-                            ← Back
-                        </button>
-                    </div>
-                </div>
-
-                {/* Status badges */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(session.status)}`}>
-                        Session: {statusLabel(session.status)}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(session.recordingStatus)}`}>
-                        Recording: {statusLabel(session.recordingStatus)}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(session.consentStatus)}`}>
-                        Consent: {statusLabel(session.consentStatus)}
-                    </span>
-                    {session.transcriptStatus && session.transcriptStatus !== 'NOT_STARTED' && (
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(session.transcriptStatus)}`}>
-                            Transcript: {statusLabel(session.transcriptStatus)}
-                        </span>
+                        </AppButton>
                     )}
                 </div>
-
             </div>
 
             {/* Error banner */}
             {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mb-6">
                     <span className="text-red-500 text-lg">⚠</span>
                     <div>
                         <p className="text-sm text-red-800">{error}</p>
-                        <button onClick={() => setError(null)} className="text-xs text-red-500 underline mt-1">
+                        <button onClick={() => setError(null)} className="text-xs text-red-500 hover:text-red-700 underline mt-1">
                             Dismiss
                         </button>
                     </div>
@@ -371,228 +339,282 @@ export default function ConsultationRoomPage() {
 
             {/* Recorder error */}
             {recorder.error && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
                     <p className="text-sm text-amber-800">{recorder.error}</p>
                 </div>
             )}
 
-            {/* Consent notice */}
-            {session.consentStatus === 'PENDING' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-                    <div className="text-3xl mb-3">🔒</div>
-                    <h3 className="text-lg font-semibold text-amber-900 mb-2">Waiting for Patient Consent</h3>
-                    <p className="text-sm text-amber-700 max-w-md mx-auto">
-                        Recording cannot start until the patient grants consent using the join link above.
-                        Share the link with the patient so they can join and consent to recording.
-                    </p>
+            {/* Clinical Rail Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                {/* Main Content Area (2/3) */}
+                <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Consent Notice */}
+                    {session.consentStatus === 'PENDING' && (
+                        <AppCard className="border-amber-200 bg-amber-50/50">
+                            <AppCardContent className="text-center py-8">
+                                <div className="text-3xl mb-3">🔒</div>
+                                <h3 className="text-lg font-semibold text-amber-900 mb-2">Waiting for Patient Consent</h3>
+                                <p className="text-sm text-amber-700 max-w-md mx-auto">
+                                    Recording cannot start until the patient grants consent using the join link. Share the link with the patient so they can join and consent to recording.
+                                </p>
+                            </AppCardContent>
+                        </AppCard>
+                    )}
+
+                    {/* Recording Controls */}
+                    <AppCard>
+                        <AppCardHeader>
+                            <AppCardTitle>AI Scribe Controls</AppCardTitle>
+                        </AppCardHeader>
+                        <AppCardContent>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {/* Start recording */}
+                                    {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
+                                        <AppButton
+                                            onClick={handleStartRecording}
+                                            disabled={session.consentStatus !== 'GRANTED'}
+                                            variant="danger"
+                                            className="flex items-center gap-2"
+                                        >
+                                            <span className="w-2.5 h-2.5 bg-white rounded-full" />
+                                            Start AI Scribe (Share Meeting Tab)
+                                        </AppButton>
+                                    )}
+
+                                    {/* Stop recording */}
+                                    {recorder.isRecording && (
+                                        <AppButton
+                                            onClick={handleStopRecording}
+                                            variant="secondary"
+                                            className="flex items-center gap-2 bg-slate-800 text-white hover:bg-slate-900"
+                                        >
+                                            <span className="w-3 h-3 bg-red-500 rounded-sm" />
+                                            Stop Recording
+                                        </AppButton>
+                                    )}
+
+                                    {/* Duration */}
+                                    {recorder.isRecording && (
+                                        <div className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-lg border border-red-100">
+                                            <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                                            <span className="text-sm font-mono font-bold">
+                                                {formatDuration(recorder.duration)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Upload */}
+                                    {recorder.audioBlob && !uploading && !transcribing && session.recordingStatus !== 'STORED' && (
+                                        <AppButton onClick={handleUploadAndTranscribe} variant="primary">
+                                            Upload & Transcribe
+                                        </AppButton>
+                                    )}
+
+                                    {/* Upload progress */}
+                                    {uploading && (
+                                        <div className="flex items-center gap-2 text-blue-600 px-2">
+                                            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                                            <span className="text-sm font-medium">Uploading…</span>
+                                        </div>
+                                    )}
+
+                                    {/* Transcription progress */}
+                                    {transcribing && (
+                                        <div className="flex items-center gap-2 text-amber-600 px-2">
+                                            <div className="animate-spin h-4 w-4 border-2 border-amber-500 border-t-transparent rounded-full" />
+                                            <span className="text-sm font-medium">Transcribing & analyzing…</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Start Recording Hint */}
+                                {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
+                                    <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                        <strong className="text-slate-700">Important:</strong> To capture the patient's voice, please select the Google Meet tab when prompted and ensure <strong className="text-slate-700">"Share tab audio"</strong> is checked.
+                                    </p>
+                                )}
+
+                                {/* Recording info */}
+                                {recorder.audioBlob && !recorder.isRecording && (
+                                    <p className="text-sm text-slate-500">
+                                        Recording complete · {formatDuration(recorder.duration)} · {(recorder.audioBlob.size / (1024 * 1024)).toFixed(1)} MB
+                                    </p>
+                                )}
+                            </div>
+                        </AppCardContent>
+                    </AppCard>
+
+                    {/* Transcript Panel */}
+                    {(transcript || session.aiScribeSessionId) && (
+                        <AppCard>
+                            <AppCardHeader className="flex flex-row items-center justify-between pb-4">
+                                <AppCardTitle>Consultation Transcript</AppCardTitle>
+                                <AppButton variant="ghost" size="sm" onClick={handleLoadTranscript} className="text-blue-600">
+                                    Refresh
+                                </AppButton>
+                            </AppCardHeader>
+                            <AppCardContent className="pt-0">
+                                {transcript?.transcript ? (
+                                    <div className="bg-slate-50 rounded-lg p-4 max-h-96 overflow-y-auto border border-slate-100">
+                                        <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-serif">
+                                            {transcript.transcript}
+                                        </p>
+                                    </div>
+                                ) : transcript ? (
+                                    <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                        {transcript.transcriptStatus === 'PROCESSING' ? 'Transcription in progress…' : 'No transcript available yet.'}
+                                    </p>
+                                ) : (
+                                    <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                        Loading transcript status…
+                                    </p>
+                                )}
+
+                                {/* Convert to template button */}
+                                {transcript?.aiScribeStatus === 'DRAFT_GENERATED' && (
+                                    <div className="mt-6">
+                                        <AppButton onClick={handleConvertToTemplate} variant="primary" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+                                            Generate SOAP Note Draft
+                                        </AppButton>
+                                    </div>
+                                )}
+
+                                {/* Error */}
+                                {transcript?.errorMessage && (
+                                    <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-100">
+                                        <p className="text-sm text-red-700">{transcript.errorMessage}</p>
+                                    </div>
+                                )}
+                            </AppCardContent>
+                        </AppCard>
+                    )}
+
+                    {/* Manual documentation fallback */}
+                    {session.status === 'FAILED' && (
+                        <AppCard className="border-amber-200 bg-amber-50">
+                            <AppCardContent className="text-center py-6">
+                                <h3 className="text-lg font-semibold text-amber-900 mb-2">Processing Issue</h3>
+                                <p className="text-sm text-amber-700 mb-4">
+                                    There was an issue with the transcript. You can still document notes manually using the standard visit record.
+                                </p>
+                                <AppButton variant="primary" onClick={() => router.push(`/dashboard/provider/visits`)}>
+                                    Go to Visit Records
+                                </AppButton>
+                            </AppCardContent>
+                        </AppCard>
+                    )}
+
                 </div>
-            )}
 
-            {/* Recording Controls */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Recording Controls</h2>
+                {/* Right Rail (1/3) - Patient Context & Status */}
+                <div className="space-y-6">
+                    <AppCard>
+                        <AppCardHeader>
+                            <AppCardTitle>Patient Context</AppCardTitle>
+                        </AppCardHeader>
+                        <AppCardContent className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient Name</label>
+                                <p className="text-slate-900 font-medium">{session.patient?.name ?? 'Unknown'}</p>
+                            </div>
+                            {session.provider && (
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Provider</label>
+                                    <p className="text-slate-900">{session.provider.firstName} {session.provider.lastName}</p>
+                                </div>
+                            )}
+                            {session.appointment && (
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scheduled Time</label>
+                                    <p className="text-slate-900">{new Date(session.appointment.startTime).toLocaleString()}</p>
+                                </div>
+                            )}
 
-                <div className="flex items-center gap-4">
-                    {/* Start recording */}
-                    {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
-                        <div className="flex flex-col items-start gap-2">
-                            <button
-                                onClick={handleStartRecording}
-                                disabled={session.consentStatus !== 'GRANTED'}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
-                            >
-                                <span className="w-3 h-3 bg-white rounded-full" />
-                                Start AI Scribe (Share Meeting Tab)
-                            </button>
-                            <p className="text-xs text-gray-500 max-w-sm">
-                                <b>Important:</b> To capture the patient's voice, please select the Google Meet tab and ensure <b>"Share tab audio"</b> is checked.
-                            </p>
-                        </div>
-                    )}
+                            <div className="pt-4 border-t border-slate-100">
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Session Status</label>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-600">Consultation</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(session.status)}`}>
+                                            {statusLabel(session.status)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-600">Recording</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(session.recordingStatus)}`}>
+                                            {statusLabel(session.recordingStatus)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-600">Consent</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(session.consentStatus)}`}>
+                                            {statusLabel(session.consentStatus)}
+                                        </span>
+                                    </div>
+                                    {session.transcriptStatus && session.transcriptStatus !== 'NOT_STARTED' && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-600">Transcript</span>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(session.transcriptStatus)}`}>
+                                                {statusLabel(session.transcriptStatus)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {transcript?.aiScribeStatus && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-600">AI Scribe</span>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(transcript.aiScribeStatus)}`}>
+                                                {statusLabel(transcript.aiScribeStatus)}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </AppCardContent>
+                    </AppCard>
 
-                    {/* Stop recording */}
-                    {recorder.isRecording && (
-                        <button
-                            onClick={handleStopRecording}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition font-medium"
-                        >
-                            <span className="w-3 h-3 bg-red-500 rounded-sm" />
-                            Stop Recording
-                        </button>
-                    )}
-
-                    {/* Duration */}
-                    {recorder.isRecording && (
-                        <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                            <span className="text-lg font-mono font-bold text-gray-900">
-                                {formatDuration(recorder.duration)}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Upload */}
-                    {recorder.audioBlob && !uploading && !transcribing && session.recordingStatus !== 'STORED' && (
-                        <button
-                            onClick={handleUploadAndTranscribe}
-                            className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
-                        >
-                            Upload & Transcribe
-                        </button>
-                    )}
-
-                    {/* Upload progress */}
-                    {uploading && (
-                        <div className="flex items-center gap-2 text-indigo-600">
-                            <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
-                            <span className="text-sm font-medium">Uploading…</span>
-                        </div>
-                    )}
-
-                    {/* Transcription progress */}
-                    {transcribing && (
-                        <div className="flex items-center gap-2 text-amber-600">
-                            <div className="animate-spin h-5 w-5 border-2 border-amber-500 border-t-transparent rounded-full" />
-                            <span className="text-sm font-medium">Transcribing & analyzing…</span>
-                        </div>
-                    )}
+                    {/* Placeholder for future Vitals / History */}
+                    <AppCard>
+                        <AppCardHeader>
+                            <AppCardTitle>Recent Vitals</AppCardTitle>
+                        </AppCardHeader>
+                        <AppCardContent>
+                            <p className="text-sm text-slate-500 italic">No recent vitals recorded for this patient.</p>
+                        </AppCardContent>
+                    </AppCard>
                 </div>
 
-                {/* Recording info */}
-                {recorder.audioBlob && !recorder.isRecording && (
-                    <p className="text-sm text-gray-500 mt-3">
-                        Recording complete · {formatDuration(recorder.duration)} · {(recorder.audioBlob.size / (1024 * 1024)).toFixed(1)} MB
-                    </p>
-                )}
             </div>
 
-            {/* Transcript Panel */}
-            {(transcript || session.aiScribeSessionId) && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900">Transcript</h2>
-                        <button
-                            onClick={handleLoadTranscript}
-                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                        >
-                            Refresh
-                        </button>
-                    </div>
-
-                    {transcript?.transcript ? (
-                        <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
-                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                                {transcript.transcript}
-                            </p>
-                        </div>
-                    ) : transcript ? (
-                        <p className="text-sm text-gray-500 italic">
-                            {transcript.transcriptStatus === 'PROCESSING' ? 'Transcription in progress…' : 'No transcript available yet.'}
-                        </p>
-                    ) : (
-                        <p className="text-sm text-gray-500 italic">Loading transcript status…</p>
-                    )}
-
-                    {/* AI Scribe status */}
-                    {transcript?.aiScribeStatus && (
-                        <div className="mt-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(transcript.aiScribeStatus)}`}>
-                                AI Status: {statusLabel(transcript.aiScribeStatus)}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Error */}
-                    {transcript?.errorMessage && (
-                        <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                            <p className="text-sm text-red-700">{transcript.errorMessage}</p>
-                        </div>
-                    )}
-
-                    {/* Convert to template button */}
-                    {transcript?.aiScribeStatus === 'DRAFT_GENERATED' && (
-                        <div className="mt-4">
-                            <button
-                                onClick={handleConvertToTemplate}
-                                className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium"
-                            >
-                                Convert to Doctor Template
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Manual documentation fallback */}
-            {session.status === 'FAILED' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-                    <h3 className="text-lg font-semibold text-amber-900 mb-2">Processing Issue</h3>
-                    <p className="text-sm text-amber-700 mb-4">
-                        There was an issue with the transcript. You can still document notes manually using the standard visit record.
-                    </p>
-                    <button
-                        onClick={() => router.push(`/dashboard/provider/visits`)}
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition"
-                    >
-                        Go to Visit Records
-                    </button>
-                </div>
-            )}
-
             {/* Draft Modal */}
-            {showDraftModal && aiScribeSession && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-gray-900">Doctor Template — Draft</h2>
-                                <button
-                                    onClick={() => setShowDraftModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                            <p className="text-sm text-amber-600 mt-1 font-medium">
-                                ⚠ This is a draft. Review and approve before it becomes the final note.
-                            </p>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            {['subjective', 'objective', 'assessment', 'plan'].map((field) => {
-                                const value = draftForm[field as keyof typeof draftForm] || '';
-                                return (
-                                    <div key={field}>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1 capitalize">
-                                            {field}
-                                        </label>
-                                        <textarea
-                                            className="w-full border border-gray-200 rounded-lg p-3 text-sm text-gray-800 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[80px]"
-                                            value={value}
-                                            onChange={(e) => setDraftForm(prev => ({ ...prev, [field]: e.target.value }))}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-3">
-                            <button
-                                onClick={() => setShowDraftModal(false)}
-                                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+            <AppModal
+                open={showDraftModal && aiScribeSession !== null}
+                onOpenChange={setShowDraftModal}
+                title="SOAP Note Draft"
+                description="This draft was generated by the AI Scribe. Please review and make any necessary edits before finalizing."
+                primaryAction={{ label: 'Approve & Finalize', onClick: handleApproveDraft }}
+                secondaryAction={{ label: 'Cancel', onClick: () => setShowDraftModal(false) }}
+                className="max-w-2xl"
+                content={
+                    <div className="space-y-5 mt-2">
+                        {['subjective', 'objective', 'assessment', 'plan'].map((field) => (
+                            <AppFormField 
+                                key={field} 
+                                label={field.charAt(0).toUpperCase() + field.slice(1)}
                             >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleApproveDraft}
-                                className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
-                            >
-                                Approve & Finalize
-                            </button>
-                        </div>
+                                <Textarea
+                                    value={draftForm[field as keyof typeof draftForm] || ''}
+                                    onChange={(e) => setDraftForm(prev => ({ ...prev, [field]: e.target.value }))}
+                                    className="min-h-[100px] resize-y font-serif text-sm"
+                                    placeholder={`Enter ${field} notes...`}
+                                />
+                            </AppFormField>
+                        ))}
                     </div>
-                </div>
-            )}
-        </div>
+                }
+            />
+        </PageContainer>
     );
 }

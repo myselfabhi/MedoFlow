@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { joinByToken, grantConsent, type ConsultationSession } from '@/lib/consultationApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { AppButton } from '@/components/ui-system';
 import { Skeleton } from '@/components/ui/skeleton';
 
 function statusLabel(status: string): string {
@@ -217,13 +217,13 @@ export default function PatientConsultationPage() {
                             </div>
                         )}
 
-                        <Button
+                        <AppButton
                             onClick={handleConsent}
                             disabled={consenting}
                             className="w-full"
                         >
                             {consenting ? 'Processing…' : 'I Consent to Recording'}
-                        </Button>
+                        </AppButton>
                     </CardContent>
                 </Card>
             ) : (

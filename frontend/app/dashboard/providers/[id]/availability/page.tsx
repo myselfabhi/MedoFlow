@@ -18,8 +18,17 @@ import { useRouter } from 'next/navigation';
 import { ImpactModal } from '@/components/ImpactModal';
 import { ProviderServicesCard } from '@/components/providers/ProviderServicesCard';
 import { EditProviderDialog } from '@/components/providers/EditProviderDialog';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { 
+  AppCard, 
+  AppCardContent, 
+  AppCardHeader,
+  AppCardTitle,
+  AppButton,
+  AppPageHeader,
+  AppInput
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
+import { ChevronLeft, UserCog, PowerOff } from 'lucide-react';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MIN_SLOT_MINUTES = 30;
@@ -166,20 +175,20 @@ export default function ProviderAvailabilityPage() {
   if (isLoading || !provider) {
     if (error) {
       return (
-        <div className="space-y-6">
-          <Link href="/dashboard/providers" className="text-sm text-primary-600 hover:text-primary-700">
-            ← Back to providers
+        <PageContainer className="space-y-6">
+          <Link href="/dashboard/providers" className="flex items-center gap-1 text-sm font-bold text-accent hover:text-accent/80 transition-colors">
+            <ChevronLeft className="h-4 w-4" /> Back to Providers
           </Link>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            Failed to load provider.
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm font-medium text-destructive">
+            Failed to load clinical provider data. Please try again.
           </div>
-        </div>
+        </PageContainer>
       );
     }
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-      </div>
+      <PageContainer className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent" />
+      </PageContainer>
     );
   }
 
@@ -198,35 +207,34 @@ export default function ProviderAvailabilityPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Link href="/dashboard/providers" className="text-sm text-primary-600 hover:text-primary-700">
-            ← Back to providers
-          </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-gray-900">
-            Availability — {provider.firstName} {provider.lastName}
-          </h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {provider.disciplines?.length
-              ? provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
-              : provider.discipline?.name ?? ''}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
-            Edit Provider
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={deactivateConfirm ? 'border-red-500 text-red-600' : ''}
-            onClick={handleDeactivate}
-            disabled={deactivateMutation.isPending}
-          >
-            {deactivateConfirm ? 'Click again to deactivate' : 'Deactivate'}
-          </Button>
-        </div>
+    <PageContainer className="space-y-8">
+      <div className="space-y-4">
+        <Link href="/dashboard/providers" className="flex items-center gap-1 text-sm font-bold text-accent hover:text-accent/80 transition-colors">
+          <ChevronLeft className="h-4 w-4" /> Back to Providers
+        </Link>
+        <AppPageHeader
+          title={`Availability — ${provider.firstName} ${provider.lastName}`}
+          description={provider.disciplines?.length
+            ? provider.disciplines.map((pd) => pd.discipline.name).join(' · ')
+            : provider.discipline?.name ?? 'Clinical Staff'}
+          actions={
+            <div className="flex gap-3">
+              <AppButton variant="outline" size="sm" onClick={() => setEditDialogOpen(true)} className="rounded-full font-bold">
+                <UserCog className="mr-2 h-4 w-4" /> Edit Profile
+              </AppButton>
+              <AppButton
+                variant="outline"
+                size="sm"
+                className={deactivateConfirm ? 'rounded-full border-rose-500 text-rose-600 bg-rose-50 hover:bg-rose-100 font-bold' : 'rounded-full border-slate-200 text-slate-500 font-bold'}
+                onClick={handleDeactivate}
+                disabled={deactivateMutation.isPending}
+              >
+                <PowerOff className="mr-2 h-4 w-4" />
+                {deactivateConfirm ? 'Confirm Deactivation' : 'Deactivate'}
+              </AppButton>
+            </div>
+          }
+        />
       </div>
 
       <EditProviderDialog
@@ -237,7 +245,7 @@ export default function ProviderAvailabilityPage() {
 
       {toast && (
         <div
-          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-800 animate-in fade-in slide-in-from-top-2"
           role="status"
         >
           {toast}
@@ -246,14 +254,14 @@ export default function ProviderAvailabilityPage() {
 
       <ProviderServicesCard providerId={providerId} />
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Schedule</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Pick a date with a start and end time. Each saved range is treated as online availability.
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>Recurring Weekly Schedule</AppCardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configure the default operating hours for this provider. These slots repeat every week.
           </p>
-        </CardHeader>
-        <CardContent>
+        </AppCardHeader>
+        <AppCardContent>
           <div className="space-y-4">
             {provider.providerAvailability?.length ? (
               provider.providerAvailability.map((slot) => (
@@ -265,37 +273,41 @@ export default function ProviderAvailabilityPage() {
                 />
               ))
             ) : (
-              <p className="text-sm text-gray-500">No availability slots yet. Add your first slot below.</p>
+              <div className="py-8 text-center text-slate-400 font-medium italic border-2 border-dashed border-slate-100 rounded-2xl">
+                No active availability slots. Add one to enable booking.
+              </div>
             )}
-            {(showAddForm || !provider.providerAvailability?.length) && (
-              <AddSlotForm
-                onSubmit={handleAddSlot}
-                onCancel={() => setShowAddForm(false)}
-                showCancel={!!provider.providerAvailability?.length}
-                isSubmitting={createMutation.isPending}
-              />
-            )}
-            {provider.providerAvailability?.length && !showAddForm && (
-              <button
-                type="button"
-                onClick={() => setShowAddForm(true)}
-                className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-primary-400 hover:text-primary-600"
-              >
-                + Add slot
-              </button>
-            )}
+            
+            <div className="pt-4">
+              {(showAddForm || !provider.providerAvailability?.length) ? (
+                <AddSlotForm
+                  onSubmit={handleAddSlot}
+                  onCancel={() => setShowAddForm(false)}
+                  showCancel={!!provider.providerAvailability?.length}
+                  isSubmitting={createMutation.isPending}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full rounded-2xl border-2 border-dashed border-slate-200 py-4 text-sm font-bold text-slate-500 hover:border-accent hover:text-accent transition-all"
+                >
+                  + Add New Weekly Slot
+                </button>
+              )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Time off</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Block specific dates when the provider is unavailable.
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>Clinical Time Off</AppCardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Block specific dates or times when the provider is unavailable for consultations.
           </p>
-        </CardHeader>
-        <CardContent>
+        </AppCardHeader>
+        <AppCardContent>
           {showUnavailabilityForm ? (
             <AddUnavailabilityForm
               onSubmit={async (payload: { date: string; startTime?: string; endTime?: string; reason?: string }) => {
@@ -311,13 +323,13 @@ export default function ProviderAvailabilityPage() {
             <button
               type="button"
               onClick={() => setShowUnavailabilityForm(true)}
-              className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-primary-400 hover:text-primary-600"
+              className="w-full rounded-2xl border-2 border-dashed border-slate-200 py-4 text-sm font-bold text-slate-500 hover:border-accent hover:text-accent transition-all"
             >
-              + Add time off
+              + Record Time Off
             </button>
           )}
-        </CardContent>
-      </Card>
+        </AppCardContent>
+      </AppCard>
 
       {impactModal && (
         <ImpactModal
@@ -329,7 +341,7 @@ export default function ProviderAvailabilityPage() {
           isForceLoading={updateMutation.isPending}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -361,59 +373,58 @@ function AddUnavailabilityForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-wrap items-end gap-4 rounded-lg border border-primary-200 bg-primary-50/30 p-4 sm:flex-nowrap"
+      className="flex flex-wrap items-end gap-4 rounded-2xl border border-accent/20 bg-accent/5 p-6 animate-in zoom-in-95"
     >
       <div className="w-full min-w-0 sm:w-36">
-        <label className="block text-xs font-medium text-gray-500">Date</label>
-        <input
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Date</label>
+        <AppInput
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)}
         />
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">Start (optional)</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Start</label>
+        <AppInput
           type="time"
           value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)}
         />
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">End (optional)</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">End</label>
+        <AppInput
           type="time"
           value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)}
         />
       </div>
       <div className="min-w-0 flex-1 sm:w-40">
-        <label className="block text-xs font-medium text-gray-500">Reason (optional)</label>
-        <input
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Reason</label>
+        <AppInput
           type="text"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Vacation"
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReason(e.target.value)}
+          placeholder="Vacation, conference, etc."
         />
       </div>
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-      >
-        {isSubmitting ? 'Adding...' : 'Add'}
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-      >
-        Cancel
-      </button>
+      <div className="flex gap-2">
+        <AppButton
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded-full font-bold shadow-md"
+        >
+          {isSubmitting ? 'Adding...' : 'Add Block'}
+        </AppButton>
+        <AppButton
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          className="rounded-full font-bold"
+        >
+          Cancel
+        </AppButton>
+      </div>
     </form>
   );
 }
@@ -444,55 +455,55 @@ function AddSlotForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-wrap items-end gap-4 rounded-lg border border-primary-200 bg-primary-50/30 p-4 sm:flex-nowrap"
+      className="flex flex-wrap items-end gap-4 rounded-2xl border border-accent/20 bg-accent/5 p-6 animate-in zoom-in-95"
     >
-      <div className="w-full min-w-0 sm:w-40">
-        <label className="block text-xs font-medium text-gray-500">Date</label>
-        <input
+      <div className="w-full min-w-0 sm:w-44">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Effective Date</label>
+        <AppInput
           type="date"
           value={date}
           min={getTodayDateValue()}
-          onChange={(e) => setDate(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)}
         />
-        <p className="mt-1 text-xs text-gray-500">Applies every {WEEKDAY_NAMES[weekday]}.</p>
+        <p className="mt-2 text-[10px] font-bold text-accent uppercase tracking-tighter italic">Recurring every {WEEKDAY_NAMES[weekday]}.</p>
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">Start</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Start Time</label>
+        <AppInput
           type="time"
           step={TIME_INPUT_STEP_SECONDS}
           value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)}
         />
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">End</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">End Time</label>
+        <AppInput
           type="time"
           step={TIME_INPUT_STEP_SECONDS}
           value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)}
         />
       </div>
-      <button
-        type="submit"
-        disabled={isSubmitting || !isValidWindow}
-        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-      >
-        {isSubmitting ? 'Adding...' : 'Add slot'}
-      </button>
-      {showCancel && (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      <div className="flex gap-2">
+        <AppButton
+          type="submit"
+          disabled={isSubmitting || !isValidWindow}
+          className="rounded-full font-bold shadow-md px-8"
         >
-          Cancel
-        </button>
-      )}
+          {isSubmitting ? 'Adding...' : 'Add Weekly Slot'}
+        </AppButton>
+        {showCancel && (
+          <AppButton
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="rounded-full font-bold"
+          >
+            Cancel
+          </AppButton>
+        )}
+      </div>
     </form>
   );
 }
@@ -525,46 +536,44 @@ function AvailabilityRow({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4 sm:flex-nowrap"
+      className="flex flex-wrap items-end gap-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-6 hover:bg-white hover:shadow-sm transition-all"
     >
-      <div className="w-full min-w-0 sm:w-40">
-        <label className="block text-xs font-medium text-gray-500">Date</label>
-        <input
+      <div className="w-full min-w-0 sm:w-44">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Weekday</label>
+        <AppInput
           type="date"
           value={date}
           min={getTodayDateValue()}
-          onChange={(e) => setDate(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)}
         />
-        <p className="mt-1 text-xs text-gray-500">Recurring every {WEEKDAY_NAMES[weekday]}.</p>
+        <p className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Recurring {WEEKDAY_NAMES[weekday]}</p>
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">Start</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Start Time</label>
+        <AppInput
           type="time"
           step={TIME_INPUT_STEP_SECONDS}
           value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)}
         />
       </div>
-      <div className="w-full min-w-0 sm:w-28">
-        <label className="block text-xs font-medium text-gray-500">End</label>
-        <input
+      <div className="w-full min-w-0 sm:w-32">
+        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">End Time</label>
+        <AppInput
           type="time"
           step={TIME_INPUT_STEP_SECONDS}
           value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)}
         />
       </div>
-      <button
+      <AppButton
         type="submit"
         disabled={isSubmitting || !isValidWindow}
-        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+        variant="outline"
+        className="rounded-full font-bold px-8 h-11"
       >
-        {isSubmitting ? 'Updating...' : 'Update'}
-      </button>
+        {isSubmitting ? 'Updating...' : 'Update Window'}
+      </AppButton>
     </form>
   );
 }

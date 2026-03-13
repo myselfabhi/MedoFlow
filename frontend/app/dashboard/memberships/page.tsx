@@ -6,7 +6,8 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { AppButton } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   cancelMembershipAtPeriodEnd,
@@ -90,9 +91,9 @@ export default function MembershipsPage() {
     <>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Memberships</h1>
-        <Button disabled title="Membership catalog setup is managed by your account administrator.">
+        <AppButton disabled title="Membership catalog setup is managed by your account administrator.">
           <Plus className="mr-2 h-4 w-4" /> Add Membership
-        </Button>
+        </AppButton>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -223,13 +224,13 @@ export default function MembershipsPage() {
             </div>
             {!activeSubscription.cancelAtPeriodEnd &&
               ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(activeSubscription.status) && (
-                <Button
+                <AppButton
                   variant="outline"
                   onClick={() => cancelMutation.mutate(activeSubscription.id)}
                   disabled={cancelMutation.isPending}
                 >
                   Cancel at period end
-                </Button>
+                </AppButton>
               )}
           </CardContent>
         </Card>
@@ -282,13 +283,13 @@ export default function MembershipsPage() {
                 <div className="text-sm text-slate-600">
                   Service discount: {Number(membership.serviceDiscountPercent ?? 0).toFixed(0)}%
                 </div>
-                <Button
+                <AppButton
                   className="w-full"
                   disabled={purchaseMutation.isPending || blockedByOtherMembership || isCurrent}
                   onClick={() => purchaseMutation.mutate(membership.id)}
                 >
                   {isCurrent ? 'Current membership' : blockedByOtherMembership ? 'Another membership is active' : 'Start membership'}
-                </Button>
+                </AppButton>
               </CardContent>
             </Card>
           );
@@ -297,5 +298,9 @@ export default function MembershipsPage() {
     </>
   );
 
-  return <div className="space-y-6 p-6">{isPatient ? renderPatientMemberships() : renderAdminCatalog()}</div>;
+  return (
+    <PageContainer className="space-y-8">
+      {isPatient ? renderPatientMemberships() : renderAdminCatalog()}
+    </PageContainer>
+  );
 }

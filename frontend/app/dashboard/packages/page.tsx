@@ -2,8 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { AppCard, AppCardContent, AppCardHeader, AppCardTitle, AppButton } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { getPackageOperationalSummary, getPackages } from '@/lib/packageApi';
 
 function formatMoney(value?: string | number | null) {
@@ -22,47 +22,47 @@ export default function PackagesPage() {
   });
 
   return (
-    <div className="space-y-6 p-6">
+    <PageContainer className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Packages</h1>
-        <Button disabled title="Package catalog setup is managed by your account administrator.">
+        <AppButton disabled title="Package catalog setup is managed by your account administrator.">
           <Plus className="mr-2 h-4 w-4" /> Add Package
-        </Button>
+        </AppButton>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Catalog</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Active Catalog</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="text-3xl font-semibold">
             {summary?.activeCatalogPackages ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Patient Packages</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Active Patient Packages</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="text-3xl font-semibold">
             {summary?.activePatientPackageCount ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Exhausted</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold text-amber-600">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Exhausted</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="text-3xl font-semibold text-amber-600">
             {summary?.exhaustedCount ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Expiring Soon</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold text-slate-700">
+          </AppCardContent>
+        </AppCard>
+        <AppCard>
+          <AppCardHeader>
+            <AppCardTitle>Expiring Soon</AppCardTitle>
+          </AppCardHeader>
+          <AppCardContent className="text-3xl font-semibold text-slate-700">
             {summary?.expiringSoonCount ?? 0}
-          </CardContent>
-        </Card>
+          </AppCardContent>
+        </AppCard>
       </div>
 
       <div className="text-sm text-slate-600">
@@ -74,10 +74,10 @@ export default function PackagesPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {packages.map((pkg) => (
-            <Card key={pkg.id}>
-              <CardHeader>
+            <AppCard key={pkg.id}>
+              <AppCardHeader>
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle>{pkg.name}</CardTitle>
+                  <AppCardTitle>{pkg.name}</AppCardTitle>
                   <span
                     className={`rounded-full px-2 py-1 text-xs font-medium ${
                       pkg.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
@@ -86,8 +86,8 @@ export default function PackagesPage() {
                     {pkg.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-              </CardHeader>
-              <CardContent>
+              </AppCardHeader>
+              <AppCardContent>
                 <p className="mb-4 text-sm text-muted-foreground">
                   {pkg.description || 'No description available.'}
                 </p>
@@ -102,8 +102,8 @@ export default function PackagesPage() {
                     <div className="text-xs text-muted-foreground">No catalog expiry</div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </AppCardContent>
+            </AppCard>
           ))}
           {packages.length === 0 && (
             <div className="col-span-full py-10 text-center text-muted-foreground">
@@ -112,32 +112,6 @@ export default function PackagesPage() {
           )}
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Patient Package State</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(summary?.recentPatientPackages ?? []).length === 0 ? (
-            <div className="text-sm text-muted-foreground">No package activity yet.</div>
-          ) : (
-            summary!.recentPatientPackages.map((pkg) => (
-              <div key={pkg.id} className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <div className="font-medium">{pkg.patient.name}</div>
-                  <div className="text-sm text-slate-600">
-                    {pkg.package.name} • {pkg.status}
-                  </div>
-                </div>
-                <div className="text-right text-sm text-slate-600">
-                  <div>{pkg.remainingSessions} sessions left</div>
-                  <div>{pkg.expiresAt ? `Expires ${new Date(pkg.expiresAt).toLocaleDateString()}` : 'No expiry set'}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    </PageContainer>
   );
 }

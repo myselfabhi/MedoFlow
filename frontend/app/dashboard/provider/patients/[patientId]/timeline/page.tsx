@@ -18,7 +18,12 @@ import type { PatientAppointment } from '@/lib/patientApi';
 import type { VisitRecord } from '@/lib/patientApi';
 import type { Prescription } from '@/lib/patientApi';
 import type { TreatmentPlan } from '@/lib/treatmentPlanApi';
-import { Card, CardContent } from '@/components/ui/Card';
+import {
+    AppCard,
+    AppCardContent,
+    AppPageHeader,
+    AppButton,
+} from '@/components/ui-system';
 
 // ───────────────────── Helpers ─────────────────────
 
@@ -144,13 +149,13 @@ function TimelineSkeleton() {
                         <div className="h-4 w-4 animate-pulse rounded-full bg-gray-200" />
                         <div className="mt-2 h-16 w-0.5 bg-gray-200 last:hidden" />
                     </div>
-                    <Card className="flex-1 animate-pulse">
-                        <CardContent className="py-4">
+                    <AppCard className="flex-1 animate-pulse">
+                        <AppCardContent className="py-4">
                             <div className="h-4 w-3/5 rounded bg-gray-200" />
                             <div className="mt-2 h-3 w-2/5 rounded bg-gray-200" />
                             <div className="mt-2 h-3 w-full rounded bg-gray-200" />
-                        </CardContent>
-                    </Card>
+                        </AppCardContent>
+                    </AppCard>
                 </div>
             ))}
         </div>
@@ -166,24 +171,24 @@ function TimelineEventCard({ event }: { event: TimelineEvent }) {
             : null;
 
     const content = (
-        <Card className="transition-shadow hover:shadow-md">
-            <CardContent className="py-4">
-                <h3 className="font-semibold text-gray-900">{event.title}</h3>
+        <AppCard className="transition-all hover:shadow-md hover:border-slate-300">
+            <AppCardContent className="py-5 px-6">
+                <h3 className="font-bold text-slate-900">{event.title}</h3>
                 {event.description && (
-                    <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                    <p className="mt-1 text-sm text-slate-500 line-clamp-2 leading-relaxed">
                         {event.description}
                     </p>
                 )}
-                <p className="mt-2 text-xs text-gray-400">{formatDate(event.date)}</p>
-            </CardContent>
-        </Card>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{formatDate(event.date)}</p>
+            </AppCardContent>
+        </AppCard>
     );
 
     if (href) {
         return (
             <Link
                 href={href}
-                className="block transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg"
+                className="block transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-2xl"
             >
                 {content}
             </Link>
@@ -281,34 +286,33 @@ export default function ProviderPatientTimelinePage() {
     };
 
     return (
-        <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900">Patient Timeline</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                    Appointments, visits, prescriptions, and treatment plans
-                </p>
-            </div>
+        <div className="space-y-10">
+            <AppPageHeader
+                title="Clinical Timeline"
+                description="Chronological history of appointments, clinical notes, prescriptions, and care plans."
+            />
 
             {isLoading ? (
                 <TimelineSkeleton />
             ) : isError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm text-red-700">
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+                    <p className="text-sm font-medium text-destructive">
                         {(error as { message?: string })?.message ??
                             'Failed to load timeline.'}
                     </p>
-                    <button
-                        type="button"
+                    <AppButton
+                        variant="outline"
+                        size="sm"
                         onClick={refetch}
-                        className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                        className="mt-4 rounded-full"
                     >
                         Retry
-                    </button>
+                    </AppButton>
                 </div>
             ) : events.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
+                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center">
                     <svg
-                        className="mx-auto h-10 w-10 text-gray-300"
+                        className="mx-auto h-12 w-12 text-slate-200"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -320,30 +324,29 @@ export default function ProviderPatientTimelinePage() {
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                     </svg>
-                    <p className="mt-3 text-sm font-medium text-gray-600">
-                        No timeline events yet
+                    <p className="mt-4 text-sm font-bold text-slate-400">
+                        No clinical events recorded for this patient yet.
                     </p>
                 </div>
             ) : (
                 <div className="relative">
                     {/* Vertical line */}
                     <div
-                        className="absolute left-[7px] top-4 bottom-4 w-0.5 bg-gray-200"
+                        className="absolute left-[7px] top-4 bottom-4 w-0.5 bg-slate-200"
                         aria-hidden
                     />
-                    <div className="space-y-0">
+                    <div className="space-y-4">
                         {events.map((event, i) => (
                             <div
                                 key={event.id}
-                                className="relative flex gap-4"
-                                style={{ marginBottom: i < events.length - 1 ? 0 : 0 }}
+                                className="relative flex gap-6"
                             >
-                                <div className="relative z-10 flex flex-col items-center pt-1">
+                                <div className="relative z-10 flex flex-col items-center pt-5">
                                     <div
-                                        className={`h-4 w-4 shrink-0 rounded-full ring-2 ring-white ${TYPE_COLORS[event.type]}`}
+                                        className={`h-4 w-4 shrink-0 rounded-full ring-4 ring-white ${TYPE_COLORS[event.type]}`}
                                     />
                                 </div>
-                                <div className="flex-1 pb-8">
+                                <div className="flex-1 pb-6">
                                     <TimelineEventCard event={event} />
                                 </div>
                             </div>

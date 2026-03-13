@@ -335,9 +335,12 @@ export const getPatientPrimaryClinic = async (patientId: string) => {
 
 export const getResponsesByPatient = async (
   clinicId: string,
-  patientId: string
+  patientId: string,
+  skipMembershipCheck: boolean = false
 ) => {
-  await patientMembershipService.assertPatientBelongsToClinic(patientId, clinicId);
+  if (!skipMembershipCheck) {
+    await patientMembershipService.assertPatientBelongsToClinic(patientId, clinicId);
+  }
   return prisma.formResponse.findMany({
     where: { clinicId, patientId },
     include: {

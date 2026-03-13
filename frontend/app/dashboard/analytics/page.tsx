@@ -18,13 +18,31 @@ import {
   AppCardTitle,
   AppEmptyState,
   AppPageHeader,
+  KPIStatCard
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import { AppInput } from '@/components/ui-system';
+import { 
+  TrendingUp, 
+  DollarSign, 
+  CreditCard, 
+  Calendar, 
+  Activity, 
+  Users, 
+  Download, 
+  Filter, 
+  AlertCircle, 
+  Clock, 
+  ChevronRight, 
+  CheckCircle2,
+  X
+} from 'lucide-react';
+import { cn as cnUtils } from '@/lib/utils';
 
 function formatMoney(value?: number | string | null) {
-  return `$${Number(value ?? 0).toFixed(2)}`;
+  return `$${Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatPercent(value?: number | null) {
@@ -71,11 +89,10 @@ export default function AnalyticsPage() {
 
   if (!clinicId) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Analytics" description="Clinic command center and provider performance." />
+      <div className="p-8">
         <AppEmptyState
-          title="No clinic assigned"
-          description="You are not assigned to a clinic. Contact your administrator."
+          title="Clinic Setup Required"
+          description="Complete your clinic setup to access the analytics dashboard."
         />
       </div>
     );
@@ -83,19 +100,18 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
+      <div className="p-8 flex justify-center py-20">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Analytics" description="Clinic command center and provider performance." />
+      <div className="p-8">
         <AppEmptyState
-          title="Analytics unavailable"
-          description="The analytics dashboard could not be loaded right now."
+          title="Data Unavailable"
+          description="We couldn't load your analytics right now. Please try again later."
         />
       </div>
     );
@@ -108,427 +124,353 @@ export default function AnalyticsPage() {
   const exportType: AnalyticsExportType = isClinicMode ? 'command-center' : 'provider';
 
   return (
-    <div className="space-y-8">
-      <AppPageHeader
-        title={isProvider ? 'Provider Analytics' : 'Clinic Analytics'}
-        description={
-          isProvider
-            ? 'Personal performance, follow-up behavior, utilization, and commissions.'
-            : 'Operational command center built from real appointments, ledger, membership, package, and commission data.'
-        }
-      />
+    <PageContainer className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <AppPageHeader
+          title={isProvider ? 'Personal Performance' : 'Clinic Intelligence'}
+          description={
+            isProvider
+              ? 'Track your clinical impact, patient retention, and earnings.'
+              : 'Enterprise-grade visibility into your clinic operations and financial health.'
+          }
+        />
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-white rounded-xl border border-slate-200 p-1 shadow-sm h-11">
+            <div className="pl-3 pr-1 text-slate-400">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <AppInput
+              type="date"
+              className="border-none bg-transparent h-9 text-sm font-bold text-slate-700 focus-visible:ring-0 w-36 px-2"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
+            />
+            <div className="flex items-center px-1 text-slate-300 font-bold">|</div>
+            <AppInput
+              type="date"
+              className="border-none bg-transparent h-9 text-sm font-bold text-slate-700 focus-visible:ring-0 w-36 px-2"
+              value={filters.dateTo}
+              onChange={(e) => setFilters(f => ({ ...f, dateTo: e.target.value }))}
+            />
+          </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Input
-            type="date"
-            value={filters.dateFrom}
-            onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-          />
-          <Input
-            type="date"
-            value={filters.dateTo}
-            onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-          />
           {!isProvider && (
             <Select
               value={filters.providerId}
-              onValueChange={(value) => setFilters((current) => ({ ...current, providerId: value }))}
+              onValueChange={(v) => setFilters(f => ({ ...f, providerId: v }))}
             >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="All providers" />
+              <SelectTrigger className="w-48 h-11 bg-white border-slate-200 rounded-xl shadow-sm">
+                <Filter className="h-3 w-3 mr-2 text-slate-400" />
+                <SelectValue placeholder="All Providers" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All providers</SelectItem>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.firstName} {provider.lastName}
-                  </SelectItem>
+                <SelectItem value="ALL">All Providers</SelectItem>
+                {providers.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
-        </div>
 
-        <select
-          className="rounded-md border border-border bg-background px-2 py-2 text-sm"
-          defaultValue=""
-          onChange={(event) => {
-            const type = event.target.value as AnalyticsExportType;
-            if (!type) return;
-            void downloadAnalyticsReport(type, {
-              dateFrom: filters.dateFrom,
-              dateTo: filters.dateTo,
-              providerId: !isProvider && filters.providerId !== 'ALL' ? filters.providerId : undefined,
-            });
-            event.currentTarget.selectedIndex = 0;
-          }}
-        >
-          <option value="" disabled>
-            Export report…
-          </option>
-          <option value={exportType}>{isProvider ? 'Provider Summary' : 'Command Center'}</option>
-          {isClinicMode && (
-            <>
-              <option value="finance">Finance Summary</option>
-              <option value="commerce">Commerce Summary</option>
-              <option value="patients">Patient Value Summary</option>
-              {isAdmin && <option value="commissions">Commission Summary</option>}
-            </>
-          )}
-        </select>
+          <select
+            className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all appearance-none cursor-pointer"
+            defaultValue=""
+            onChange={(e) => {
+              const type = e.target.value as AnalyticsExportType;
+              if (!type) return;
+              downloadAnalyticsReport(type, {
+                dateFrom: filters.dateFrom,
+                dateTo: filters.dateTo,
+                providerId: !isProvider && filters.providerId !== 'ALL' ? filters.providerId : undefined,
+              });
+              e.currentTarget.selectedIndex = 0;
+            }}
+          >
+            <option value="" disabled>Export CSV</option>
+            <option value={exportType}>Full Report</option>
+            {isClinicMode && (
+              <>
+                <option value="finance">Finance Only</option>
+                <option value="commerce">Commerce Only</option>
+                <option value="patients">Patients Only</option>
+              </>
+            )}
+          </select>
+        </div>
       </div>
 
       {isClinicMode && clinicData && (
-        <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Total Revenue</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">{formatMoney(clinicData.commandCenter.finance.totalRevenue)}</AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Net Collected</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold text-emerald-700">
-                {formatMoney(clinicData.commandCenter.finance.netCollectedRevenue)}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Refunded</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatMoney(clinicData.commandCenter.finance.refundedAmount)}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Outstanding AR</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold text-amber-700">
-                {formatMoney(clinicData.commandCenter.finance.outstandingReceivables)}
-              </AppCardContent>
-            </AppCard>
+        <div className="space-y-10">
+          
+          {/* Revenue & Finance */}
+          <div className="space-y-6">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+              <DollarSign className="h-4 w-4" /> Financial Health
+            </h2>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <KPIStatCard 
+                label="Gross Revenue"
+                value={formatMoney(clinicData.commandCenter.finance.totalRevenue)}
+                icon={TrendingUp}
+                iconClassName="text-blue-600 bg-blue-50"
+                description="Billed in selected period"
+              />
+              <KPIStatCard 
+                label="Net Collected"
+                value={formatMoney(clinicData.commandCenter.finance.netCollectedRevenue)}
+                icon={DollarSign}
+                iconClassName="text-emerald-600 bg-emerald-50"
+                description="Actual cash in bank"
+              />
+              <KPIStatCard 
+                label="Accounts Receivable"
+                value={formatMoney(clinicData.commandCenter.finance.outstandingReceivables)}
+                icon={CreditCard}
+                iconClassName="text-amber-600 bg-amber-50"
+                description="Unpaid finalized invoices"
+              />
+              <KPIStatCard 
+                label="Refunds"
+                value={formatMoney(clinicData.commandCenter.finance.refundedAmount)}
+                icon={Activity}
+                iconClassName="text-rose-600 bg-rose-50"
+                description="Total reversals"
+              />
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Total Appointments</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {clinicData.commandCenter.operations.totalAppointments}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Completed</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {clinicData.commandCenter.operations.completedAppointments}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Cancellation Rate</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatPercent(clinicData.commandCenter.operations.cancellationRate)}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>No-show Rate</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatPercent(clinicData.commandCenter.operations.noShowRate)}
-              </AppCardContent>
-            </AppCard>
+          {/* Operations */}
+          <div className="space-y-6">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+              <Activity className="h-4 w-4" /> Operational Efficiency
+            </h2>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <KPIStatCard 
+                label="Total Appointments"
+                value={clinicData.commandCenter.operations.totalAppointments}
+                icon={Calendar}
+                iconClassName="text-indigo-600 bg-indigo-50"
+              />
+              <KPIStatCard 
+                label="Completion Rate"
+                value={formatPercent((clinicData.commandCenter.operations.completedAppointments / clinicData.commandCenter.operations.totalAppointments) * 100)}
+                icon={CheckCircle2}
+                iconClassName="text-emerald-600 bg-emerald-50"
+              />
+              <KPIStatCard 
+                label="Cancellation Rate"
+                value={formatPercent(clinicData.commandCenter.operations.cancellationRate)}
+                icon={X}
+                iconClassName="text-rose-600 bg-rose-50"
+              />
+              <KPIStatCard 
+                label="Avg Visit Length"
+                value={`${clinicData.commandCenter.operations.averageAppointmentDuration.toFixed(0)}m`}
+                icon={Clock}
+                iconClassName="text-slate-600 bg-slate-100"
+              />
+            </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Business Alerts</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3">
-                {clinicData.commandCenter.alerts.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No material alerts for the selected period.</div>
-                ) : (
-                  clinicData.commandCenter.alerts.map((alert) => (
-                    <div key={alert.id} className="rounded-lg border p-3">
+          <div className="grid gap-8 xl:grid-cols-3">
+            {/* Top Lists */}
+            <div className="xl:col-span-2 space-y-8">
+              <AppCard className="border-none shadow-sm overflow-hidden">
+                <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                  <AppCardTitle className="font-bold">Provider Utilization</AppCardTitle>
+                </AppCardHeader>
+                <AppCardContent className="p-0">
+                  <div className="divide-y divide-slate-100">
+                    {clinicData.commandCenter.providerUtilization.map(row => (
+                      <div key={row.provider.id} className="px-6 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500">
+                            {row.provider.firstName[0]}{row.provider.lastName[0]}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">{row.provider.firstName} {row.provider.lastName}</p>
+                            <p className="text-xs text-slate-500">{row.completedAppointments} visits completed</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-slate-900">{formatPercent(row.utilizationRate)}</p>
+                          <div className="w-32 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                            <div 
+                              className="h-full bg-primary-600 rounded-full" 
+                              style={{ width: `${Math.min(100, row.utilizationRate)}%` }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AppCardContent>
+              </AppCard>
+
+              <div className="grid md:grid-cols-2 gap-8">
+                <AppCard className="border-none shadow-sm">
+                  <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                    <AppCardTitle className="font-bold">Top Services</AppCardTitle>
+                  </AppCardHeader>
+                  <AppCardContent className="p-6">
+                    <div className="space-y-4">
+                      {clinicData.commandCenter.topServices.slice(0, 5).map(s => (
+                        <div key={s.serviceId} className="flex justify-between items-center">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-slate-900 truncate">{s.serviceName}</p>
+                            <p className="text-xs text-slate-500">{s.count} visits</p>
+                          </div>
+                          <span className="text-sm font-black text-slate-900">{formatMoney(s.revenue)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AppCardContent>
+                </AppCard>
+
+                <AppCard className="border-none shadow-sm">
+                  <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                    <AppCardTitle className="font-bold">Top Products</AppCardTitle>
+                  </AppCardHeader>
+                  <AppCardContent className="p-6">
+                    <div className="space-y-4">
+                      {clinicData.commandCenter.commerce.topProducts.slice(0, 5).map(p => (
+                        <div key={p.productId} className="flex justify-between items-center">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-slate-900 truncate">{p.productName}</p>
+                            <p className="text-xs text-slate-500">{p.quantity} units</p>
+                          </div>
+                          <span className="text-sm font-black text-slate-900">{formatMoney(p.revenue)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AppCardContent>
+                </AppCard>
+              </div>
+            </div>
+
+            {/* Sidebar Stats */}
+            <div className="space-y-8">
+              <AppCard className="border-l-4 border-l-primary-600 shadow-sm">
+                <AppCardHeader>
+                  <AppCardTitle className="text-base">Business Insights</AppCardTitle>
+                </AppCardHeader>
+                <AppCardContent className="space-y-6">
+                  {clinicData.commandCenter.alerts.map(alert => (
+                    <div key={alert.id} className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <StatusBadge
-                          status={
-                            alert.severity === 'critical'
-                              ? 'CANCELLED'
-                              : alert.severity === 'warning'
-                                ? 'UNPAID'
-                                : 'CONFIRMED'
-                          }
-                          variant="invoice"
-                        />
-                        <div className="font-medium">{alert.title}</div>
+                        <AlertCircle className={cnUtils(
+                          "h-4 w-4",
+                          alert.severity === 'critical' ? "text-rose-600" : "text-amber-500"
+                        )} />
+                        <p className="text-xs font-black uppercase tracking-wider">{alert.title}</p>
                       </div>
-                      <div className="mt-2 text-sm text-slate-600">{alert.message}</div>
+                      <p className="text-sm text-slate-600 leading-relaxed">{alert.message}</p>
                     </div>
-                  ))
-                )}
-              </AppCardContent>
-            </AppCard>
+                  ))}
+                  {clinicData.commandCenter.alerts.length === 0 && (
+                    <p className="text-sm text-slate-400 italic">No alerts for this period.</p>
+                  )}
+                </AppCardContent>
+              </AppCard>
 
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Operational Summary</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Average appointment duration</span><span>{clinicData.commandCenter.operations.averageAppointmentDuration.toFixed(0)} min</span></div>
-                <div className="flex justify-between"><span>Upcoming load (7 days)</span><span>{clinicData.commandCenter.operations.upcomingLoadCount}</span></div>
-                <div className="flex justify-between"><span>Waitlist entries</span><span>{clinicData.commandCenter.operations.waitlistCount}</span></div>
-                <div className="flex justify-between"><span>Waitlist booked</span><span>{clinicData.commandCenter.operations.waitlistBookedCount}</span></div>
-                <div className="flex justify-between"><span>Waitlist conversion</span><span>{formatPercent(clinicData.commandCenter.operations.waitlistConversionRate)}</span></div>
-                <div className="flex justify-between"><span>Avg revenue per patient</span><span>{formatMoney(clinicData.commandCenter.finance.averageRevenuePerPatient)}</span></div>
-                <div className="flex justify-between"><span>Avg revenue per visit</span><span>{formatMoney(clinicData.commandCenter.finance.averageRevenuePerVisit)}</span></div>
-              </AppCardContent>
-            </AppCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Top Services</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3">
-                {clinicData.commandCenter.topServices.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No service revenue in this period.</div>
-                ) : (
-                  clinicData.commandCenter.topServices.map((service) => (
-                    <div key={service.serviceId} className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{service.serviceName}</div>
-                        <div className="text-sm text-slate-600">{service.count} booked line items</div>
-                      </div>
-                      <div className="font-semibold">{formatMoney(service.revenue)}</div>
-                    </div>
-                  ))
-                )}
-              </AppCardContent>
-            </AppCard>
-
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Top Products</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3">
-                {clinicData.commandCenter.commerce.topProducts.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No product sales in this period.</div>
-                ) : (
-                  clinicData.commandCenter.commerce.topProducts.map((product) => (
-                    <div key={product.productId} className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{product.productName}</div>
-                        <div className="text-sm text-slate-600">{product.quantity} units</div>
-                      </div>
-                      <div className="font-semibold">{formatMoney(product.revenue)}</div>
-                    </div>
-                  ))
-                )}
-              </AppCardContent>
-            </AppCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Commerce And Entitlements</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Product revenue</span><span>{formatMoney(clinicData.commandCenter.commerce.productRevenue)}</span></div>
-                <div className="flex justify-between"><span>Package revenue</span><span>{formatMoney(clinicData.commandCenter.commerce.packageRevenue)}</span></div>
-                <div className="flex justify-between"><span>Membership revenue</span><span>{formatMoney(clinicData.commandCenter.commerce.membershipRevenue)}</span></div>
-                <div className="flex justify-between"><span>Attach rate</span><span>{formatPercent(clinicData.commandCenter.commerce.attachRate)}</span></div>
-                <div className="flex justify-between"><span>Active memberships</span><span>{clinicData.commandCenter.memberships.activeCount}</span></div>
-                <div className="flex justify-between"><span>Membership churn</span><span>{formatPercent(clinicData.commandCenter.memberships.churnRate)}</span></div>
-                <div className="flex justify-between"><span>Package utilization</span><span>{formatPercent(clinicData.commandCenter.packages.utilizationRate)}</span></div>
-                <div className="flex justify-between"><span>Packages expiring soon</span><span>{clinicData.commandCenter.packages.expiringSoonCount}</span></div>
-              </AppCardContent>
-            </AppCard>
-
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Patient Analytics</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Distinct patients</span><span>{clinicData.commandCenter.patients.distinctPatients}</span></div>
-                <div className="flex justify-between"><span>Average visits per patient</span><span>{clinicData.commandCenter.patients.averageVisitsPerPatient.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Repeat visit rate</span><span>{formatPercent(clinicData.commandCenter.patients.repeatVisitRate)}</span></div>
-                <div className="flex justify-between"><span>Inactive patients</span><span>{clinicData.commandCenter.patients.inactivePatients}</span></div>
-                <div className="flex justify-between"><span>Drop-off risk</span><span>{clinicData.commandCenter.patients.dropOffRiskCount}</span></div>
-                {clinicData.commandCenter.patients.topPatientsByValue.length > 0 && (
-                  <div className="pt-3">
-                    <div className="mb-2 font-medium text-slate-900">Top patients by value</div>
-                    <div className="space-y-2">
-                      {clinicData.commandCenter.patients.topPatientsByValue.map((patient) => (
-                        <div key={patient.patientId} className="flex justify-between">
-                          <span>{patient.patientName}</span>
-                          <span>{formatMoney(patient.lifetimeValue)}</span>
-                        </div>
-                      ))}
-                    </div>
+              <AppCard className="bg-slate-900 text-white border-none">
+                <AppCardHeader>
+                  <AppCardTitle className="text-white text-base">Patient Analytics</AppCardTitle>
+                </AppCardHeader>
+                <AppCardContent className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-sm text-slate-400">Unique Patients</span>
+                    <span className="text-lg font-bold">{clinicData.commandCenter.patients.distinctPatients}</span>
                   </div>
-                )}
-              </AppCardContent>
-            </AppCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Provider Utilization</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3">
-                {clinicData.commandCenter.providerUtilization.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No provider availability data configured.</div>
-                ) : (
-                  clinicData.commandCenter.providerUtilization.map((row) => (
-                    <div key={row.provider.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">
-                          {row.provider.firstName} {row.provider.lastName}
-                        </div>
-                        <div className="font-semibold">{formatPercent(row.utilizationRate)}</div>
-                      </div>
-                      <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
-                        <div>Scheduled: {row.scheduledMinutes.toFixed(0)} min</div>
-                        <div>Available: {row.availableMinutes.toFixed(0)} min</div>
-                        <div>Completed: {row.completedAppointments}</div>
-                        <div>Cancel/No-show: {row.cancellationCount}/{row.noShowCount}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </AppCardContent>
-            </AppCard>
-
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Commission Visibility</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Commission owed</span><span>{formatMoney(clinicData.commandCenter.commissions.owed)}</span></div>
-                <div className="flex justify-between"><span>Commission paid</span><span>{formatMoney(clinicData.commandCenter.commissions.paid)}</span></div>
-                <div className="flex justify-between"><span>Pending records</span><span>{clinicData.commandCenter.commissions.pendingCount}</span></div>
-                <div className="flex justify-between"><span>Total records</span><span>{clinicData.commandCenter.commissions.totalCount}</span></div>
-                {isAdmin && clinicData.commandCenter.topProviders.length > 0 && (
-                  <div className="pt-3">
-                    <div className="mb-2 font-medium text-slate-900">Top providers by collected revenue</div>
-                    <div className="space-y-2">
-                      {clinicData.commandCenter.topProviders.map((provider) => (
-                        <div key={provider.providerId} className="flex justify-between">
-                          <span>{provider.providerName}</span>
-                          <span>{formatMoney(provider.revenue)}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-sm text-slate-400">Repeat Visit Rate</span>
+                    <span className="text-lg font-bold text-primary-400">{formatPercent(clinicData.commandCenter.patients.repeatVisitRate)}</span>
                   </div>
-                )}
-              </AppCardContent>
-            </AppCard>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-slate-400">Drop-off Risk</span>
+                    <span className="text-lg font-bold text-rose-400">{clinicData.commandCenter.patients.dropOffRiskCount}</span>
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {!isClinicMode && providerData && (
-        <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Completed Appointments</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {providerData.performance.completedAppointments}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Revenue Generated</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatMoney(providerData.performance.revenueGenerated)}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Avg Revenue Per Visit</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatMoney(providerData.performance.averageRevenuePerVisit)}
-              </AppCardContent>
-            </AppCard>
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Utilization</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="text-3xl font-semibold">
-                {formatPercent(providerData.performance.utilizationRate)}
-              </AppCardContent>
-            </AppCard>
+        <div className="space-y-10">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <KPIStatCard 
+              label="Completed Visits"
+              value={providerData.performance.completedAppointments}
+              icon={CheckCircle2}
+              iconClassName="text-blue-600 bg-blue-50"
+            />
+            <KPIStatCard 
+              label="Revenue Generated"
+              value={formatMoney(providerData.performance.revenueGenerated)}
+              icon={DollarSign}
+              iconClassName="text-emerald-600 bg-emerald-50"
+            />
+            <KPIStatCard 
+              label="Utilization"
+              value={formatPercent(providerData.performance.utilizationRate)}
+              icon={Activity}
+              iconClassName="text-indigo-600 bg-indigo-50"
+            />
+            <KPIStatCard 
+              label="Pending Commissions"
+              value={formatMoney(providerData.commissions.owed)}
+              icon={CreditCard}
+              iconClassName="text-amber-600 bg-amber-50"
+            />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Performance</AppCardTitle>
+          <div className="grid gap-8 lg:grid-cols-2">
+            <AppCard className="border-none shadow-sm">
+              <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                <AppCardTitle className="font-bold">Patient Retention</AppCardTitle>
               </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Total appointments</span><span>{providerData.performance.totalAppointments}</span></div>
-                <div className="flex justify-between"><span>Cancellation count</span><span>{providerData.performance.cancellationCount}</span></div>
-                <div className="flex justify-between"><span>No-show count</span><span>{providerData.performance.noShowCount}</span></div>
-                <div className="flex justify-between"><span>Follow-up conversion</span><span>{formatPercent(providerData.performance.followUpConversionRate)}</span></div>
-                <div className="flex justify-between"><span>Repeat patient rate</span><span>{formatPercent(providerData.performance.repeatPatientRate)}</span></div>
-                <div className="flex justify-between"><span>Scheduled minutes</span><span>{providerData.performance.scheduledMinutes.toFixed(0)}</span></div>
-                <div className="flex justify-between"><span>Available minutes</span><span>{providerData.performance.availableMinutes.toFixed(0)}</span></div>
-              </AppCardContent>
-            </AppCard>
-
-            <AppCard>
-              <AppCardHeader>
-                <AppCardTitle>Commissions</AppCardTitle>
-              </AppCardHeader>
-              <AppCardContent className="space-y-3 text-sm text-slate-700">
-                <div className="flex justify-between"><span>Owed</span><span>{formatMoney(providerData.commissions.owed)}</span></div>
-                <div className="flex justify-between"><span>Paid</span><span>{formatMoney(providerData.commissions.paid)}</span></div>
-                <div className="flex justify-between"><span>Pending records</span><span>{providerData.commissions.pendingCount}</span></div>
-                <div className="flex justify-between"><span>Total records</span><span>{providerData.commissions.totalCount}</span></div>
-              </AppCardContent>
-            </AppCard>
-          </div>
-
-          <AppCard>
-            <AppCardHeader>
-              <AppCardTitle>Top Services In Your Period</AppCardTitle>
-            </AppCardHeader>
-            <AppCardContent className="space-y-3">
-              {providerData.topServices.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No completed service revenue in this period.</div>
-              ) : (
-                providerData.topServices.map((service) => (
-                  <div key={service.serviceId} className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{service.serviceName}</div>
-                      <div className="text-sm text-slate-600">{service.count} line items</div>
-                    </div>
-                    <div className="font-semibold">{formatMoney(service.revenue)}</div>
+              <AppCardContent className="p-8">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="text-center p-6 bg-slate-50 rounded-3xl">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Follow-up Rate</p>
+                    <p className="text-3xl font-black text-slate-900">{formatPercent(providerData.performance.followUpConversionRate)}</p>
                   </div>
-                ))
-              )}
-            </AppCardContent>
-          </AppCard>
-        </>
+                  <div className="text-center p-6 bg-slate-50 rounded-3xl">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Repeat Patients</p>
+                    <p className="text-3xl font-black text-slate-900">{formatPercent(providerData.performance.repeatPatientRate)}</p>
+                  </div>
+                </div>
+              </AppCardContent>
+            </AppCard>
+
+            <AppCard className="border-none shadow-sm">
+              <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                <AppCardTitle className="font-bold">Top Performing Services</AppCardTitle>
+              </AppCardHeader>
+              <AppCardContent className="p-6">
+                <div className="space-y-4">
+                  {providerData.topServices.map(s => (
+                    <div key={s.serviceId} className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{s.serviceName}</p>
+                        <p className="text-xs text-slate-500">{s.count} visits</p>
+                      </div>
+                      <span className="font-black text-slate-900">{formatMoney(s.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              </AppCardContent>
+            </AppCard>
+          </div>
+        </div>
       )}
-    </div>
+    </PageContainer>
   );
+}
+
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
 }

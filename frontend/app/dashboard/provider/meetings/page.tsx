@@ -11,6 +11,7 @@ import {
   AppCardHeader,
   AppPageHeader,
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
@@ -23,7 +24,7 @@ import {
   syncGoogleMeetings,
 } from '@/lib/googleCalendarApi';
 
-export default function ProviderMeetingsPage() {
+function ProviderMeetingsPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -136,10 +137,10 @@ export default function ProviderMeetingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
-        title="Google Meet Scribe"
-        description="Connect Google Calendar, sync upcoming Meet calls, and start AI Scribe directly."
+        title="Virtual Care Sync"
+        description="Connect your clinical calendar and sync Google Meet consultations for automated AI Scribing."
       />
 
       <AppCard>
@@ -288,6 +289,14 @@ export default function ProviderMeetingsPage() {
           </AppCardContent>
         </AppCard>
       )}
-    </div>
+    </PageContainer>
+  );
+}
+
+export default function ProviderMeetingsPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <ProviderMeetingsPageContent />
+    </React.Suspense>
   );
 }

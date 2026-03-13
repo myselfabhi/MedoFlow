@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getMyAppointments, type PatientAppointment } from '@/lib/patientApi';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { EmptyState } from '@/components/common/EmptyState';
+import {
+  AppPageHeader,
+  AppTable,
+  AppButton,
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -25,97 +30,83 @@ export default function PatientAppointmentsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-      </div>
+      <PageContainer className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent" />
+      </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-        Failed to load appointments. Please try again.
-      </div>
-    );
-  }
-
-  if (!appointments?.length) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">My Appointments</h1>
-          <p className="mt-1 text-sm text-gray-500">View and manage your appointments</p>
+      <PageContainer className="space-y-6">
+        <AppPageHeader title="My Appointments" description="View and manage your health consultations" />
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+          Failed to load appointments. Please try again.
         </div>
-        <EmptyState
-          title="No appointments yet"
-          description="Book your first appointment to get started."
-          actionLabel="Book an appointment"
-          onAction={() => router.push('/')}
-        />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">My Appointments</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          View and manage your appointments
-        </p>
-      </div>
+    <PageContainer className="space-y-8">
+      <AppPageHeader
+        title="My Appointments"
+        description="View and manage your health consultations"
+        actions={
+          <AppButton size="sm" asChild>
+            <Link href="/">Book New Appointment</Link>
+          </AppButton>
+        }
+      />
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Service
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Provider
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Date & Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {appointments.map((apt: PatientAppointment) => (
-                <tr key={apt.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                    {apt.service.name}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                    {apt.provider.firstName} {apt.provider.lastName}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                    {formatDateTime(apt.startTime)}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <StatusBadge status={apt.status} variant="appointment" />
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                    <Link
-                      href={`/dashboard/patient/appointments/${apt.id}`}
-                      className="font-medium text-primary-600 hover:text-primary-700"
-                    >
-                      View Details
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <AppTable
+          columns={[
+            {
+              key: 'service',
+              header: 'Service',
+              render: (apt: PatientAppointment) => <span className="font-bold text-foreground">{apt.service.name}</span>,
+            },
+            {
+              key: 'provider',
+              header: 'Provider',
+              render: (apt: PatientAppointment) => (
+                <span className="text-muted-foreground">
+                  {apt.provider.firstName} {apt.provider.lastName}
+                </span>
+              ),
+            },
+            {
+              key: 'datetime',
+              header: 'Date & Time',
+              render: (apt: PatientAppointment) => (
+                <span className="text-muted-foreground font-medium">{formatDateTime(apt.startTime)}</span>
+              ),
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (apt: PatientAppointment) => <StatusBadge status={apt.status} variant="appointment" />,
+            },
+            {
+              key: 'actions',
+              header: '',
+              className: 'text-right',
+              render: (apt: PatientAppointment) => (
+                <AppButton variant="ghost" size="sm" asChild className="rounded-full">
+                  <Link href={`/dashboard/patient/appointments/${apt.id}`}>View Details</Link>
+                </AppButton>
+              ),
+            },
+          ]}
+          data={appointments ?? []}
+          keyExtractor={(apt: PatientAppointment) => apt.id}
+          emptyTitle="No appointments yet"
+          emptyDescription="Book your first appointment to get started."
+          emptyActionLabel="Book an appointment"
+          onEmptyAction={() => router.push('/')}
+        />
       </div>
-    </div>
+    </PageContainer>
   );
 }

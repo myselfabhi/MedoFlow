@@ -11,7 +11,12 @@ import {
     type TreatmentPlan,
 } from '@/lib/treatmentPlanApi';
 import { getDisciplines } from '@/lib/disciplineApi';
-import { Card, CardContent } from '@/components/ui/Card';
+import {
+    AppCard,
+    AppCardContent,
+    AppPageHeader,
+    AppButton,
+} from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { CreatePlanModal } from '@/components/CreatePlanModal';
 
@@ -58,8 +63,8 @@ function ProgressBar({
 
 function CardSkeleton() {
     return (
-        <Card className="animate-pulse">
-            <CardContent className="space-y-4">
+        <AppCard className="animate-pulse">
+            <AppCardContent className="space-y-4">
                 <div className="h-5 w-3/5 rounded bg-gray-200" />
                 <div className="h-4 w-2/5 rounded bg-gray-200" />
                 <div className="h-2 w-full rounded bg-gray-200" />
@@ -67,8 +72,8 @@ function CardSkeleton() {
                     <div className="h-4 w-3/5 rounded bg-gray-200" />
                     <div className="h-4 w-2/5 rounded bg-gray-200" />
                 </div>
-            </CardContent>
-        </Card>
+            </AppCardContent>
+        </AppCard>
     );
 }
 
@@ -90,25 +95,25 @@ function PlanCard({
     const isActive = plan.status === 'ACTIVE';
 
     return (
-        <Card className="group relative overflow-hidden transition-shadow hover:shadow-md">
+        <AppCard className="group relative overflow-hidden">
             {/* colour accent bar */}
             <div
                 className={`absolute left-0 top-0 h-full w-1 ${plan.status === 'ACTIVE'
-                        ? 'bg-blue-500'
+                        ? 'bg-blue-600'
                         : plan.status === 'COMPLETED'
-                            ? 'bg-green-500'
-                            : 'bg-gray-400'
+                            ? 'bg-emerald-600'
+                            : 'bg-slate-400'
                     }`}
             />
 
-            <CardContent className="pl-5 space-y-3">
+            <AppCardContent className="pl-6 pt-6 pb-6 space-y-4">
                 {/* Header row */}
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <h3 className="truncate text-base font-semibold text-gray-900">
+                        <h3 className="truncate text-base font-bold text-slate-900">
                             {plan.name}
                         </h3>
-                        <p className="text-sm text-gray-500">{plan.discipline.name}</p>
+                        <p className="text-sm font-medium text-slate-400 uppercase tracking-tighter">{plan.discipline.name}</p>
                     </div>
                     <StatusBadge status={plan.status} variant="treatmentPlan" className="shrink-0" />
                 </div>
@@ -119,54 +124,57 @@ function PlanCard({
                     total={plan.totalSessions}
                 />
 
-                {/* Dates */}
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
-                    <span>
-                        <span className="font-medium text-gray-600">Start:</span>{' '}
-                        {formatDate(plan.startDate)}
-                    </span>
-                    <span>
-                        <span className="font-medium text-gray-600">End:</span>{' '}
-                        {formatDate(plan.endDate)}
-                    </span>
+                {/* Dates & Provider */}
+                <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500 font-medium">
+                        <span>
+                            <span className="text-slate-400 uppercase tracking-tighter">Start:</span>{' '}
+                            {formatDate(plan.startDate)}
+                        </span>
+                        <span>
+                            <span className="text-slate-400 uppercase tracking-tighter">End:</span>{' '}
+                            {formatDate(plan.endDate)}
+                        </span>
+                    </div>
+                    <p className="text-xs text-slate-400 font-medium">
+                        Managed by: {plan.provider.firstName} {plan.provider.lastName}
+                    </p>
                 </div>
-
-                {/* Provider */}
-                <p className="text-xs text-gray-400">
-                    Provider: {plan.provider.firstName} {plan.provider.lastName}
-                </p>
 
                 {/* Actions — only for ACTIVE plans */}
                 {isActive && (
-                    <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                        <button
-                            type="button"
+                    <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                        <AppButton
+                            variant="outline"
+                            size="sm"
                             onClick={onEdit}
                             disabled={isActioning}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            className="rounded-full font-bold"
                         >
                             Update
-                        </button>
-                        <button
-                            type="button"
+                        </AppButton>
+                        <AppButton
+                            variant="default"
+                            size="sm"
                             onClick={onComplete}
                             disabled={isActioning}
-                            className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                            className="rounded-full bg-emerald-600 hover:bg-emerald-700 font-bold"
                         >
                             Complete
-                        </button>
-                        <button
-                            type="button"
+                        </AppButton>
+                        <AppButton
+                            variant="ghost"
+                            size="sm"
                             onClick={onDiscontinue}
                             disabled={isActioning}
-                            className="rounded-lg bg-gray-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-600 disabled:opacity-50"
+                            className="rounded-full text-slate-500 font-bold"
                         >
                             Discontinue
-                        </button>
+                        </AppButton>
                     </div>
                 )}
-            </CardContent>
-        </Card>
+            </AppCardContent>
+        </AppCard>
     );
 }
 
@@ -238,49 +246,43 @@ export default function ProviderPatientPlansPage() {
     // ────────────── Render ──────────────
 
     return (
-        <>
-            {/* Header */}
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Treatment Plans</h1>
-                    <p className="mt-1 text-sm text-gray-500">
-                        Manage treatment plans for this patient
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={openCreate}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 transition"
-                >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    New Plan
-                </button>
-            </div>
+        <div className="space-y-8">
+            <AppPageHeader
+                title="Treatment Plans"
+                description="Manage clinical treatment protocols and session tracking for this patient."
+                actions={
+                    <AppButton
+                        type="button"
+                        onClick={openCreate}
+                        className="rounded-full px-6 shadow-md"
+                    >
+                        New Protocol
+                    </AppButton>
+                }
+            />
 
             {/* Tabs */}
-            <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1">
+            <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
                 {(
                     [
                         { key: 'active' as TabKey, label: 'Active', count: activePlans.length },
-                        { key: 'closed' as TabKey, label: 'Completed / Discontinued', count: closedPlans.length },
+                        { key: 'closed' as TabKey, label: 'Closed', count: closedPlans.length },
                     ] as const
                 ).map(({ key, label, count }) => (
                     <button
                         key={key}
                         type="button"
                         onClick={() => setActiveTab(key)}
-                        className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${activeTab === key
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                        className={`px-6 py-2 rounded-xl text-sm font-bold tracking-tight transition-all ${activeTab === key
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900'
                             }`}
                     >
-                        {label}{' '}
+                        {label}
                         <span
-                            className={`ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${activeTab === key
+                            className={`ml-2 inline-flex items-center justify-center rounded-full h-5 min-w-[20px] px-1.5 text-[10px] font-black tracking-tighter ${activeTab === key
                                     ? 'bg-primary-100 text-primary-700'
-                                    : 'bg-gray-200 text-gray-600'
+                                    : 'bg-slate-200 text-slate-500'
                                 }`}
                         >
                             {count}
@@ -291,32 +293,33 @@ export default function ProviderPatientPlansPage() {
 
             {/* Content */}
             {isLoading ? (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-6 sm:grid-cols-2">
                     {Array.from({ length: 4 }).map((_, i) => (
                         <CardSkeleton key={i} />
                     ))}
                 </div>
             ) : isError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm text-red-700">
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+                    <p className="text-sm font-medium text-destructive">
                         {(error as { message?: string })?.message ?? 'Failed to load treatment plans.'}
                     </p>
-                    <button
-                        type="button"
+                    <AppButton
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                             queryClient.invalidateQueries({
                                 queryKey: ['treatmentPlans', patientId],
                             })
                         }
-                        className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                        className="mt-4 rounded-full"
                     >
                         Retry
-                    </button>
+                    </AppButton>
                 </div>
             ) : displayedPlans.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
+                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center">
                     <svg
-                        className="mx-auto h-10 w-10 text-gray-300"
+                        className="mx-auto h-12 w-12 text-slate-200"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -328,23 +331,22 @@ export default function ProviderPatientPlansPage() {
                             d="M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                         />
                     </svg>
-                    <p className="mt-3 text-sm font-medium text-gray-600">
+                    <p className="mt-4 text-sm font-bold text-slate-400">
                         {activeTab === 'active'
-                            ? 'No active treatment plans'
-                            : 'No completed or discontinued plans'}
+                            ? 'No active protocols found.'
+                            : 'No completed or discontinued plans.'}
                     </p>
                     {activeTab === 'active' && (
-                        <button
-                            type="button"
+                        <AppButton
                             onClick={openCreate}
-                            className="mt-4 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                            className="mt-6 rounded-full"
                         >
-                            Create first plan
-                        </button>
+                            Create first protocol
+                        </AppButton>
                     )}
                 </div>
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-6 sm:grid-cols-2">
                     {displayedPlans.map((plan) => (
                         <PlanCard
                             key={plan.id}
@@ -371,6 +373,6 @@ export default function ProviderPatientPlansPage() {
                 editingPlan={editingPlan}
                 onSuccess={invalidate}
             />
-        </>
+        </div>
     );
 }

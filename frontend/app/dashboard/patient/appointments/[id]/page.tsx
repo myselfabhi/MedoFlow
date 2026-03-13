@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   getAppointmentById,
@@ -13,9 +13,28 @@ import { getPatientForms } from '@/lib/formsApi';
 import { getByAppointment } from '@/lib/consultationApi';
 import { PatientFilesSection } from '@/components/PatientFilesSection';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { 
+  AppCard, 
+  AppCardContent, 
+  AppCardHeader, 
+  AppCardTitle,
+  AppButton,
+  StickySummaryPanel
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { IntakeFormsSection } from '@/components/intake/IntakeFormsSection';
+import { 
+  ArrowLeft, 
+  Video, 
+  FileText, 
+  History, 
+  Stethoscope, 
+  ClipboardCheck,
+  ShieldCheck,
+  Download,
+  AlertCircle
+} from 'lucide-react';
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -28,6 +47,7 @@ function formatDateTime(iso: string) {
 export default function PatientAppointmentDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const router = useRouter();
 
   const {
     data: appointment,
@@ -41,8 +61,7 @@ export default function PatientAppointmentDetailPage() {
 
   const { data: visitData } = useQuery({
     queryKey: ['patient', 'visit', id],
-    queryFn: () =>
-      appointment ? getVisitByAppointment(id) : null,
+    queryFn: () => appointment ? getVisitByAppointment(id) : null,
     enabled: !!appointment?.id,
   });
   const visitRecord = visitData?.visitRecord ?? null;
@@ -72,251 +91,191 @@ export default function PatientAppointmentDetailPage() {
   });
 
   if (appointmentLoading || !appointment) {
-    if (appointmentError) {
-      return (
-        <div className="space-y-6">
-          <Link
-            href="/dashboard/patient/appointments"
-            className="text-sm text-primary-600 hover:text-primary-700"
-          >
-            ← Back to appointments
-          </Link>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            Appointment not found or access denied.
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="p-8 space-y-6">
+        <Skeleton className="h-12 w-48" />
+        <div className="grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-64 w-full rounded-2xl" />
+            <Skeleton className="h-96 w-full rounded-2xl" />
+          </div>
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <Link
-        href="/dashboard/patient/appointments"
-        className="inline-block text-sm text-primary-600 hover:text-primary-700"
-      >
-        ← Back to appointments
-      </Link>
-
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Appointment Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Service</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {appointment.service.name}
-                </dd>
+    <div className="bg-slate-50 min-h-screen">
+      {/* Header */}
+      <div className="px-8 py-6 bg-white border-b sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <AppButton variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </AppButton>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-slate-900">{appointment.service.name}</h1>
+                <StatusBadge status={appointment.status} variant="appointment" />
               </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Provider</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {appointment.provider.firstName} {appointment.provider.lastName}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {formatDateTime(appointment.startTime)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Status</dt>
-                <dd className="mt-1">
-                  <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                    {appointment.status.replace(/_/g, ' ')}
-                  </span>
-                </dd>
-              </div>
-            </dl>
+              <p className="text-sm text-slate-500 font-medium">
+                Dr. {appointment.provider.firstName} {appointment.provider.lastName} · {formatDateTime(appointment.startTime)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
             {appointment.meetLink && (
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <a
-                  href={appointment.meetLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 transition"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                  </svg>
-                  Join Video Call
+              <AppButton size="lg" className="rounded-full shadow-lg shadow-primary-100" asChild>
+                <a href={appointment.meetLink} target="_blank" rel="noopener noreferrer">
+                  <Video className="mr-2 h-5 w-5" /> Join Consultation
                 </a>
-              </div>
+              </AppButton>
             )}
-            {consultationSession?.joinToken && (
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <a
-                  href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 transition"
-                >
-                  Open AI Scribe Consent Panel
-                </a>
-                <p className="mt-2 text-xs text-gray-500">
-                  {consultationSession.consentStatus === 'GRANTED'
-                    ? 'You have consented to recording. Your provider can begin recording.'
-                    : 'Click to join and provide consent for the consultation recording.'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {patientSummary && (patientSummary.diagnosis || patientSummary.treatmentPlan || patientSummary.nextSteps) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Visit Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {patientSummary.diagnosis && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Diagnosis</h3>
-                    <p className="mt-1 text-sm text-gray-900">{patientSummary.diagnosis}</p>
-                  </div>
-                )}
-                {patientSummary.treatmentPlan && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Treatment Plan</h3>
-                    <p className="mt-1 text-sm text-gray-900">{patientSummary.treatmentPlan}</p>
-                  </div>
-                )}
-                {patientSummary.nextSteps && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Next Steps</h3>
-                    <p className="mt-1 text-sm text-gray-900">{patientSummary.nextSteps}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Visit Record</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {visitRecord ? (
-              <div className="mt-4 space-y-6">
-                <div>
-                  <StatusBadge status={visitRecord.status} variant="visitRecord" />
-                </div>
-                <div className="space-y-4">
-                  {visitRecord.subjective && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700">
-                        Subjective
-                      </h3>
-                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                        {visitRecord.subjective}
-                      </p>
-                    </div>
-                  )}
-                  {visitRecord.objective && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700">
-                        Objective
-                      </h3>
-                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                        {visitRecord.objective}
-                      </p>
-                    </div>
-                  )}
-                  {visitRecord.assessment && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700">
-                        Assessment
-                      </h3>
-                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                        {visitRecord.assessment}
-                      </p>
-                    </div>
-                  )}
-                  {visitRecord.plan && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-700">Plan</h3>
-                      <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                        {visitRecord.plan}
-                      </p>
-                    </div>
-                  )}
-                  {!visitRecord.subjective &&
-                    !visitRecord.objective &&
-                    !visitRecord.assessment &&
-                    !visitRecord.plan && (
-                      <p className="text-sm text-gray-500">
-                        {visitRecord.status === 'FINAL'
-                          ? 'Your provider has finalized the visit. A summary will appear here when they share it with you.'
-                          : 'No visit notes recorded yet.'}
-                      </p>
-                    )}
-                </div>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-gray-500">
-                No visit record for this appointment yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <IntakeFormsSection
-          responses={formResponses}
-          appointmentId={id}
-          isLoading={formsLoading}
-        />
-
-        <PatientFilesSection
-          patientId={appointment.patientId}
-          clinicId={appointment.clinicId}
-          canDelete={false}
-          canUpload={false}
-          asPatient
-        />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Prescriptions</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {prescriptions.length > 0 ? (
-              <div className="mt-4 space-y-4">
-                {prescriptions.map((rx) => (
-                  <div
-                    key={rx.id}
-                    className="rounded border border-gray-100 bg-gray-50 p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                      <span>
-                        {formatDateTime(rx.createdAt)} •{' '}
-                        {rx.provider.firstName} {rx.provider.lastName}
-                      </span>
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
-                      {rx.notes}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-gray-500">
-                No prescriptions for this appointment.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
+
+      <PageContainer className="py-8">
+        <div className="grid gap-8 lg:grid-cols-3 items-start">
+          
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Visit Summary - Featured care info */}
+            {patientSummary && (patientSummary.diagnosis || patientSummary.treatmentPlan || patientSummary.nextSteps) ? (
+              <AppCard className="border-none shadow-md overflow-hidden bg-primary-600 text-white">
+                <AppCardHeader className="border-none pb-0">
+                  <AppCardTitle className="text-xl font-bold flex items-center gap-2 text-white">
+                    <ClipboardCheck className="h-6 w-6" />
+                    Care Summary
+                  </AppCardTitle>
+                </AppCardHeader>
+                <AppCardContent className="p-8 space-y-8">
+                  {patientSummary.diagnosis && (
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary-200">Diagnosis / Findings</h3>
+                      <p className="text-lg font-medium leading-relaxed">{patientSummary.diagnosis}</p>
+                    </div>
+                  )}
+                  {patientSummary.treatmentPlan && (
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary-200">Treatment Plan</h3>
+                      <p className="text-lg font-medium leading-relaxed">{patientSummary.treatmentPlan}</p>
+                    </div>
+                  )}
+                  {patientSummary.nextSteps && (
+                    <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-primary-100 mb-2">Next Steps</h3>
+                      <p className="text-sm font-medium">{patientSummary.nextSteps}</p>
+                    </div>
+                  )}
+                </AppCardContent>
+              </AppCard>
+            ) : (
+              <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+                <AppCardContent className="p-12 text-center space-y-4">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                    <History className="h-8 w-8 text-slate-200" />
+                  </div>
+                  <div className="max-w-xs mx-auto">
+                    <h3 className="font-bold text-slate-900">Clinical documentation in progress</h3>
+                    <p className="text-sm text-slate-500 mt-1">Your care summary will appear here once the provider has finalized their notes.</p>
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            )}
+
+            {/* Prescriptions */}
+            <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+              <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                <AppCardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary-600" />
+                  Prescriptions & Orders
+                </AppCardTitle>
+              </AppCardHeader>
+              <AppCardContent className="p-8">
+                {prescriptions.length > 0 ? (
+                  <div className="space-y-4">
+                    {prescriptions.map((rx) => (
+                      <div key={rx.id} className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <p className="text-lg font-bold text-slate-900 whitespace-pre-wrap">{rx.notes}</p>
+                          <p className="text-xs text-slate-500 font-medium">Issued by Dr. {rx.provider.lastName} on {new Date(rx.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <AppButton variant="outline" size="sm" className="rounded-full bg-white">
+                          <Download className="h-4 w-4 mr-2" /> PDF
+                        </AppButton>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-6 text-slate-400 text-sm italic">No prescriptions issued for this visit.</p>
+                )}
+              </AppCardContent>
+            </AppCard>
+
+            {/* Forms & Files */}
+            <IntakeFormsSection responses={formResponses} appointmentId={id} isLoading={formsLoading} />
+            
+            <PatientFilesSection
+              patientId={appointment.patientId}
+              clinicId={appointment.clinicId}
+              canDelete={false}
+              canUpload={false}
+              asPatient
+            />
+          </div>
+
+          <div className="lg:col-span-1 space-y-8">
+            {/* Sidebar Summary */}
+            <StickySummaryPanel 
+              title="Visit Details"
+              items={[
+                { label: 'Provider', value: `Dr. ${appointment.provider.lastName}` },
+                { label: 'Date', value: new Date(appointment.startTime).toLocaleDateString() },
+                { label: 'Time', value: new Date(appointment.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) },
+                { label: 'Status', value: <StatusBadge status={appointment.status} variant="appointment" /> },
+                { label: 'Payment', value: <span className="text-emerald-600 font-bold uppercase tracking-tighter text-xs">Paid</span>, isTotal: true }
+              ]}
+              footer="Receipt available in Billing history."
+            />
+
+            {/* AI Scribe Consent Panel */}
+            {consultationSession?.joinToken && consultationSession.consentStatus !== 'GRANTED' && (
+              <AppCard className="border-amber-100 bg-amber-50/50">
+                <AppCardContent className="p-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-amber-900 text-sm">Action Required: Recording Consent</h4>
+                      <p className="text-xs text-amber-700 mt-1">Your provider has requested to use AI Scribe for this session. Please provide your consent to continue.</p>
+                    </div>
+                  </div>
+                  <AppButton className="w-full bg-amber-600 hover:bg-amber-700 border-none rounded-full text-xs font-bold" asChild>
+                    <Link href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}>
+                      Open Consent Panel
+                    </Link>
+                  </AppButton>
+                </AppCardContent>
+              </AppCard>
+            )}
+
+            {/* Security Note */}
+            <div className="p-6 bg-slate-900 rounded-[2rem] text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-500 rounded-lg">
+                  <ShieldCheck className="h-4 w-4 text-white" />
+                </div>
+                <h4 className="font-bold text-sm">Your Privacy</h4>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                All visit records are encrypted and stored in compliance with HIPAA regulations. Only you and your assigned clinical team have access to this information.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </PageContainer>
     </div>
   );
 }

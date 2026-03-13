@@ -22,14 +22,16 @@ import { useSystemModal } from '@/hooks/useSystemModal';
 import {
   AppCard,
   AppCardHeader,
+  AppCardTitle,
   AppCardContent,
   AppButton,
   AppInput,
   AppPageHeader,
   AppEmptyState,
   AppTable,
-  type AppTableColumn,
+  KPIStatCard
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +47,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ClipboardList, Stethoscope, Clock, Plus, Edit2, Trash2 } from 'lucide-react';
 
 const serviceSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -100,109 +103,80 @@ function ServiceForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-700">Name</label>
-        <AppInput
-          className="mt-1"
-          {...register('name')}
-          placeholder="e.g. Initial Consultation"
-        />
-        {errors.name && (
-          <p className="mt-1 text-sm text-danger">{errors.name.message}</p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700">
-          Discipline
-        </label>
-        <Select
-          value={disciplineId}
-          onValueChange={(v) =>
-            setValue('disciplineId', v, { shouldValidate: true })
-          }
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue placeholder="Select discipline" />
-          </SelectTrigger>
-          <SelectContent>
-            {disciplines.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-1">Service Name</label>
+          <AppInput
+            {...register('name')}
+            placeholder="e.g. Initial Consultation"
+            className="rounded-xl"
+          />
+          {errors.name && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.name.message}</p>}
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-1">Clinical Discipline</label>
+          <Select
+            value={disciplineId}
+            onValueChange={(v) => setValue('disciplineId', v, { shouldValidate: true })}
+          >
+            <SelectTrigger className="rounded-xl h-11">
+              <SelectValue placeholder="Select discipline" />
+            </SelectTrigger>
+            <SelectContent>
+              {disciplines.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.disciplineId && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.disciplineId.message}</p>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Duration (min)</label>
+            <AppInput
+              type="number"
+              min={1}
+              {...register('duration')}
+              className="rounded-xl"
+            />
+            {errors.duration && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.duration.message}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Default Price ($)</label>
+            <AppInput
+              type="text"
+              placeholder="0.00"
+              {...register('defaultPrice')}
+              className="rounded-xl"
+            />
+            {errors.defaultPrice && <p className="mt-1 text-xs text-rose-600 font-medium">{errors.defaultPrice.message}</p>}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">Cross-sell Recommendations</label>
+          <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            {products.map((p) => (
+              <label key={p.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-xl transition-colors">
+                <input
+                  type="checkbox"
+                  checked={selectedProductIds.includes(p.id)}
+                  onChange={() => toggleProduct(p.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-slate-700">{p.name}</span>
+              </label>
             ))}
-          </SelectContent>
-        </Select>
-        {errors.disciplineId && (
-          <p className="mt-1 text-sm text-danger">
-            {errors.disciplineId.message}
-          </p>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700">
-            Duration (min)
-          </label>
-          <AppInput
-            type="number"
-            min={1}
-            className="mt-1"
-            {...register('duration')}
-          />
-          {errors.duration && (
-            <p className="mt-1 text-sm text-danger">
-              {errors.duration.message}
-            </p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">
-            Default Price
-          </label>
-          <AppInput
-            type="text"
-            className="mt-1"
-            placeholder="0.00"
-            {...register('defaultPrice')}
-          />
-          {errors.defaultPrice && (
-            <p className="mt-1 text-sm text-danger">
-              {errors.defaultPrice.message}
-            </p>
-          )}
+            {products.length === 0 && <p className="text-center text-xs text-slate-400 py-4 italic">No products available</p>}
+          </div>
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
-          Recommended Products
-        </label>
-        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md bg-white">
-          {products.map((p) => (
-            <label
-              key={p.id}
-              className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded"
-            >
-              <input
-                type="checkbox"
-                checked={selectedProductIds.includes(p.id)}
-                onChange={() => toggleProduct(p.id)}
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm truncate">{p.name}</span>
-            </label>
-          ))}
-          {products.length === 0 && (
-            <p className="col-span-2 text-center text-xs text-muted-foreground py-4">
-              No products found
-            </p>
-          )}
-        </div>
-      </div>
-
-      <DialogFooter>
-        <AppButton type="submit" disabled={isSubmitting}>
+      <DialogFooter className="pt-4 border-t border-slate-100">
+        <AppButton type="submit" disabled={isSubmitting} className="rounded-full px-8 shadow-lg font-bold">
           {isSubmitting ? 'Saving...' : submitLabel}
         </AppButton>
       </DialogFooter>
@@ -250,28 +224,18 @@ export default function ServicesPage() {
       setAddOpen(false);
       toast.success('Service created');
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message ?? 'Failed to create service');
-    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Failed to create service'),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: UpdateServicePayload;
-    }) => updateService(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateServicePayload }) => updateService(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditOpen(false);
       setEditing(null);
       toast.success('Service updated');
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message ?? 'Failed to update service');
-    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Failed to update service'),
   });
 
   const archiveMutation = useMutation({
@@ -280,9 +244,7 @@ export default function ServicesPage() {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Service archived');
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast.error(err.response?.data?.message ?? 'Failed to archive service');
-    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Failed to archive service'),
   });
 
   const handleAddSubmit = (data: ServiceFormData) => {
@@ -309,192 +271,148 @@ export default function ServicesPage() {
     });
   };
 
-  const handleArchive = (id: string) => {
-    showModal({
-      title: 'Archive Service',
-      description:
-        'Archive this service? It will no longer be available for booking.',
-      actionLabel: 'Archive',
-      onAction: () => archiveMutation.mutate(id),
-    });
-  };
-
-  if (user?.role === 'PATIENT') {
+  if (!clinicId) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Services" description="Manage clinic services" />
-        <p className="text-sm text-slate-600">
-          Service management is available to clinic staff. Contact your clinic
-          for more information.
-        </p>
+      <div className="p-8">
+        <AppEmptyState title="Setup Required" description="Assign a clinic to manage services." />
       </div>
     );
   }
 
-  if (!clinicId) {
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Services" description="Manage clinic services" />
-        <AppEmptyState
-          title="No clinic assigned"
-          description="You are not assigned to a clinic. Contact your administrator."
-        />
+      <div className="p-8 flex justify-center py-20">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
-        title="Services"
-        description="Manage clinic services"
+        title="Clinical Services"
+        description="Configure your medical offerings, pricing, and durations."
         actions={
           canEdit ? (
-            <AppButton onClick={() => setAddOpen(true)}>Add Service</AppButton>
+            <AppButton onClick={() => setAddOpen(true)} className="rounded-full px-6 shadow-md">
+              <Plus className="mr-2 h-4 w-4" /> Add Service
+            </AppButton>
           ) : undefined
         }
       />
 
-      <AppCard>
-        <AppCardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">All Services</h2>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <KPIStatCard 
+          label="Total Services"
+          value={services.length}
+          icon={ClipboardList}
+          iconClassName="text-blue-600 bg-blue-50"
+        />
+        <KPIStatCard 
+          label="Disciplines"
+          value={disciplines.length}
+          icon={Stethoscope}
+          iconClassName="text-purple-600 bg-purple-50"
+        />
+        <KPIStatCard 
+          label="Avg. Session"
+          value={`${Math.round(services.reduce((acc, s) => acc + s.duration, 0) / (services.length || 1))}m`}
+          icon={Clock}
+          iconClassName="text-amber-600 bg-amber-50"
+        />
+      </div>
+
+      <AppCard className="border-none shadow-sm overflow-hidden">
+        <AppCardHeader className="bg-white border-b-0 py-6 px-8">
+          <AppCardTitle className="text-lg font-bold">Service Catalog</AppCardTitle>
         </AppCardHeader>
-        <AppCardContent>
-          {isLoading && (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
-              Failed to load services.
-            </div>
-          )}
-
-          {!isLoading && !error && services.length === 0 && (
-            <AppEmptyState
-              title="No services yet"
-              description="Create services under disciplines."
-              actionLabel={canEdit ? 'Add Service' : undefined}
-              onAction={canEdit ? () => setAddOpen(true) : undefined}
-            />
-          )}
-
-          {!isLoading && !error && services.length > 0 && (
-            <AppTable<DashboardService>
-              columns={[
-                {
-                  key: 'name',
-                  header: 'Name',
-                  render: (s) => (
-                    <span className="font-medium text-slate-900">{s.name}</span>
-                  ),
-                },
-                {
-                  key: 'discipline',
-                  header: 'Discipline',
-                  render: (s) => (
-                    <span className="text-slate-600">{s.discipline.name}</span>
-                  ),
-                },
-                {
-                  key: 'duration',
-                  header: 'Duration',
-                  render: (s) => (
-                    <span className="text-slate-600">{s.duration} min</span>
-                  ),
-                },
-                {
-                  key: 'price',
-                  header: 'Price',
-                  render: (s) => (
-                    <span className="text-slate-600">${s.defaultPrice}</span>
-                  ),
-                },
-                ...(canEdit
-                  ? [
-                      {
-                        key: 'actions',
-                        header: 'Actions',
-                        className: 'text-right',
-                        render: (s: DashboardService) => (
-                          <div className="flex justify-end gap-2">
-                            <AppButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditing(s);
-                                setEditOpen(true);
-                              }}
-                            >
-                              Edit
-                            </AppButton>
-                            <AppButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-danger hover:bg-danger/10"
-                              onClick={() => handleArchive(s.id)}
-                              disabled={archiveMutation.isPending}
-                            >
-                              Archive
-                            </AppButton>
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-              ]}
-              data={services}
-              keyExtractor={(s) => s.id}
-            />
-          )}
+        <AppCardContent className="p-0">
+          <AppTable<DashboardService>
+            columns={[
+              {
+                key: 'name',
+                header: 'Service Name',
+                render: (s) => (
+                  <div>
+                    <p className="font-bold text-slate-900">{s.name}</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{s.discipline.name}</p>
+                  </div>
+                ),
+              },
+              {
+                key: 'duration',
+                header: 'Duration',
+                render: (s) => <span className="font-medium text-slate-600">{s.duration} min</span>,
+              },
+              {
+                key: 'price',
+                header: 'Base Price',
+                render: (s) => <span className="font-black text-slate-900">${s.defaultPrice}</span>,
+              },
+              {
+                key: 'actions',
+                header: '',
+                className: 'text-right',
+                render: (s) => (
+                  <div className="flex justify-end gap-2 pr-4">
+                    <AppButton variant="ghost" size="icon" className="rounded-full hover:bg-slate-50" onClick={() => { setEditing(s); setEditOpen(true); }}>
+                      <Edit2 className="h-4 w-4" />
+                    </AppButton>
+                    <AppButton variant="ghost" size="icon" className="rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-600" onClick={() => showModal({ title: 'Archive Service', description: 'Are you sure?', onAction: () => archiveMutation.mutate(s.id)})}>
+                      <Trash2 className="h-4 w-4" />
+                    </AppButton>
+                  </div>
+                ),
+              }
+            ]}
+            data={services}
+            keyExtractor={(s) => s.id}
+          />
         </AppCardContent>
       </AppCard>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="rounded-[var(--radius)]">
-          <DialogHeader>
-            <DialogTitle>Add Service</DialogTitle>
+        <DialogContent className="max-w-md rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="bg-slate-900 text-white p-8 border-none">
+            <DialogTitle className="text-2xl font-black">Create Service</DialogTitle>
           </DialogHeader>
-          <ServiceForm
-            disciplines={disciplines}
-            products={products}
-            onSubmit={handleAddSubmit}
-            isSubmitting={createMutation.isPending}
-            submitLabel="Create"
-          />
+          <div className="p-8">
+            <ServiceForm
+              disciplines={disciplines}
+              products={products}
+              onSubmit={handleAddSubmit}
+              isSubmitting={createMutation.isPending}
+              submitLabel="Create Service"
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={editOpen}
-        onOpenChange={(open) => !open && setEditing(null)}
-      >
-        <DialogContent className="rounded-[var(--radius)]">
-          <DialogHeader>
-            <DialogTitle>Edit Service</DialogTitle>
+      <Dialog open={editOpen} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="max-w-md rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="bg-slate-900 text-white p-8 border-none">
+            <DialogTitle className="text-2xl font-black">Edit Service</DialogTitle>
           </DialogHeader>
-          {editing && (
-            <ServiceForm
-              defaultValues={{
-                name: editing.name,
-                duration: editing.duration,
-                defaultPrice: editing.defaultPrice,
-                disciplineId: editing.discipline.id,
-                recommendedProductIds: editing.recommendedProducts?.map(p => p.id) || [],
-              }}
-              disciplines={disciplines}
-              products={products}
-              onSubmit={handleEditSubmit}
-              isSubmitting={updateMutation.isPending}
-              submitLabel="Save"
-            />
-          )}
+          <div className="p-8">
+            {editing && (
+              <ServiceForm
+                defaultValues={{
+                  name: editing.name,
+                  duration: editing.duration,
+                  defaultPrice: editing.defaultPrice,
+                  disciplineId: editing.discipline.id,
+                  recommendedProductIds: editing.recommendedProducts?.map(p => p.id) || [],
+                }}
+                disciplines={disciplines}
+                products={products}
+                onSubmit={handleEditSubmit}
+                isSubmitting={updateMutation.isPending}
+                submitLabel="Save Changes"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

@@ -3,8 +3,15 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import {
+  AppCard,
+  AppCardContent,
+  AppCardHeader,
+  AppCardTitle,
+  AppPageHeader,
+  AppButton,
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import Link from 'next/link';
 
 export default function BillingPage() {
@@ -23,32 +30,34 @@ export default function BillingPage() {
 
   if (canAccessInvoices) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-      </div>
+      <PageContainer className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent" />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Billing</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage billing and invoices</p>
-      </div>
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Billing</h2>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500">
+    <PageContainer className="space-y-8">
+      <AppPageHeader
+        title="Billing"
+        description="Manage billing and invoices"
+      />
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>Billing Information</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent>
+          <p className="text-sm text-muted-foreground">
             Billing and invoices are managed by your clinic. Contact your clinic
             administrator for billing questions.
           </p>
-          <Button variant="outline" className="mt-4" asChild>
-            <Link href="/dashboard">Back to Dashboard</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="mt-6">
+            <AppButton variant="outline" size="sm" asChild>
+              <Link href="/dashboard">Back to Dashboard</Link>
+            </AppButton>
+          </div>
+        </AppCardContent>
+      </AppCard>
+    </PageContainer>
   );
 }

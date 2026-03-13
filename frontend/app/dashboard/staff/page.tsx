@@ -2,15 +2,25 @@
 
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AppPageHeader, AppEmptyState } from '@/components/ui-system';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { 
+  AppPageHeader, 
+  AppEmptyState,
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  KPIStatCard,
+  AppTable
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listStaff, deactivateStaff } from '@/lib/staffApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { Trash2, UserPlus } from 'lucide-react';
+import { Trash2, UserPlus, ShieldCheck, Users, Mail, Clock } from 'lucide-react';
 import { AddStaffModal } from './AddStaffModal';
+import { cn } from '@/lib/utils';
 
 export default function StaffPage() {
   const { user } = useAuth();
@@ -45,93 +55,133 @@ export default function StaffPage() {
 
   if (!isAuthorized) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Staff" description="Manage your clinic team." />
+      <div className="p-8">
         <AppEmptyState
-          title="Access restricted"
+          title="Access Restricted"
           description="Only administrators can manage clinic staff."
         />
       </div>
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="p-8 flex justify-center py-20">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <AppPageHeader
-          title="Staff"
-          description="Manage your clinic's providers and administration team."
+    <PageContainer className="space-y-8">
+      <AppPageHeader
+        title="Internal Team"
+        description="Manage your clinic's administrators and operational support staff."
+        actions={
+          <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Invite Member
+          </AppButton>
+        }
+      />
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <KPIStatCard 
+          label="Team Size"
+          value={staff.length}
+          icon={Users}
+          iconClassName="text-blue-600 bg-blue-50"
         />
-        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
-          <UserPlus className="h-4 w-4" />
-          Invite Staff
-        </Button>
+        <KPIStatCard 
+          label="Admins"
+          value={staff.filter(s => s.role === 'SUPER_ADMIN').length}
+          icon={ShieldCheck}
+          iconClassName="text-purple-600 bg-purple-50"
+        />
+        <KPIStatCard 
+          label="Latest Invite"
+          value="Today"
+          icon={Clock}
+          iconClassName="text-emerald-600 bg-emerald-50"
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Clinic Team</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground animate-pulse">Loading team members...</p>
-          ) : staff.length === 0 ? (
-            <AppEmptyState
-              title="No staff yet"
-              description="Invite your first team member to start managing your clinic."
-            />
-          ) : (
-            <div className="space-y-3">
-              {staff.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-4 hover:border-primary/20 transition-colors"
-                >
+      <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+        <AppCardHeader className="bg-white border-b-0 py-6 px-8">
+          <AppCardTitle className="text-lg font-bold">Member Directory</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent className="p-0">
+          <AppTable
+            columns={[
+              {
+                key: 'member',
+                header: 'Member',
+                render: (m) => (
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {member.name.charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-500">
+                      {m.name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                      <p className="font-bold text-slate-900">{m.name}</p>
+                      <p className="text-xs text-slate-500 font-medium">{m.email}</p>
                     </div>
-                    <Badge variant={
-                      member.role === 'SUPER_ADMIN' ? 'default' : 
-                      member.role === 'PROVIDER' ? 'outline' : 'secondary'
-                    }>
-                      {member.role === 'SUPER_ADMIN' ? 'Super Admin' : 
-                       member.role === 'PROVIDER' ? 'Provider' : 'Front Desk'}
-                    </Badge>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs text-muted-foreground">
-                        Joined {new Date(member.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {member.id !== user?.id && member.role !== 'SUPER_ADMIN' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeactivate(member.id, member.name)}
+                ),
+              },
+              {
+                key: 'role',
+                header: 'System Role',
+                render: (m) => (
+                  <Badge className="rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-widest" variant={
+                    m.role === 'SUPER_ADMIN' ? 'default' : 
+                    m.role === 'PROVIDER' ? 'outline' : 'secondary'
+                  }>
+                    {m.role.replace('_', ' ')}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'joined',
+                header: 'Joined On',
+                render: (m) => (
+                  <span className="text-xs font-medium text-slate-400">
+                    {new Date(m.createdAt).toLocaleDateString()}
+                  </span>
+                ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                className: 'text-right',
+                render: (m) => (
+                  <div className="flex justify-end gap-2 pr-4">
+                    {m.id !== user?.id && m.role !== 'SUPER_ADMIN' ? (
+                      <AppButton 
+                        variant="ghost" 
+                        size="icon" 
+                        className="rounded-full text-slate-400 hover:text-rose-600"
+                        onClick={() => handleDeactivate(m.id, m.name)}
                         disabled={deactivateMutation.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </AppButton>
+                    ) : (
+                      <div className="w-8 h-8" />
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ),
+              }
+            ]}
+            data={staff}
+            keyExtractor={(m) => m.id}
+          />
+        </AppCardContent>
+      </AppCard>
 
       <AddStaffModal 
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
       />
-    </div>
+    </PageContainer>
   );
 }

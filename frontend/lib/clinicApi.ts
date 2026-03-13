@@ -26,3 +26,23 @@ export const getClinic = async (id: string): Promise<Clinic> => {
   const { data } = await api.get<GetClinicResponse>(`/clinics/${id}`);
   return data.data.clinic;
 };
+
+export const getPublicClinicProducts = async (clinicId: string) => {
+  const { data } = await api.get(`/clinics/${clinicId}/products`);
+  return data.data.products;
+};
+
+export const getPublicClinicPackages = async (clinicId: string) => {
+  const { data } = await api.get(`/clinics/${clinicId}/packages`);
+  return data.data.packages;
+};
+
+export const getPublicClinicMemberships = async (clinicId: string) => {
+  const { data } = await api.get(`/clinics/${clinicId}/memberships`);
+  return data.data.memberships;
+};
+
+export const getPublicProduct = async (id: string) => {
+  const { data } = await api.get(`/products/${id}`);
+  return data.data.product;
+};

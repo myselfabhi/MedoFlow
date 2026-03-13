@@ -7,12 +7,21 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
-import { AppPageHeader, AppEmptyState } from '@/components/ui-system';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { 
+  AppPageHeader, 
+  AppEmptyState,
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+  AppButton,
+  AppInput,
+  KPIStatCard
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { getCurrentClinic, upsertLaunchLocation } from '@/lib/clinicAdminApi';
 import { US_TIMEZONES, US_TIMEZONE_VALUES, DEFAULT_US_TIMEZONE } from '@/lib/constants/timezones';
+import { MapPin, Globe, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 const launchLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -47,52 +56,77 @@ function LaunchLocationForm({
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-          Name
-        </label>
-        <Input
-          id="name"
-          type="text"
-          placeholder="e.g. Online or Virtual"
-          {...register('name')}
-        />
-        <p className="mt-1 text-xs text-gray-500">All meets are online; this is for timezone and display.</p>
-        {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="space-y-6">
+          <div>
+            <label htmlFor="name" className="block text-sm font-bold text-slate-700 mb-1">
+              Location Name
+            </label>
+            <AppInput
+              id="name"
+              type="text"
+              placeholder="e.g. Main Clinic or Virtual Office"
+              className="rounded-xl"
+              {...register('name')}
+            />
+            <p className="mt-2 text-xs text-slate-400 font-medium">This name will be displayed to patients during the booking flow.</p>
+            {errors.name && <p className="mt-1 text-xs text-rose-600 font-bold">{errors.name.message}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="address" className="block text-sm font-bold text-slate-700 mb-1">
+              Physical Address (Optional)
+            </label>
+            <AppInput
+              id="address"
+              type="text"
+              placeholder="123 Clinical Way, Ste 100"
+              className="rounded-xl"
+              {...register('address')}
+            />
+            <p className="mt-2 text-xs text-slate-400 font-medium">Leave blank if this is an online-only/virtual location.</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <label htmlFor="timezone" className="block text-sm font-bold text-slate-700 mb-1">
+              Operational Timezone
+            </label>
+            <select
+              id="timezone"
+              className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+              {...register('timezone')}
+            >
+              {US_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-400 font-medium">Ensures appointment reminders and schedules are accurately synchronized.</p>
+            {errors.timezone && <p className="mt-1 text-xs text-rose-600 font-bold">{errors.timezone.message}</p>}
+          </div>
+
+          <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Location Features</h4>
+            <ul className="space-y-3">
+              <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Multi-location backend support
+              </li>
+              <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Integrated Virtual Meeting URLs
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
-      <div>
-        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-          Address (optional)
-        </label>
-        <Input
-          id="address"
-          type="text"
-          placeholder="Leave blank for online-only"
-          {...register('address')}
-        />
-      </div>
-      <div>
-        <label htmlFor="timezone" className="block text-sm font-medium text-gray-700">
-          US timezone
-        </label>
-        <select
-          id="timezone"
-          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          {...register('timezone')}
-        >
-          {US_TIMEZONES.map((tz) => (
-            <option key={tz.value} value={tz.value}>
-              {tz.label}
-            </option>
-          ))}
-        </select>
-        {errors.timezone && <p className="mt-1 text-sm text-red-600">{errors.timezone.message}</p>}
-      </div>
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Save Launch Location'}
-        </Button>
+
+      <div className="flex justify-end pt-8 border-t border-slate-100">
+        <AppButton type="submit" disabled={isSubmitting} className="rounded-full px-10 h-12 font-bold shadow-lg">
+          {isSubmitting ? 'Updating...' : 'Save Facility Settings'}
+        </AppButton>
       </div>
     </form>
   );
@@ -119,10 +153,10 @@ export default function LocationsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-clinic', 'current'] });
-      toast.success('Launch location saved');
+      toast.success('Facility settings updated');
     },
-    onError: (error: { response?: { data?: { message?: string } }; message?: string }) => {
-      toast.error(error.response?.data?.message ?? error.message ?? 'Unable to save location');
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Unable to save location');
     },
   });
 
@@ -130,11 +164,10 @@ export default function LocationsPage() {
 
   if (user?.role !== 'SUPER_ADMIN') {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Location" description="Launch location settings are limited to super admins." />
+      <div className="p-8">
         <AppEmptyState
-          title="Access restricted"
-          description="Only super admins can manage the launch location."
+          title="Access Restricted"
+          description="Facility management is limited to Super Administrators."
         />
       </div>
     );
@@ -142,30 +175,52 @@ export default function LocationsPage() {
 
   if (!clinicId) {
     return (
-      <div className="space-y-6">
-        <AppPageHeader title="Location" description="Complete clinic setup before editing the launch location." />
+      <div className="p-8">
         <AppEmptyState
-          title="Clinic setup required"
-          description="Create the clinic first, then return here to update its launch location."
+          title="Clinic Required"
+          description="Create your clinic first to configure its primary facility."
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
-        title="Launch Location"
-        description="The admin UI is single-location for now, while the backend stays multi-location ready."
+        title="Clinic Facility"
+        description="Configure your primary operational location and clinical timezone."
       />
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-medium text-gray-900">Primary Operational Location</h2>
-        </CardHeader>
-        <CardContent>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <KPIStatCard 
+          label="Active Facilities"
+          value={clinic?.launchLocation ? 1 : 0}
+          icon={MapPin}
+          iconClassName="text-blue-600 bg-blue-50"
+        />
+        <KPIStatCard 
+          label="Primary Timezone"
+          value={clinic?.launchLocation?.timezone.split('/').pop()?.replace('_', ' ') || 'Not Set'}
+          icon={Clock}
+          iconClassName="text-purple-600 bg-purple-50"
+        />
+        <KPIStatCard 
+          label="Backend Status"
+          value="Online"
+          icon={Globe}
+          iconClassName="text-emerald-600 bg-emerald-50"
+        />
+      </div>
+
+      <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+        <AppCardHeader className="bg-slate-50/50 border-b-0 py-6 px-8">
+          <AppCardTitle className="text-lg font-bold">Facility Configuration</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent className="p-8">
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading location settings...</p>
+            <div className="py-12 flex justify-center">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+            </div>
           ) : (
             <LaunchLocationForm
               defaultValues={{
@@ -180,8 +235,8 @@ export default function LocationsPage() {
               isSubmitting={saveMutation.isPending}
             />
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </AppCardContent>
+      </AppCard>
+    </PageContainer>
   );
 }

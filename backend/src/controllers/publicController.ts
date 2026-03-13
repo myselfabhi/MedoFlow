@@ -111,6 +111,69 @@ export const getClinicLocations = asyncHandler(
   }
 );
 
+export const getClinicProducts = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const products = await prisma.product.findMany({
+      where: {
+        clinicId: id,
+        isActive: true,
+      },
+      include: {
+        inventoryItem: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    successResponse(res, 200, 'Products retrieved', { products });
+  }
+);
+
+export const getClinicPackages = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const packages = await prisma.package.findMany({
+      where: {
+        clinicId: id,
+        isActive: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    successResponse(res, 200, 'Packages retrieved', { packages });
+  }
+);
+
+export const getClinicMemberships = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const memberships = await prisma.membership.findMany({
+      where: {
+        clinicId: id,
+        isActive: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    successResponse(res, 200, 'Memberships retrieved', { memberships });
+  }
+);
+
+export const getProduct = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const product = await prisma.product.findFirst({
+      where: { id, isActive: true },
+      include: {
+        inventoryItem: true,
+      },
+    });
+    if (!product) {
+      const err = new Error('Product not found') as ApiError;
+      err.statusCode = 404;
+      throw err;
+    }
+    successResponse(res, 200, 'Product retrieved', { product });
+  }
+);
+
 export const checkPatientExists = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { email } = req.query;

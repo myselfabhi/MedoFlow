@@ -12,11 +12,20 @@ import {
   updateClinic,
   upsertLaunchLocation,
 } from '@/lib/clinicAdminApi';
-import { AppPageHeader, AppEmptyState } from '@/components/ui-system';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { 
+  AppPageHeader, 
+  AppEmptyState,
+  AppCard,
+  AppCardContent,
+  AppCardHeader,
+  AppCardTitle,
+  AppButton,
+  AppInput,
+  KPIStatCard,
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { useAppToast } from '@/hooks/useAppToast';
+import { Users, Layout, Building2 } from 'lucide-react';
 
 import { US_TIMEZONES, DEFAULT_US_TIMEZONE } from '@/lib/constants/timezones';
 
@@ -105,18 +114,18 @@ export default function CreateClinicPage() {
 
   if (user?.role !== 'SUPER_ADMIN') {
     return (
-      <div className="space-y-6">
+      <PageContainer className="space-y-8">
         <AppPageHeader title="Clinic Setup" description="Clinic settings are limited to super admins." />
         <AppEmptyState
           title="Access restricted"
           description="Only super admins can create or update clinic settings."
         />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title={clinic ? 'Clinic Settings' : 'Clinic Setup'}
         description={
@@ -125,51 +134,77 @@ export default function CreateClinicPage() {
             : 'Complete the initial clinic setup before inviting staff or configuring providers.'
         }
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>{clinic ? 'Clinic Profile' : 'Launch Your Clinic'}</CardTitle>
-          <p className="mt-1 text-sm text-gray-500">
+      
+      {clinic && (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <KPIStatCard 
+            label="Total Providers"
+            value={clinic.stats.providerCount}
+            icon={Users}
+            iconClassName="text-blue-600 bg-blue-50"
+          />
+          <KPIStatCard 
+            label="Staff Count"
+            value={clinic.stats.staffCount}
+            icon={Layout}
+            iconClassName="text-purple-600 bg-purple-50"
+          />
+          <KPIStatCard 
+            label="Active Locations"
+            value={clinic.stats.locationCount}
+            icon={Building2}
+            iconClassName="text-emerald-600 bg-emerald-50"
+          />
+        </div>
+      )}
+
+      <AppCard>
+        <AppCardHeader>
+          <AppCardTitle>{clinic ? 'Clinic Profile' : 'Launch Your Clinic'}</AppCardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
             Keep the UI single-location for launch while preserving the multi-location-ready data model underneath.
           </p>
-        </CardHeader>
-        <CardContent>
+        </AppCardHeader>
+        <AppCardContent>
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading clinic settings...</p>
+            <div className="py-12 flex justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-accent" />
+            </div>
           ) : (
-            <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))} className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))} className="space-y-8">
+              <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Clinic name</label>
-                  <Input {...register('name')} placeholder="Medoflow Clinic" />
-                  {errors.name && <p className="text-sm text-danger">{errors.name.message}</p>}
+                  <label className="text-sm font-bold text-slate-700 uppercase tracking-tighter">Clinic name</label>
+                  <AppInput {...register('name')} placeholder="Medoflow Clinic" />
+                  {errors.name && <p className="text-xs font-bold text-destructive">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Clinic email</label>
-                  <Input {...register('email')} type="email" placeholder="hello@clinic.com" />
-                  {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
+                  <label className="text-sm font-bold text-slate-700 uppercase tracking-tighter">Clinic email</label>
+                  <AppInput {...register('email')} type="email" placeholder="hello@clinic.com" />
+                  {errors.email && <p className="text-xs font-bold text-destructive">{errors.email.message}</p>}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border bg-background/60 p-4">
+              <div className="rounded-2xl border border-border bg-slate-50/50 p-6 space-y-6">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-slate-900">Location (all meets are online)</h3>
-                  <p className="text-sm text-slate-600">
-                    One location is used for timezone and scheduling. Name it e.g. &quot;Online&quot; or &quot;Virtual&quot;.
+                  <h3 className="text-base font-bold text-slate-900">Primary Operating Location</h3>
+                  <p className="text-sm text-slate-500">
+                    This location defines your primary timezone and clinical operations.
                   </p>
                 </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Location name</label>
-                    <Input {...register('locationName')} placeholder="e.g. Online or Virtual" />
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-tighter">Location name</label>
+                    <AppInput {...register('locationName')} placeholder="e.g. Online or Virtual" />
                     {errors.locationName && (
-                      <p className="text-sm text-danger">{errors.locationName.message}</p>
+                      <p className="text-xs font-bold text-destructive">{errors.locationName.message}</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">US timezone</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-tighter">US timezone</label>
                     <select
                       {...register('timezone')}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="flex h-11 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-accent outline-none"
                     >
                       {US_TIMEZONES.map((tz) => (
                         <option key={tz.value} value={tz.value}>
@@ -178,12 +213,12 @@ export default function CreateClinicPage() {
                       ))}
                     </select>
                     {errors.timezone && (
-                      <p className="text-sm text-danger">{errors.timezone.message}</p>
+                      <p className="text-xs font-bold text-destructive">{errors.timezone.message}</p>
                     )}
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-slate-700">Address (optional)</label>
-                    <Input
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-tighter">Address (optional)</label>
+                    <AppInput
                       {...register('locationAddress')}
                       placeholder="Leave blank for online-only"
                     />
@@ -191,36 +226,21 @@ export default function CreateClinicPage() {
                 </div>
               </div>
 
-              {clinic && (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-sm text-muted-foreground">Providers</p>
-                    <p className="mt-1 text-2xl font-semibold">{clinic.stats.providerCount}</p>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-sm text-muted-foreground">Front desk staff</p>
-                    <p className="mt-1 text-2xl font-semibold">{clinic.stats.staffCount}</p>
-                  </div>
-                  <div className="rounded-lg border border-border p-4">
-                    <p className="text-sm text-muted-foreground">Active locations</p>
-                    <p className="mt-1 text-2xl font-semibold">{clinic.stats.locationCount}</p>
-                  </div>
-                </div>
-              )}
-
-              <Button type="submit" disabled={saveMutation.isPending}>
-                {saveMutation.isPending
-                  ? clinic
-                    ? 'Saving...'
-                    : 'Setting up...'
-                  : clinic
-                    ? 'Save Clinic Settings'
-                    : 'Complete Clinic Setup'}
-              </Button>
+              <div className="pt-4 border-t border-slate-100 flex justify-end">
+                <AppButton type="submit" disabled={saveMutation.isPending} className="rounded-full px-8">
+                  {saveMutation.isPending
+                    ? clinic
+                      ? 'Saving...'
+                      : 'Setting up...'
+                    : clinic
+                      ? 'Save Clinic Settings'
+                      : 'Complete Clinic Setup'}
+                </AppButton>
+              </div>
             </form>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </AppCardContent>
+      </AppCard>
+    </PageContainer>
   );
 }

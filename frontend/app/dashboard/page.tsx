@@ -12,7 +12,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isLoading || !user) return;
-    if (user.role === 'FRONT_DESK' || user.role === 'SUPER_ADMIN') {
+    if (user.role === 'SUPER_ADMIN') {
+      router.replace('/dashboard/admin');
+      return;
+    }
+    if (user.role === 'FRONT_DESK') {
       router.replace('/dashboard/front-desk');
       return;
     }

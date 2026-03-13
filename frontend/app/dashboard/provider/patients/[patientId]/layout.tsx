@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
+import { PageContainer } from '@/components/layout';
 
 export default function ProviderPatientLayout({
     children,
@@ -19,13 +20,13 @@ export default function ProviderPatientLayout({
     ];
 
     return (
-        <div>
-            <nav className="mb-6 flex gap-1 border-b border-border">
+        <PageContainer className="space-y-8">
+            <nav className="flex gap-1 border-b border-border">
                 {tabs.map(({ href, label }) => (
                     <Link
                         key={href}
                         href={href}
-                        className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+                        className={`border-b-2 px-4 py-3 text-sm font-bold tracking-tight transition ${
                             pathname === href
                                 ? 'border-accent text-accent'
                                 : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -35,7 +36,9 @@ export default function ProviderPatientLayout({
                     </Link>
                 ))}
             </nav>
-            {children}
-        </div>
+            <div className="pt-2">
+                {children}
+            </div>
+        </PageContainer>
     );
 }

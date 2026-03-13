@@ -2,9 +2,24 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
+import { 
+  Trash2, 
+  ArrowLeft, 
+  Calendar, 
+  User as UserIcon, 
+  FileText, 
+  Video, 
+  Receipt, 
+  ShieldCheck, 
+  Clock, 
+  Plus,
+  Stethoscope,
+  Activity,
+  History,
+  AlertCircle
+} from 'lucide-react';
 import {
   getAppointmentById,
   getPatientEntitlements,
@@ -21,10 +36,18 @@ import {
   type Invoice,
   type InvoiceItem,
 } from '@/lib/invoiceApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { 
+  AppCard, 
+  AppCardContent, 
+  AppCardHeader, 
+  AppCardTitle, 
+  AppButton, 
+  AppPageHeader,
+  StickySummaryPanel
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { Input } from '@/components/ui/input';
+import { AppInput } from '@/components/ui-system';
 import {
   Table,
   TableBody,
@@ -41,6 +64,7 @@ import { getPatientForms } from '@/lib/formsApi';
 import { createPrescription, getPrescriptionsByPatient, type Prescription } from '@/lib/prescriptionApi';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -49,114 +73,21 @@ function formatDateTime(iso: string) {
   });
 }
 
-function InvoiceItemRow({
-  item,
-  canEdit,
-  onUpdate,
-  onDelete,
-  isUpdating,
-  isDeleting,
-}: {
-  item: InvoiceItem;
-  canEdit: boolean;
-  onUpdate: (unitPrice?: number, quantity?: number) => void;
-  onDelete: () => void;
-  isUpdating: boolean;
-  isDeleting: boolean;
-}) {
-  const [unitPrice, setUnitPrice] = useState(item.unitPrice);
-  const [quantity, setQuantity] = useState(String(item.quantity));
-
-  const handleUnitPriceBlur = () => {
-    const num = parseFloat(unitPrice);
-    if (!Number.isNaN(num) && num >= 0 && num !== parseFloat(item.unitPrice)) {
-      onUpdate(num, undefined);
-    } else {
-      setUnitPrice(item.unitPrice);
-    }
-  };
-
-  const handleQuantityBlur = () => {
-    const num = Math.max(1, Math.floor(parseInt(quantity, 10) || 1));
-    if (num !== item.quantity) {
-      onUpdate(undefined, num);
-    } else {
-      setQuantity(String(item.quantity));
-    }
-  };
-
-  React.useEffect(() => {
-    setUnitPrice(item.unitPrice);
-    setQuantity(String(item.quantity));
-  }, [item.unitPrice, item.quantity]);
-
-  return (
-    <TableRow>
-      <TableCell className="font-medium">{item.service?.name ?? '—'}</TableCell>
-      <TableCell>{item.description}</TableCell>
-      <TableCell className="text-right">
-        {canEdit ? (
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={unitPrice}
-            onChange={(e) => setUnitPrice(e.target.value)}
-            onBlur={handleUnitPriceBlur}
-            disabled={isUpdating}
-            className="h-8 w-24 text-right"
-          />
-        ) : (
-          item.unitPrice
-        )}
-      </TableCell>
-      <TableCell className="text-right">
-        {canEdit ? (
-          <Input
-            type="number"
-            min="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            onBlur={handleQuantityBlur}
-            disabled={isUpdating}
-            className="h-8 w-16 text-right"
-          />
-        ) : (
-          item.quantity
-        )}
-      </TableCell>
-      <TableCell className="text-right">{item.totalPrice}</TableCell>
-      {canEdit && (
-        <TableCell>
-          <Button
-            variant="destructive"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onDelete()}
-            disabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </TableCell>
-      )}
-    </TableRow>
-  );
-}
-
 export default function ProviderAppointmentDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const router = useRouter();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isProvider = user?.role === 'PROVIDER';
+  
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
-  const [creatingVisit, setCreatingVisit] = useState(false);
   const [prescriptionNotes, setPrescriptionNotes] = useState('');
   const [prescriptionOpen, setPrescriptionOpen] = useState(false);
 
-  const { data: appointment, isLoading: appointmentLoading, error: appointmentError } = useQuery({
+  const { data: appointment, isLoading: appointmentLoading } = useQuery({
     queryKey: ['appointment', id],
     queryFn: () => getAppointmentById(id),
     enabled: !!id,
@@ -177,8 +108,7 @@ export default function ProviderAppointmentDetailPage() {
 
   const { data: formResponses = [], isLoading: formsLoading } = useQuery({
     queryKey: ['forms', 'patient', appointment?.patientId, appointment?.clinicId],
-    queryFn: () =>
-      getPatientForms(appointment!.patientId, appointment?.clinicId),
+    queryFn: () => getPatientForms(appointment!.patientId, appointment?.clinicId),
     enabled: !!appointment?.patientId,
   });
 
@@ -206,457 +136,276 @@ export default function ProviderAppointmentDetailPage() {
     onError: () => toast.error('Failed to create prescription'),
   });
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      createInvoice({
-        appointmentId: id,
-        providerId: appointment!.providerId,
-      }),
+  const createInvoiceMutation = useMutation({
+    mutationFn: () => createInvoice({ appointmentId: id, providerId: appointment!.providerId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
       toast.success('Invoice created');
     },
-    onError: () => toast.error('Failed to create invoice'),
-  });
-
-  const finalizeMutation = useMutation({
-    mutationFn: (invoiceId: string) => finalizeInvoice(invoiceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
-      toast.success('Invoice finalized');
-    },
-    onError: () => toast.error('Failed to finalize invoice'),
-  });
-
-  const payMutation = useMutation({
-    mutationFn: (invoiceId: string) => payInvoice(invoiceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
-      toast.success('Invoice marked as paid');
-    },
-    onError: () => toast.error('Failed to mark invoice as paid'),
   });
 
   const invoice = invoices[0] ?? null;
-  const isDraft = invoice?.status === 'DRAFT';
-  const isFinalized = invoice?.status === 'FINALIZED';
-  const isPaid = invoice?.status === 'PAID';
-  const canEdit = isDraft;
-
-  const handleAddItemSuccess = () => {
-    refetchInvoices();
-  };
-
-  const updateItemMutation = useMutation({
-    mutationFn: ({
-      itemId,
-      unitPrice,
-      quantity,
-    }: {
-      itemId: string;
-      unitPrice?: number;
-      quantity?: number;
-    }) =>
-      updateInvoiceItem(invoice!.id, itemId, { unitPrice, quantity }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
-      toast.success('Item updated');
-    },
-    onError: () => toast.error('Failed to update item'),
-  });
-
-  const deleteItemMutation = useMutation({
-    mutationFn: (itemId: string) =>
-      deleteInvoiceItem(invoice!.id, itemId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', 'appointment', id] });
-      toast.success('Item removed');
-    },
-    onError: () => toast.error('Failed to remove item'),
-  });
 
   if (appointmentLoading || !appointment) {
-    if (appointmentError) {
-      return (
-        <div className="space-y-6">
-          <Link href="/dashboard/appointments" className="text-sm text-primary-600 hover:text-primary-700">
-            ← Back to appointments
-          </Link>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            Appointment not found or access denied.
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="p-8 space-y-6">
+        <Skeleton className="h-12 w-48" />
+        <div className="grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-64 w-full rounded-2xl" />
+            <Skeleton className="h-96 w-full rounded-2xl" />
+          </div>
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <Link
-        href="/dashboard/appointments"
-        className="inline-block text-sm text-primary-600 hover:text-primary-700"
-      >
-        ← Back to appointments
-      </Link>
-
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Appointment Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Service</dt>
-                <dd className="mt-1 text-sm text-gray-900">{appointment.service.name}</dd>
+    <div className="bg-slate-50 min-h-screen">
+      <div className="px-8 py-6 bg-white border-b sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <AppButton variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </AppButton>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-slate-900">{appointment.patientId ? (appointment as any).patient?.name : 'Patient'}</h1>
+                <StatusBadge status={appointment.status} variant="appointment" />
               </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Provider</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {appointment.provider.firstName} {appointment.provider.lastName}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Date & Time</dt>
-                <dd className="mt-1 text-sm text-gray-900">{formatDateTime(appointment.startTime)}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Status</dt>
-                <dd className="mt-1">
-                  <StatusBadge status={appointment.status} variant="appointment" />
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-
-        {entitlements && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Patient Entitlements</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-6 text-sm text-slate-700">
-              {entitlements.activeMembershipBenefit ? (
-                <div>
-                  Membership discount: {entitlements.activeMembershipBenefit.membershipName} (
-                  {Number(entitlements.activeMembershipBenefit.serviceDiscountPercent).toFixed(0)}% off services)
-                </div>
-              ) : (
-                <div>No active membership discount</div>
-              )}
-              {entitlements.packages.length > 0 ? (
-                <div className="space-y-1">
-                  {entitlements.packages.map((pkg) => (
-                    <div key={pkg.id}>
-                      {pkg.package.name}: {pkg.remainingSessions ?? Math.max(pkg.totalSessions - pkg.usedSessions, 0)} sessions left
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div>No active packages</div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {visitRecord && (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <CardTitle>Visit Record</CardTitle>
-                {isProvider && visitRecord && !visitRecord.isFinalized && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                  >
-                    <Link href={`/dashboard/provider/appointments/${id}/consultation`}>
-                      Consultation Room
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <StatusBadge status={visitRecord.status} variant="visitRecord" />
-              <div className="mt-4 space-y-4">
-                {visitRecord.subjective && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Subjective</h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.subjective}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.objective && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Objective</h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.objective}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.assessment && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Assessment</h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.assessment}
-                    </p>
-                  </div>
-                )}
-                {visitRecord.plan && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700">Plan</h3>
-                    <p className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-900">
-                      {visitRecord.plan}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!visitRecord && !creatingVisit && appointment && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Consultation</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="mb-4 text-sm text-gray-500">
-                {isProvider
-                  ? 'Start a Medoflow consultation session. Record audio, transcribe, and generate clinical notes—all in one place.'
-                  : 'Visit record will be created when the provider starts the consultation.'}
+              <p className="text-sm text-slate-500 font-medium">
+                {appointment.service.name} · {formatDateTime(appointment.startTime)}
               </p>
-              {isProvider && (
-                <Button
-                  onClick={() => {
-                    window.location.href = `/dashboard/provider/appointments/${id}/consultation`;
-                  }}
-                >
-                  Start Consultation
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Invoice</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {!invoice ? (
-              <div className="flex flex-col items-center gap-4 py-8">
-                <p className="text-sm text-gray-500">No invoice for this appointment yet.</p>
-                <Button
-                  onClick={() => createMutation.mutate()}
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending ? 'Creating...' : 'Create Invoice'}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <StatusBadge status={invoice.status} variant="invoice" />
-                  {canEdit && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setAddServiceOpen(true)}
-                    >
-                      Add Service
-                    </Button>
-                  )}
-                </div>
-
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Unit Price</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        {canEdit && <TableHead className="w-[80px]" />}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {invoice.items?.length ? (
-                        invoice.items.map((item: InvoiceItem) => (
-                          <InvoiceItemRow
-                            key={item.id}
-                            item={item}
-                            canEdit={canEdit}
-                            onUpdate={(unitPrice, quantity) =>
-                              updateItemMutation.mutate({
-                                itemId: item.id,
-                                unitPrice,
-                                quantity,
-                              })
-                            }
-                            onDelete={() => deleteItemMutation.mutate(item.id)}
-                            isUpdating={updateItemMutation.isPending}
-                            isDeleting={deleteItemMutation.isPending}
-                          />
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={canEdit ? 6 : 5} className="text-center text-gray-500 py-8">
-                            No items yet. Add a service to get started.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 border-t pt-4">
-                  <div className="flex w-full max-w-[240px] justify-between text-sm">
-                    <span className="text-gray-600">Subtotal</span>
-                    <span>{invoice.subtotal ?? '0.00'}</span>
-                  </div>
-                  <div className="flex w-full max-w-[240px] justify-between text-sm">
-                    <span className="text-gray-600">Tax</span>
-                    <span>{invoice.taxAmount ?? '0.00'}</span>
-                  </div>
-                  <div className="flex w-full max-w-[240px] justify-between font-semibold">
-                    <span>Total</span>
-                    <span>{invoice.totalAmount ?? '0.00'}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  {isDraft && (
-                    <Button
-                      variant="outline"
-                      onClick={() => finalizeMutation.mutate(invoice.id)}
-                      disabled={finalizeMutation.isPending}
-                    >
-                      Finalize
-                    </Button>
-                  )}
-                  {isFinalized && (
-                    <Button
-                      onClick={() => payMutation.mutate(invoice.id)}
-                      disabled={payMutation.isPending}
-                    >
-                      Mark as Paid
-                    </Button>
-                  )}
-                </div>
-              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {appointment.meetLink && (
+              <AppButton variant="outline" className="rounded-full bg-white shadow-sm border-slate-200" asChild>
+                <a href={appointment.meetLink} target="_blank" rel="noopener noreferrer">
+                  <Video className="mr-2 h-4 w-4 text-blue-600" /> Join Virtual Room
+                </a>
+              </AppButton>
             )}
-          </CardContent>
-        </Card>
-
-        {isProvider && appointment?.status === 'COMPLETED' && (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <CardTitle>Prescriptions</CardTitle>
-                {!prescriptionOpen && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPrescriptionOpen(true)}
-                  >
-                    Add Prescription
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {prescriptionOpen && (
-                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Prescription notes
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={prescriptionNotes}
-                    onChange={(e) => setPrescriptionNotes(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    placeholder="Enter medication name, dosage, instructions..."
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setPrescriptionOpen(false);
-                        setPrescriptionNotes('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={!prescriptionNotes.trim() || createPrescriptionMutation.isPending}
-                      onClick={() => createPrescriptionMutation.mutate(prescriptionNotes.trim())}
-                    >
-                      {createPrescriptionMutation.isPending ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {prescriptions.length === 0 && !prescriptionOpen && (
-                <p className="text-sm text-gray-500">No prescriptions for this appointment.</p>
-              )}
-              {prescriptions.map((rx: Prescription) => (
-                <div
-                  key={rx.id}
-                  className="rounded-lg border border-slate-200 bg-white p-4"
-                >
-                  <p className="whitespace-pre-wrap text-sm text-gray-900">{rx.notes}</p>
-                  <p className="mt-2 text-xs text-gray-400">
-                    {new Date(rx.createdAt).toLocaleString(undefined, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        <IntakeFormsSection
-          responses={formResponses}
-          appointmentId={id}
-          isLoading={formsLoading}
-        />
-
-        {appointment?.patientId && (
-          <>
-            <Button variant="outline" onClick={() => setRecordSheetOpen(true)}>
-              View Full Record
-            </Button>
-            <PatientRecordSheet
-              patientId={appointment.patientId}
-              clinicId={appointment.clinicId}
-              open={recordSheetOpen}
-              onOpenChange={setRecordSheetOpen}
-            />
-          </>
-        )}
+            <AppButton onClick={() => setRecordSheetOpen(true)} className="rounded-full shadow-lg">
+              <UserIcon className="mr-2 h-4 w-4" /> Full Clinical Record
+            </AppButton>
+          </div>
+        </div>
       </div>
+
+      <PageContainer className="py-8">
+        <div className="grid gap-8 lg:grid-cols-3 items-start">
+          
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Consultation Section */}
+            <AppCard className="border-none shadow-sm overflow-hidden">
+              <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+                <AppCardTitle className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-primary-600" />
+                  Active Consultation
+                </AppCardTitle>
+              </AppCardHeader>
+              <AppCardContent className="p-8">
+                {!visitRecord ? (
+                  <div className="text-center py-10 space-y-6">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                      <Activity className="h-10 w-10 text-slate-200" />
+                    </div>
+                    <div className="max-w-md mx-auto">
+                      <h3 className="text-lg font-bold text-slate-900">Start documenting this visit</h3>
+                      <p className="text-slate-500 text-sm mt-2">
+                        Use Medoflow AI Scribe to automatically document this session or create a manual visit record.
+                      </p>
+                    </div>
+                    <AppButton size="lg" className="rounded-full px-10" asChild>
+                      <Link href={`/dashboard/provider/appointments/${id}/consultation`}>
+                        Enter Consultation Room
+                      </Link>
+                    </AppButton>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <StatusBadge status={visitRecord.status} variant="visitRecord" />
+                      {!visitRecord.isFinalized && (
+                        <AppButton variant="outline" size="sm" className="rounded-full" asChild>
+                          <Link href={`/dashboard/provider/appointments/${id}/consultation`}>
+                            Resume Scribe
+                          </Link>
+                        </AppButton>
+                      )}
+                    </div>
+                    <div className="grid gap-4">
+                      {['subjective', 'objective', 'assessment', 'plan'].map((field) => (
+                        visitRecord[field as keyof typeof visitRecord] && (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{field}</label>
+                            <p className="p-4 bg-slate-50 rounded-2xl text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                              {visitRecord[field as keyof typeof visitRecord] as string}
+                            </p>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </AppCardContent>
+            </AppCard>
+
+            {/* Prescriptions */}
+            {appointment.status === 'COMPLETED' && (
+              <AppCard className="border-none shadow-sm overflow-hidden">
+                <AppCardHeader className="flex flex-row items-center justify-between bg-slate-50/50 border-b-0 py-6">
+                  <AppCardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary-600" /> Prescriptions
+                  </AppCardTitle>
+                  {!prescriptionOpen && (
+                    <AppButton variant="ghost" size="sm" className="rounded-full text-primary-600" onClick={() => setPrescriptionOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1" /> Add New
+                    </AppButton>
+                  )}
+                </AppCardHeader>
+                <AppCardContent className="p-8 space-y-4">
+                  {prescriptionOpen && (
+                    <div className="p-6 bg-slate-50 rounded-3xl border-2 border-primary-100 animate-in zoom-in-95 space-y-4">
+                      <textarea 
+                        className="w-full bg-white rounded-2xl p-4 text-sm border-slate-200 outline-none focus:border-primary-600"
+                        rows={4}
+                        placeholder="Enter medication, dosage, and instructions..."
+                        value={prescriptionNotes}
+                        onChange={(e) => setPrescriptionNotes(e.target.value)}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <AppButton variant="ghost" size="sm" onClick={() => setPrescriptionOpen(false)}>Cancel</AppButton>
+                        <AppButton size="sm" className="rounded-full px-6" onClick={() => createPrescriptionMutation.mutate(prescriptionNotes)}>Save Prescription</AppButton>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {prescriptions.map((rx: any) => (
+                      <div key={rx.id} className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap font-medium">{rx.notes}</p>
+                        <p className="text-[10px] text-slate-400 mt-3 uppercase font-bold tracking-tighter">Issued on {new Date(rx.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                    {prescriptions.length === 0 && !prescriptionOpen && (
+                      <p className="text-center py-6 text-slate-400 text-sm">No prescriptions issued for this visit.</p>
+                    )}
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            )}
+
+            {/* Forms Section */}
+            <IntakeFormsSection responses={formResponses} appointmentId={id} isLoading={formsLoading} />
+          </div>
+
+          <div className="lg:col-span-1 space-y-8">
+            {/* Billing Rail */}
+            <div className="sticky top-32 space-y-6">
+              {!invoice ? (
+                <AppCard className="border-2 border-dashed border-slate-200 bg-transparent text-center p-8">
+                  <Receipt className="h-10 w-10 text-slate-200 mx-auto mb-4" />
+                  <h3 className="font-bold text-slate-900">No active invoice</h3>
+                  <p className="text-xs text-slate-500 mt-2 mb-6">Invoices are usually generated automatically upon booking.</p>
+                  <AppButton className="w-full rounded-full" onClick={() => createInvoiceMutation.mutate()}>
+                    Create Manual Invoice
+                  </AppButton>
+                </AppCard>
+              ) : (
+                <StickySummaryPanel 
+                  title="Billing Details"
+                  items={[
+                    { label: 'Status', value: <StatusBadge status={invoice.status} variant="invoice" /> },
+                    { label: 'Subtotal', value: `$${invoice.subtotal}` },
+                    { label: 'Tax', value: `$${invoice.taxAmount}` },
+                    { label: 'Total', value: `$${invoice.totalAmount}`, isTotal: true },
+                  ]}
+                  actions={
+                    <div className="space-y-3">
+                      {invoice.status === 'DRAFT' && (
+                        <AppButton className="w-full rounded-full h-12" onClick={() => setAddServiceOpen(true)}>Add Billable Item</AppButton>
+                      )}
+                      <AppButton variant="outline" className="w-full rounded-full h-12 bg-white" asChild>
+                        <Link href={`/dashboard/front-desk/invoices/${invoice.id}`}>View Full Invoice</Link>
+                      </AppButton>
+                    </div>
+                  }
+                />
+              )}
+
+              {/* Entitlements Rail */}
+              {entitlements && (
+                <AppCard className="border-primary-100 bg-primary-50/20">
+                  <AppCardHeader className="border-none pb-0">
+                    <AppCardTitle className="text-sm font-black uppercase tracking-widest text-primary-700 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" />
+                      Patient Entitlements
+                    </AppCardTitle>
+                  </AppCardHeader>
+                  <AppCardContent className="p-6 pt-4 space-y-4">
+                    {entitlements.activeMembershipBenefit ? (
+                      <div className="p-3 bg-white rounded-xl border border-primary-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-900">{entitlements.activeMembershipBenefit.membershipName}</p>
+                        <p className="text-[10px] text-emerald-600 font-black uppercase mt-1">
+                          {Number(entitlements.activeMembershipBenefit.serviceDiscountPercent)}% Service Discount
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No active membership.</p>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Wellness Packages</p>
+                      {entitlements.packages.map((pkg: any) => (
+                        <div key={pkg.id} className="flex justify-between items-center text-xs font-medium text-slate-700">
+                          <span>{pkg.package.name}</span>
+                          <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full text-[10px] font-black">
+                            {pkg.remainingSessions ?? Math.max(pkg.totalSessions - pkg.usedSessions, 0)} LEFT
+                          </span>
+                        </div>
+                      ))}
+                      {entitlements.packages.length === 0 && (
+                        <p className="text-xs text-slate-400 italic">No pre-paid packages.</p>
+                      )}
+                    </div>
+                  </AppCardContent>
+                </AppCard>
+              )}
+
+              {/* Compliance Note */}
+              <div className="p-6 bg-slate-900 rounded-[2rem] text-white">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-emerald-500 rounded-lg">
+                    <History className="h-4 w-4 text-white" />
+                  </div>
+                  <h4 className="font-bold text-sm">Clinical Integrity</h4>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  All clinical documentation is immutable once finalized. Medoflow tracks every edit made to the SOAP record for clinical audit purposes.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </PageContainer>
+
+      <PatientRecordSheet
+        patientId={appointment.patientId}
+        clinicId={appointment.clinicId}
+        open={recordSheetOpen}
+        onOpenChange={setRecordSheetOpen}
+      />
 
       {invoice && (
         <AddServiceDialog
           open={addServiceOpen}
           onOpenChange={setAddServiceOpen}
           invoiceId={invoice.id}
-          onSuccess={handleAddItemSuccess}
+          onSuccess={() => refetchInvoices()}
         />
       )}
     </div>

@@ -40,6 +40,7 @@ export interface PatientAppointment {
 export interface PatientAppointmentDetail extends PatientAppointment {
   clinic: { id: string; name: string };
   service: { id: string; name: string; duration: number };
+  patient: { id: string; name: string; email: string };
 }
 
 export interface PatientSummary {

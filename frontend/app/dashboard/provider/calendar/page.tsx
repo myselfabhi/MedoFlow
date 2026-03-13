@@ -21,7 +21,8 @@ import {
   isToday,
 } from '@/lib/calendarUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
+import { PageContainer } from '@/components/layout';
+import { AppPageHeader, AppButton } from '@/components/ui-system';
 import {
   Select,
   SelectContent,
@@ -121,11 +122,11 @@ export default function ProviderCalendarPage() {
   const timeSlots = getTimeSlots();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Calendar</h1>
-        <p className="mt-1 text-sm text-gray-500">Your weekly appointments</p>
-      </div>
+    <PageContainer className="space-y-8">
+      <AppPageHeader
+        title="Clinical Schedule"
+        description="Your weekly consultation timeline and availability."
+      />
 
       <Card>
         <CardHeader>
@@ -133,15 +134,15 @@ export default function ProviderCalendarPage() {
             <CardTitle>Week</CardTitle>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={handlePrevWeek}>
+                <AppButton variant="outline" size="icon" onClick={handlePrevWeek}>
                   <ChevronLeft className="h-4 w-4" />
-                </Button>
+                </AppButton>
                 <span className="min-w-[180px] text-center font-medium">
                   {formatWeekLabel(start, end)}
                 </span>
-                <Button variant="outline" size="icon" onClick={handleNextWeek}>
+                <AppButton variant="outline" size="icon" onClick={handleNextWeek}>
                   <ChevronRight className="h-4 w-4" />
-                </Button>
+                </AppButton>
               </div>
               {locations.length > 1 && (
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
@@ -255,6 +256,6 @@ export default function ProviderCalendarPage() {
         onOpenChange={setSheetOpen}
         onSuccess={handleSheetSuccess}
       />
-    </div>
+    </PageContainer>
   );
 }

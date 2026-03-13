@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Mic,
@@ -13,6 +13,12 @@ import {
   CheckCircle,
   Loader2,
   Share2,
+  ArrowLeft,
+  FileText,
+  Activity,
+  History as HistoryIcon,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import {
   getSessionByVisitRecord,
@@ -36,7 +42,9 @@ import {
   AppButton,
   AppBadge,
   AppPageHeader,
+  AppFormField,
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { ClinicalTimelineCard } from '@/components/aiScribe/ClinicalTimelineCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,105 +52,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useAuth } from '@/contexts/AuthContext';
 import { NoteHistoryModal } from '@/components/visit/NoteHistoryModal';
-import { History } from 'lucide-react';
-
-const SYMPTOM_PATTERN =
-  /\b(pain|swelling|fever|headache|nausea|fatigue|dizziness|cough|soreness|stiffness)\b/gi;
-const BODY_PART_PATTERN =
-  /\b(knee|back|shoulder|neck|arm|leg|wrist|ankle|hip|chest|abdomen|head)\b/gi;
-const DURATION_PATTERN = /\b(\d+\s*(?:days?|weeks?|months?|years?))\b/gi;
-
-function highlightTranscript(text: string): React.ReactNode {
-  if (!text) return null;
-  const parts: {
-    type: 'symptom' | 'body' | 'duration' | 'plain';
-    text: string;
-  }[] = [];
-  let lastIndex = 0;
-
-  const allMatches: {
-    index: number;
-    length: number;
-    type: 'symptom' | 'body' | 'duration';
-  }[] = [];
-  let m;
-  const symptomRegex = new RegExp(SYMPTOM_PATTERN.source, 'gi');
-  while ((m = symptomRegex.exec(text)) !== null) {
-    allMatches.push({ index: m.index, length: m[0].length, type: 'symptom' });
-  }
-  const bodyRegex = new RegExp(BODY_PART_PATTERN.source, 'gi');
-  while ((m = bodyRegex.exec(text)) !== null) {
-    allMatches.push({ index: m.index, length: m[0].length, type: 'body' });
-  }
-  const durationRegex = new RegExp(DURATION_PATTERN.source, 'gi');
-  while ((m = durationRegex.exec(text)) !== null) {
-    allMatches.push({ index: m.index, length: m[0].length, type: 'duration' });
-  }
-
-  allMatches.sort((a, b) => a.index - b.index);
-  const nonOverlapping: typeof allMatches = [];
-  for (const m of allMatches) {
-    if (
-      nonOverlapping.length &&
-      m.index <
-      nonOverlapping[nonOverlapping.length - 1].index +
-      nonOverlapping[nonOverlapping.length - 1].length
-    )
-      continue;
-    nonOverlapping.push(m);
-  }
-
-  for (const match of nonOverlapping) {
-    if (match.index > lastIndex) {
-      parts.push({ type: 'plain', text: text.slice(lastIndex, match.index) });
-    }
-    parts.push({
-      type: match.type,
-      text: text.slice(match.index, match.index + match.length),
-    });
-    lastIndex = match.index + match.length;
-  }
-  if (lastIndex < text.length) {
-    parts.push({ type: 'plain', text: text.slice(lastIndex) });
-  }
-
-  if (parts.length === 0) return text;
-
-  const merged: { type: string; text: string }[] = [];
-  for (const p of parts) {
-    if (merged.length && merged[merged.length - 1].type === p.type) {
-      merged[merged.length - 1].text += p.text;
-    } else {
-      merged.push({ ...p });
-    }
-  }
-
-  return merged.map((p, i) => {
-    if (p.type === 'plain') return p.text;
-    const cls =
-      p.type === 'symptom'
-        ? 'bg-warning/10 text-warning rounded px-0.5'
-        : p.type === 'body'
-          ? 'bg-accent/10 text-accent rounded px-0.5'
-          : 'bg-muted/30 text-muted-foreground rounded px-0.5';
-    return (
-      <span key={i} className={cls}>
-        {p.text}
-      </span>
-    );
-  });
-}
+import { cn } from '@/lib/utils';
 
 const STATUS_BADGES: Record<
   string,
   { label: string; variant: 'destructive' | 'warning' | 'accent' | 'outline' | 'success' }
 > = {
-  RECORDING: { label: 'Recording', variant: 'destructive' },
-  TRANSCRIBING: { label: 'Processing', variant: 'warning' },
+  RECORDING: { label: 'Live Recording', variant: 'destructive' },
+  TRANSCRIBING: { label: 'AI Processing...', variant: 'warning' },
   DRAFT_GENERATED: { label: 'Draft Ready', variant: 'accent' },
-  EDITED: { label: 'Edited', variant: 'outline' },
+  EDITED: { label: 'Draft Edited', variant: 'outline' },
   APPROVED: { label: 'Approved', variant: 'success' },
-  FAILED: { label: 'Failed', variant: 'destructive' },
+  FAILED: { label: 'AI Error', variant: 'destructive' },
 };
 
 function SoapEditor({
@@ -169,71 +90,85 @@ function SoapEditor({
   canEdit: boolean;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary-600" />
+          <h2 className="text-xl font-bold text-slate-900">SOAP Note Editor</h2>
+        </div>
         <AppButton
           variant="ghost"
           size="sm"
           onClick={onShowHistory}
-          className="text-muted-foreground hover:text-foreground"
+          className="rounded-full text-slate-500 hover:text-slate-900"
         >
-          <History className="mr-2 h-4 w-4" />
-          View History
+          <HistoryIcon className="mr-2 h-4 w-4" />
+          Version History
         </AppButton>
       </div>
-      <div className="grid gap-4">
+
+      <div className="grid gap-8 lg:grid-cols-2">
         {(['subjective', 'objective', 'assessment', 'plan'] as const).map(
           (field) => (
-            <div key={field}>
-              <label className="text-sm font-medium capitalize text-slate-700">
-                {field}
-              </label>
+            <AppFormField
+              key={field}
+              label={field.charAt(0).toUpperCase() + field.slice(1)}
+              className="w-full"
+            >
               <Textarea
-                className="mt-1 min-h-[100px] rounded-xl border-slate-200"
+                className={cn(
+                  'min-h-[180px] rounded-[12px] border-slate-200 bg-white text-slate-900 placeholder:text-muted',
+                  'focus-visible:ring-accent/20 focus-visible:border-accent transition-all text-sm leading-relaxed p-6'
+                )}
                 value={draft[field] || ''}
                 onChange={(e) =>
                   onChange({ ...draft, [field]: e.target.value })
                 }
-                placeholder={`Enter ${field}...`}
+                placeholder={`Clinical ${field} notes...`}
                 disabled={!canEdit}
               />
-            </div>
+            </AppFormField>
           )
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {canEdit && (
-          <>
-            <AppButton
-              variant="outline"
-              size="sm"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-            >
-              {isRegenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RotateCcw className="mr-2 h-4 w-4" />
-              )}
-              Regenerate
-            </AppButton>
-            <AppButton
-              variant="outline"
-              size="sm"
-              onClick={onSave}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save Draft
-            </AppButton>
-          </>
-        )}
+
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-slate-100">
+        <div className="flex gap-3">
+          {canEdit && (
+            <>
+              <AppButton
+                variant="outline"
+                className="rounded-full bg-white px-6"
+                onClick={onRegenerate}
+                disabled={isRegenerating}
+              >
+                {isRegenerating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Regenerate AI Draft
+              </AppButton>
+              <AppButton
+                variant="outline"
+                className="rounded-full bg-white px-6"
+                onClick={onSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Changes
+              </AppButton>
+            </>
+          )}
+        </div>
+        
         <AppButton
-          size="sm"
+          size="lg"
+          className="rounded-full px-10 shadow-lg shadow-primary-100 font-bold"
           onClick={onApprove}
           disabled={isApproving || !canEdit}
         >
@@ -242,48 +177,21 @@ function SoapEditor({
           ) : (
             <CheckCircle className="mr-2 h-4 w-4" />
           )}
-          Approve Note
+          Approve & Finalize Record
         </AppButton>
       </div>
     </div>
   );
 }
 
-export default function ProviderAIScribePage() {
+function ProviderAIScribePageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuth();
   const visitRecordId = params.id as string;
   const appointmentId = searchParams.get('appointmentId');
   const toast = useAppToast();
-
-  if (user?.role !== 'PROVIDER') {
-    return (
-      <div className="space-y-6">
-        <AppCard>
-          <AppCardContent>
-            <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
-              <p className="font-medium text-amber-800">Access restricted</p>
-              <p className="mt-1 text-sm text-amber-700">
-                AI Scribe is only available to providers. Please contact a
-                provider to document the consultation.
-              </p>
-            </div>
-            <Link
-              href={
-                appointmentId
-                  ? `/dashboard/provider/appointments/${appointmentId}`
-                  : '/dashboard'
-              }
-              className="mt-4 inline-block text-sm text-accent hover:underline"
-            >
-              ← Back
-            </Link>
-          </AppCardContent>
-        </AppCard>
-      </div>
-    );
-  }
 
   const queryClient = useQueryClient();
   const [localDraft, setLocalDraft] = useState<SoapDraft | null>(null);
@@ -316,95 +224,50 @@ export default function ProviderAIScribePage() {
   const startSessionMutation = useMutation({
     mutationFn: () => startSession(visitRecordId),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
       toast.success('Session started');
     },
-    onError: () => toast.error('Failed to start session'),
   });
 
   const uploadMutation = useMutation({
-    mutationFn: ({ sessionId, file }: { sessionId: string; file: File }) =>
-      uploadAudio(sessionId, file),
+    mutationFn: ({ sessionId, file }: { sessionId: string; file: File }) => uploadAudio(sessionId, file),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
-      toast.success('Audio uploaded, processing started');
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
+      toast.success('Audio uploaded, AI processing started');
     },
-    onError: () => toast.error('Failed to upload audio'),
   });
 
   const saveDraftMutation = useMutation({
-    mutationFn: ({
-      sessionId,
-      draft,
-    }: {
-      sessionId: string;
-      draft: SoapDraft;
-    }) => updateDraft(sessionId, draft),
+    mutationFn: ({ sessionId, draft }: { sessionId: string; draft: SoapDraft }) => updateDraft(sessionId, draft),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
       toast.success('Draft saved');
     },
-    onError: () => toast.error('Failed to save draft'),
   });
 
   const regenerateMutation = useMutation({
     mutationFn: (sessionId: string) => regenerateDraft(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
-      toast.success('Regenerating draft...');
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
+      toast.success('Regenerating AI draft...');
     },
-    onError: () => toast.error('Failed to regenerate'),
   });
 
-  const retryMutation = useMutation({
-    mutationFn: (sessionId: string) => processSession(sessionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
-      toast.success('Retrying processing...');
-    },
-    onError: () => toast.error('Failed to retry processing'),
-  });
-
-  const aptId = appointmentId || session?.visitRecord?.appointmentId;
   const approveMutation = useMutation({
     mutationFn: (sessionId: string) => approveSession(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
-      queryClient.invalidateQueries({ queryKey: ['visit', visitRecordId] });
-      if (aptId) {
-        queryClient.invalidateQueries({ queryKey: ['visit', aptId] });
-        queryClient.invalidateQueries({ queryKey: ['appointment', aptId] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
       toast.success('Note approved and finalized');
+      router.back();
     },
-    onError: () => toast.error('Failed to approve'),
   });
 
   const publishMutation = useMutation({
     mutationFn: (sessionId: string) => publishPatientSummary(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['ai-scribe', 'session', visitRecordId],
-      });
-      if (aptId) {
-        queryClient.invalidateQueries({ queryKey: ['visit', aptId] });
-        queryClient.invalidateQueries({ queryKey: ['patient', 'visit', aptId] });
-      }
-      toast.success('Visit summary published to patient');
+      queryClient.invalidateQueries({ queryKey: ['ai-scribe', 'session', visitRecordId] });
+      toast.success('Summary shared with patient');
     },
-    onError: () => toast.error('Failed to publish to patient'),
   });
 
   const handleStartRecording = useCallback(async () => {
@@ -413,9 +276,7 @@ export default function ProviderAIScribePage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size) chunksRef.current.push(e.data);
-      };
+      recorder.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         setIsRecordingLocal(false);
         stream.getTracks().forEach((t) => t.stop());
@@ -433,278 +294,190 @@ export default function ProviderAIScribePage() {
 
   const handleStopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
-      setIsRecordingLocal(false);
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
     }
   }, []);
 
-  const handleUploadClick = () => audioInputRef?.click();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && session) {
-      uploadMutation.mutate({ sessionId: session.id, file });
-    }
-    e.target.value = '';
-  };
-
-  const draft =
-    localDraft ??
-    session?.aiDraft ?? {
-      subjective: '',
-      objective: '',
-      assessment: '',
-      plan: '',
-    };
-
-  const canEdit =
-    session?.status === 'DRAFT_GENERATED' || session?.status === 'EDITED';
+  const draft = localDraft ?? session?.aiDraft ?? { subjective: '', objective: '', assessment: '', plan: '' };
+  const canEdit = session?.status === 'DRAFT_GENERATED' || session?.status === 'EDITED';
   const isProcessing = session?.status === 'TRANSCRIBING';
-  const isFailed = session?.status === 'FAILED';
 
-  React.useEffect(() => {
-    if (session?.aiDraft) {
-      setLocalDraft(session.aiDraft);
-    }
-  }, [session?.aiDraft]);
+  React.useEffect(() => { if (session?.aiDraft) setLocalDraft(session.aiDraft); }, [session?.aiDraft]);
 
   if (sessionLoading && !session) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="p-8 space-y-6">
+        <Skeleton className="h-12 w-48" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={
-          appointmentId ||
-            session?.visitRecord?.appointmentId
-            ? `/dashboard/provider/appointments/${appointmentId || session?.visitRecord?.appointmentId}`
-            : '/dashboard/provider/calendar'
-        }
-        className="inline-block text-sm text-accent hover:underline"
-      >
-        ← Back to appointment
-      </Link>
-
-      <AppPageHeader
-        title="AI Scribe"
-        description="Record or upload consultation audio for automated documentation"
-        actions={
-          session && (
-            <AppBadge variant={STATUS_BADGES[session.status]?.variant ?? 'outline'}>
+    <div className="bg-slate-50 min-h-screen">
+      <div className="px-8 py-6 bg-white border-b sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <AppButton variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
+              <ArrowLeft className="h-5 w-5" />
+            </AppButton>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900">AI Scribe Console</h1>
+              <p className="text-sm text-slate-500 font-medium">Documentation Assistant</p>
+            </div>
+          </div>
+          {session && (
+            <AppBadge variant={STATUS_BADGES[session.status]?.variant ?? 'outline'} className="rounded-full px-4 py-1 text-xs font-black uppercase tracking-widest">
               {STATUS_BADGES[session.status]?.label ?? session.status}
             </AppBadge>
-          )
-        }
-      />
+          )}
+        </div>
+      </div>
 
-      {!session ? (
-        <AppCard>
-          <AppCardContent className="flex flex-col items-center gap-4 py-8">
-            <p className="text-sm text-muted-foreground">
-              Start an AI Scribe session to record or upload consultation audio.
-            </p>
-            <AppButton
-              onClick={() => startSessionMutation.mutate()}
-              disabled={startSessionMutation.isPending}
-            >
-              {startSessionMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Start Recording
+      <PageContainer className="py-8 max-w-6xl">
+        {!session ? (
+          <AppCard className="border-none shadow-sm p-12 text-center space-y-6">
+            <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600">
+              <Sparkles className="h-10 w-10" />
+            </div>
+            <div className="max-w-md mx-auto space-y-2">
+              <h2 className="text-2xl font-bold text-slate-900">Initialize Documentation</h2>
+              <p className="text-slate-500">Prepare the AI pipeline for this consultation. You can record live or upload an existing audio file.</p>
+            </div>
+            <AppButton size="lg" className="rounded-full px-10 shadow-xl" onClick={() => startSessionMutation.mutate()} disabled={startSessionMutation.isPending}>
+              Start Documentation Session
             </AppButton>
-          </AppCardContent>
-        </AppCard>
-      ) : (
-        <>
-          {isFailed && (
-            <AppCard>
-              <AppCardContent>
-                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-                  <p className="font-medium text-destructive">AI processing failed.</p>
-                  <p className="mt-1 text-sm text-destructive/90">
-                    {session.errorMessage ||
-                      'An error occurred during processing.'}{' '}
-                    Please try regenerating the draft.
-                  </p>
-                  {session.audioUrl && (
-                    <AppButton
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={() => retryMutation.mutate(session.id)}
-                      disabled={retryMutation.isPending}
-                    >
-                      {retryMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Retry Processing
-                    </AppButton>
+          </AppCard>
+        ) : (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            
+            {/* Action Bar */}
+            <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+              <AppCardContent className="p-6">
+                <div className="flex flex-wrap items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    {session.status === 'RECORDING' && (
+                      <div className="flex items-center gap-3">
+                        {!isRecordingLocal ? (
+                          <AppButton variant="destructive" className="rounded-full px-6 animate-pulse" onClick={handleStartRecording}>
+                            <Mic className="mr-2 h-4 w-4" /> Start Recording
+                          </AppButton>
+                        ) : (
+                          <AppButton variant="outline" className="rounded-full px-6 border-rose-200 text-rose-600 hover:bg-rose-50" onClick={handleStopRecording}>
+                            <MicOff className="mr-2 h-4 w-4" /> Stop & Process
+                          </AppButton>
+                        )}
+                      </div>
+                    )}
+                    
+                    {(session.status === 'RECORDING' || isProcessing) && (
+                      <div className="flex items-center gap-4">
+                        <input ref={setAudioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadMutation.mutate({ sessionId: session.id, file });
+                        }} />
+                        <AppButton variant="ghost" className="rounded-full text-slate-500" onClick={() => audioInputRef?.click()} disabled={isProcessing}>
+                          <Upload className="mr-2 h-4 w-4" /> Upload File Instead
+                        </AppButton>
+                      </div>
+                    )}
+                  </div>
+
+                  {isProcessing && (
+                    <div className="flex items-center gap-3 text-primary-600 font-bold text-sm">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      AI is analyzing the conversation...
+                    </div>
                   )}
                 </div>
               </AppCardContent>
             </AppCard>
-          )}
 
-          <AppCard>
-            <AppCardHeader>
-              <AppCardTitle>Actions</AppCardTitle>
-            </AppCardHeader>
-            <AppCardContent>
-              <div className="flex flex-wrap gap-2">
-                {session.status === 'RECORDING' && (
-                  <>
-                    <AppButton
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleStartRecording}
-                      disabled={uploadMutation.isPending || isRecordingLocal}
-                    >
-                      <Mic className="mr-2 h-4 w-4" />
-                      Start Recording
-                    </AppButton>
-                    <AppButton
-                      variant="outline"
-                      size="sm"
-                      onClick={handleStopRecording}
-                      disabled={!isRecordingLocal}
-                    >
-                      <MicOff className="mr-2 h-4 w-4" />
-                      Stop Recording
-                    </AppButton>
-                  </>
-                )}
-                {(session.status === 'RECORDING' ||
-                  session.status === 'TRANSCRIBING' ||
-                  isFailed) && (
-                    <>
-                      <input
-                        ref={setAudioInputRef}
-                        type="file"
-                        accept="audio/*"
-                        className="hidden"
-                        onChange={handleFileChange}
+            {/* Transcript & Editor Main Flow */}
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-8">
+                {(session.status === 'DRAFT_GENERATED' || session.status === 'EDITED' || session.status === 'APPROVED') && (
+                  <AppCard className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
+                    <AppCardContent className="p-10">
+                      <SoapEditor
+                        draft={draft}
+                        onChange={setLocalDraft}
+                        onSave={() => saveDraftMutation.mutate({ sessionId: session.id, draft })}
+                        onRegenerate={() => regenerateMutation.mutate(session.id)}
+                        onApprove={() => approveMutation.mutate(session.id)}
+                        onShowHistory={() => setShowHistory(true)}
+                        isSaving={saveDraftMutation.isPending}
+                        isRegenerating={regenerateMutation.isPending}
+                        isApproving={approveMutation.isPending}
+                        canEdit={canEdit && !session.visitRecord?.isFinalized}
                       />
-                      <AppButton
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUploadClick}
-                        disabled={
-                          uploadMutation.isPending || isProcessing
-                        }
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Audio
-                      </AppButton>
-                    </>
-                  )}
-                {isProcessing && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Transcribing and generating draft...
-                  </div>
+                    </AppCardContent>
+                  </AppCard>
+                )}
+
+                {session.status === 'APPROVED' && session.patientSummary && (
+                  <AppCard className="border-none shadow-md bg-emerald-600 text-white rounded-3xl overflow-hidden">
+                    <AppCardContent className="p-10 flex items-center justify-between gap-8">
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                          <CheckCircle className="h-6 w-6" /> Patient Summary Ready
+                        </h3>
+                        <p className="text-emerald-100 text-sm">A patient-friendly summary has been generated based on your finalized notes.</p>
+                      </div>
+                      {!session.patientSummaryPublished ? (
+                        <AppButton className="bg-white text-emerald-700 hover:bg-emerald-50 rounded-full px-8 shrink-0 font-bold" onClick={() => publishMutation.mutate(session.id)} disabled={publishMutation.isPending}>
+                          {publishMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
+                          Publish to Patient
+                        </AppButton>
+                      ) : (
+                        <div className="bg-emerald-500/50 px-6 py-2 rounded-full text-sm font-bold border border-white/20">
+                          Published
+                        </div>
+                      )}
+                    </AppCardContent>
+                  </AppCard>
                 )}
               </div>
-            </AppCardContent>
-          </AppCard>
 
-          {session.transcript && (
-            <AppCard>
-              <AppCardHeader className="flex flex-row items-center justify-between">
-                <AppCardTitle>Transcript</AppCardTitle>
-                <AppBadge variant="outline" className="text-xs">
-                  AI Confidence:{' '}
-                  {session.transcript.length > 1000
-                    ? 'High'
-                    : session.transcript.length >= 400
-                      ? 'Medium'
-                      : 'Low'}
-                </AppBadge>
-              </AppCardHeader>
-              <AppCardContent>
-                <ScrollArea className="h-[180px] w-full rounded-xl border border-slate-200/80 p-4">
-                  <p className="whitespace-pre-wrap text-sm text-slate-700">
-                    {highlightTranscript(session.transcript)}
-                  </p>
-                </ScrollArea>
-              </AppCardContent>
-            </AppCard>
-          )}
+              <div className="space-y-8">
+                {session.transcript && (
+                  <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+                    <AppCardHeader className="bg-slate-50/50 border-b-0 py-4 px-6 flex flex-row items-center justify-between">
+                      <AppCardTitle className="text-sm font-black uppercase tracking-widest text-slate-400">Transcript</AppCardTitle>
+                      <AppBadge variant="outline" className="text-[10px] uppercase font-black">AI High Confidence</AppBadge>
+                    </AppCardHeader>
+                    <AppCardContent className="p-0">
+                      <ScrollArea className="h-[400px] w-full p-6">
+                        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap italic">
+                          "{session.transcript}"
+                        </p>
+                      </ScrollArea>
+                    </AppCardContent>
+                  </AppCard>
+                )}
 
-          {session.timeline && (
-            <ClinicalTimelineCard timeline={session.timeline} />
-          )}
+                {session.timeline && (
+                  <ClinicalTimelineCard timeline={session.timeline} />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </PageContainer>
 
-          {(session.status === 'DRAFT_GENERATED' ||
-            session.status === 'EDITED' ||
-            session.status === 'APPROVED') && (
-              <AppCard>
-                <AppCardHeader>
-                  <AppCardTitle>SOAP Editor</AppCardTitle>
-                </AppCardHeader>
-                <AppCardContent>
-                  <SoapEditor
-                    draft={draft}
-                    onChange={setLocalDraft}
-                    onSave={() =>
-                      saveDraftMutation.mutate({
-                        sessionId: session.id,
-                        draft,
-                      })
-                    }
-                    onRegenerate={() =>
-                      regenerateMutation.mutate(session.id)
-                    }
-                    onApprove={() => approveMutation.mutate(session.id)}
-                    onShowHistory={() => setShowHistory(true)}
-                    isSaving={saveDraftMutation.isPending}
-                    isRegenerating={regenerateMutation.isPending}
-                    isApproving={approveMutation.isPending}
-                    canEdit={
-                      canEdit && !session.visitRecord?.isFinalized
-                    }
-                  />
-                  {session.status === 'APPROVED' &&
-                    session.patientSummary &&
-                    !session.patientSummaryPublished && (
-                      <div className="mt-4 border-t border-slate-200 pt-4">
-                        <AppButton
-                          variant="outline"
-                          size="sm"
-                          onClick={() => publishMutation.mutate(session.id)}
-                          disabled={publishMutation.isPending}
-                        >
-                          {publishMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Share2 className="mr-2 h-4 w-4" />
-                          )}
-                          Publish Summary to Patient
-                        </AppButton>
-                      </div>
-                    )}
-                  {session.status === 'APPROVED' && session.patientSummaryPublished && (
-                    <p className="mt-4 text-sm text-slate-600">
-                      Visit summary has been published to the patient.
-                    </p>
-                  )}
-                </AppCardContent>
-              </AppCard>
-            )}
-
-          <NoteHistoryModal
-            isOpen={showHistory}
-            onClose={() => setShowHistory(false)}
-            versions={visitWithHistory?.versions || []}
-          />
-        </>
-      )}
+      <NoteHistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        versions={visitWithHistory?.versions || []}
+      />
     </div>
+  );
+}
+
+export default function ProviderAIScribePage() {
+  return (
+    <React.Suspense fallback={null}>
+      <ProviderAIScribePageContent />
+    </React.Suspense>
   );
 }

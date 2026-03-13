@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listAuditLogs } from '@/lib/auditApi';
-import { AppPageHeader, AppCard, AppCardContent } from '@/components/ui-system';
+import { AppPageHeader, AppCard, AppCardContent, AppButton } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const LIMIT = 50;
@@ -41,7 +41,7 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title="Audit Logs"
         description="Review system activities and compliance events."
@@ -110,26 +110,26 @@ export default function AuditLogsPage() {
               Showing {offset + 1} to {Math.min(offset + LIMIT, total)} of {total} events
             </div>
             <div className="flex gap-2">
-              <Button
+              <AppButton
                 variant="outline"
                 size="sm"
                 onClick={handlePrev}
                 disabled={offset === 0}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-              </Button>
-              <Button
+              </AppButton>
+              <AppButton
                 variant="outline"
                 size="sm"
                 onClick={handleNext}
                 disabled={offset + LIMIT >= total}
               >
                 Next <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              </AppButton>
             </div>
           </div>
         </AppCardContent>
       </AppCard>
-    </div>
+    </PageContainer>
   );
 }

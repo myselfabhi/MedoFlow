@@ -1,6 +1,6 @@
 'use client';
 
-import { DashboardLayout, PageContainer } from '@/components/layout';
+import { DashboardLayout } from '@/components/layout';
 
 export default function DashboardLayoutWrapper({
   children,
@@ -9,7 +9,7 @@ export default function DashboardLayoutWrapper({
 }) {
   return (
     <DashboardLayout>
-      <PageContainer>{children}</PageContainer>
+      {children}
     </DashboardLayout>
   );
 }

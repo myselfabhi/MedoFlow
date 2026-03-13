@@ -30,6 +30,7 @@ import {
 } from '@/components/ui-system';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageContainer } from '@/components/layout';
 
 const ITEM_TYPE_OPTIONS = [
   { value: 'ALL', label: 'All invoice items' },
@@ -224,7 +225,7 @@ export default function CommissionsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title="Commissions"
         description={
@@ -631,6 +632,6 @@ export default function CommissionsPage() {
           </AppCard>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

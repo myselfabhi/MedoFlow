@@ -1,68 +1,112 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/button';
-import api from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { 
+  AppCard, 
+  AppCardContent, 
+  AppCardHeader, 
+  AppCardTitle, 
+  AppButton, 
+  AppPageHeader,
+  AppEmptyState
+} from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
+import { getProducts, type Product } from '@/lib/productApi';
+import { Plus, Package, ShoppingCart } from 'lucide-react';
+import { AddProductModal } from '@/components/products/AddProductModal';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await api.get('/products');
-      setProducts(res.data.data.products);
-    } catch (error) {
-      console.error('Failed to fetch products', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: getProducts,
+  });
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Products Catalog</h1>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add Product
-        </Button>
-      </div>
+    <PageContainer className="space-y-8">
+      <AppPageHeader 
+        title="Products Catalog" 
+        description="Manage clinical supplements, wellness products, and retail inventory."
+        actions={
+          <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full shadow-md px-6">
+            <Plus className="mr-2 h-4 w-4" /> Add Product
+          </AppButton>
+        }
+      />
 
       {isLoading ? (
-        <div>Loading...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+          <p className="text-sm font-medium text-destructive">
+            Failed to load product catalog. Please try again.
+          </p>
+        </div>
+      ) : products.length === 0 ? (
+        <AppEmptyState
+          title="No products yet"
+          description="Your clinical store is currently empty. Add your first product to start selling."
+          actionLabel="Add First Product"
+          onAction={() => setIsModalOpen(true)}
+          className="py-24"
+        />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <Card key={product.id}>
-              <CardHeader>
-                <CardTitle>{product.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {product.description || 'No description available.'}
-                </p>
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-lg">${Number(product.price).toFixed(2)}</span>
-                  <span className="text-sm">
-                    Stock: {product.inventoryItem?.quantityInStock || 0}
-                  </span>
+          {products.map((product: Product) => (
+            <AppCard key={product.id} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden">
+              <AppCardHeader className="bg-slate-50/50 border-b-0 py-6 px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <AppCardTitle className="text-lg font-bold text-slate-900 leading-tight">
+                    {product.name}
+                  </AppCardTitle>
+                  <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+                    <Package className="h-4 w-4 text-primary-600" />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </AppCardHeader>
+              <AppCardContent className="p-6">
+                <p className="text-sm text-slate-500 line-clamp-3 mb-6 min-h-[3rem]">
+                  {product.description || 'No clinical description available.'}
+                </p>
+                <div className="flex justify-between items-end border-t border-slate-100 pt-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Price</p>
+                    <span className="font-black text-2xl text-slate-900">${Number(product.price).toFixed(2)}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Availability</p>
+                    <span className={cn(
+                      "text-xs font-bold px-2.5 py-1 rounded-lg",
+                      (product.inventoryItem?.quantityInStock ?? 0) > 0 
+                        ? "bg-emerald-50 text-emerald-700" 
+                        : "bg-rose-50 text-rose-700"
+                    )}>
+                      {product.inventoryItem?.quantityInStock ?? 0} in stock
+                    </span>
+                  </div>
+                </div>
+              </AppCardContent>
+            </AppCard>
           ))}
-          {products.length === 0 && (
-            <div className="col-span-full text-center text-muted-foreground py-10">
-              No products found. Add one to get started.
-            </div>
-          )}
         </div>
       )}
-    </div>
+
+      <AddProductModal 
+        open={isModalOpen} 
+        onOpenChange={setIsModalOpen} 
+      />
+    </PageContainer>
   );
+}
+
+// Helper for conditional classes
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
 }

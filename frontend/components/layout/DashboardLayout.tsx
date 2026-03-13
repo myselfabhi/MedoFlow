@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from './AppSidebar';
-import { AppNavbar } from './AppNavbar';
 import { cn } from '@/lib/utils';
 
 export interface DashboardLayoutProps {
@@ -69,11 +68,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       <AppSidebar />
-      <div className="pl-[240px]">
-        <AppNavbar />
-        <main>{children}</main>
+      <div className="ml-[280px] relative">
+        <main className="min-h-screen">{children}</main>
       </div>
     </div>
   );

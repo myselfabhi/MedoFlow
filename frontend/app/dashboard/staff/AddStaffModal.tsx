@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { AppButton, AppInput } from '@/components/ui-system';
 import {
   Dialog,
   DialogContent,
@@ -170,14 +169,14 @@ export function AddStaffModal({ open, onOpenChange }: any) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Email</label>
-            <Input {...register('email')} placeholder="email@clinic.com" />
+            <AppInput {...register('email')} placeholder="email@clinic.com" />
             {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
           </div>
 
           {role === 'FRONT_DESK' ? (
             <div className="space-y-2">
               <label className="text-sm font-medium">Full Name</label>
-              <Input {...register('name')} placeholder="Jamie Rivera" />
+              <AppInput {...register('name')} placeholder="Jamie Rivera" />
               {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
             </div>
           ) : (
@@ -185,12 +184,12 @@ export function AddStaffModal({ open, onOpenChange }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">First Name</label>
-                  <Input {...register('firstName')} placeholder="Jamie" />
+                  <AppInput {...register('firstName')} placeholder="Jamie" />
                   {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Last Name</label>
-                  <Input {...register('lastName')} placeholder="Rivera" />
+                  <AppInput {...register('lastName')} placeholder="Rivera" />
                   {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message}</p>}
                 </div>
               </div>
@@ -256,10 +255,10 @@ export function AddStaffModal({ open, onOpenChange }: any) {
           )}
 
           <div className="flex justify-end gap-3 pt-4 border-t mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={inviteMutation.isPending || (role === 'PROVIDER' && disciplines.length === 0)}>
+            <AppButton type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</AppButton>
+            <AppButton type="submit" disabled={inviteMutation.isPending || (role === 'PROVIDER' && disciplines.length === 0)}>
               {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
-            </Button>
+            </AppButton>
           </div>
         </form>
       </DialogContent>

@@ -23,23 +23,39 @@ import {
   AppPageHeader,
   AppEmptyState,
   AppModal,
+  KPIStatCard,
+  AppTable,
+  AppInput
 } from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { useAppToast } from '@/hooks/useAppToast';
+import { 
+  DollarSign, 
+  CreditCard, 
+  Activity, 
+  Search, 
+  Filter, 
+  Calendar, 
+  History, 
+  ArrowRight,
+  ShoppingCart,
+  Plus,
+  X
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PageContainer } from '@/components/layout';
 
 const DOC_STATUS_OPTIONS = [
-  { value: 'ALL', label: 'All documents' },
+  { value: 'ALL', label: 'All Documents' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'FINALIZED', label: 'Finalized' },
-  { value: 'PAID', label: 'Paid document' },
+  { value: 'PAID', label: 'Paid' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
 const FINANCE_STATUS_OPTIONS = [
-  { value: 'ALL', label: 'All balances' },
+  { value: 'ALL', label: 'All Balances' },
   { value: 'UNPAID', label: 'Unpaid' },
   { value: 'PARTIALLY_PAID', label: 'Partially paid' },
   { value: 'PAID', label: 'Paid' },
@@ -50,13 +66,13 @@ const FINANCE_STATUS_OPTIONS = [
 const MANUAL_PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'CHECK', label: 'Check' },
-  { value: 'CARD_PRESENT', label: 'Card (manually recorded — no terminal)' },
+  { value: 'CARD_PRESENT', label: 'Card (Manual)' },
   { value: 'BANK_TRANSFER', label: 'Bank transfer' },
   { value: 'OTHER', label: 'Other' },
 ];
 
 function formatCurrency(amount?: string | number | null) {
-  return `$${Number(amount ?? 0).toFixed(2)}`;
+  return `$${Number(amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(iso?: string | null) {
@@ -86,10 +102,12 @@ export default function FrontDeskInvoicesPage() {
   const [providerFilter, setProviderFilter] = React.useState('ALL');
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
+  
   const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState('CASH');
   const [paymentAmount, setPaymentAmount] = React.useState('');
   const [paymentNotes, setPaymentNotes] = React.useState('');
+  
   const [refundInvoice, setRefundInvoice] = React.useState<Invoice | null>(null);
   const [refundPaymentId, setRefundPaymentId] = React.useState('');
   const [refundAmount, setRefundAmount] = React.useState('');
@@ -148,8 +166,7 @@ export default function FrontDeskInvoicesPage() {
       setPaymentAmount('');
       setPaymentNotes('');
     },
-    onError: (error: any) =>
-      toast.error(error?.response?.data?.message || 'Failed to record manual payment'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Failed to record payment'),
   });
 
   const refundMutation = useMutation({
@@ -164,8 +181,7 @@ export default function FrontDeskInvoicesPage() {
       setRefundPaymentId('');
       setRefundAmount('');
     },
-    onError: (error: any) =>
-      toast.error(error?.response?.data?.message || 'Failed to refund payment'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Failed to refund'),
   });
 
   const eligibleRefundPayments = React.useMemo(() => {
@@ -183,28 +199,11 @@ export default function FrontDeskInvoicesPage() {
     }
   }, [eligibleRefundPayments, refundInvoice, refundPaymentId]);
 
-  if (!isAllowed) {
-    return null;
-  }
-
-  if (!clinicId) {
-    return (
-      <div className="space-y-6">
-        <AppPageHeader title="Billing Operations" description="Front-desk billing and AR" />
-        <AppEmptyState
-          title="No clinic assigned"
-          description="You are not assigned to a clinic. Contact your administrator."
-        />
-      </div>
-    );
-  }
+  if (!isAllowed || !clinicId) return null;
 
   const submitManualPayment = () => {
     if (!paymentInvoice) return;
-    const amount =
-      paymentAmount.trim().length > 0
-        ? Number(paymentAmount)
-        : Number(paymentInvoice.outstandingAmount);
+    const amount = paymentAmount.trim().length > 0 ? Number(paymentAmount) : Number(paymentInvoice.outstandingAmount);
     collectMutation.mutate({
       invoiceId: paymentInvoice.id,
       amount,
@@ -225,341 +224,196 @@ export default function FrontDeskInvoicesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title="Billing Operations"
-        description="Outstanding balances, invoice collection, and refunds"
+        description="Monitor clinic revenue, collect outstanding balances, and manage refunds."
+        actions={
+          <AppButton asChild className="rounded-full px-6 shadow-md">
+            <Link href="/dashboard/front-desk/pos">
+              <ShoppingCart className="mr-2 h-4 w-4" /> New Checkout
+            </Link>
+          </AppButton>
+        }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Outstanding AR</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-3xl font-bold text-slate-900">
-              {formatCurrency(receivables?.totalOutstandingAmount)}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {receivables?.outstandingInvoiceCount ?? 0} invoices still need collection
-            </p>
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Partial States</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent className="space-y-2 text-sm text-slate-700">
-            <div>Partially paid: {receivables?.partiallyPaidCount ?? 0}</div>
-            <div>Partially refunded: {receivables?.partiallyRefundedCount ?? 0}</div>
-            <div>Refunded: {receivables?.refundedCount ?? 0}</div>
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Quick Actions</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent className="space-y-3">
-            <AppButton asChild className="w-full">
-              <Link href="/dashboard/front-desk/pos">Open front-desk checkout</Link>
-            </AppButton>
-            <div className="text-sm text-slate-600">
-              Use checkout for new walk-in invoices. Use the table below for collection and refunds on existing invoices.
-            </div>
-          </AppCardContent>
-        </AppCard>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <KPIStatCard 
+          label="Outstanding AR"
+          value={formatCurrency(receivables?.totalOutstandingAmount)}
+          icon={CreditCard}
+          iconClassName="text-amber-600 bg-amber-50"
+          description={`${receivables?.outstandingInvoiceCount ?? 0} unpaid invoices`}
+        />
+        <KPIStatCard 
+          label="Total Collected"
+          value={formatCurrency(financeSummary?.totalCollected)}
+          icon={DollarSign}
+          iconClassName="text-emerald-600 bg-emerald-50"
+          description="In selected period"
+        />
+        <KPIStatCard 
+          label="Total Refunds"
+          value={formatCurrency(financeSummary?.totalRefunded)}
+          icon={History}
+          iconClassName="text-rose-600 bg-rose-50"
+        />
+        <KPIStatCard 
+          label="Net Billed"
+          value={formatCurrency(financeSummary?.totalInvoiced)}
+          icon={Activity}
+          iconClassName="text-blue-600 bg-blue-50"
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Total Invoiced</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-bold text-slate-900">
-              {formatCurrency(financeSummary?.totalInvoiced)}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {financeSummary?.invoiceCount ?? 0} invoices in the current filter
-            </p>
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Collected</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-bold text-emerald-700">
-              {formatCurrency(financeSummary?.totalCollected)}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Paid states: {financeSummary?.paidCount ?? 0} paid, {financeSummary?.partiallyPaidCount ?? 0} partial
-            </p>
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Refunded</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-bold text-slate-900">
-              {formatCurrency(financeSummary?.totalRefunded)}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {financeSummary?.partiallyRefundedCount ?? 0} partial, {financeSummary?.refundedCount ?? 0} full
-            </p>
-          </AppCardContent>
-        </AppCard>
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Open Balances</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent>
-            <div className="text-2xl font-bold text-amber-700">
-              {formatCurrency(financeSummary?.totalOutstanding)}
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {financeSummary?.unpaidCount ?? 0} unpaid, {financeSummary?.partiallyPaidCount ?? 0} partially paid
-            </p>
-          </AppCardContent>
-        </AppCard>
-      </div>
-
-      <AppCard>
-        <AppCardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <AppCardTitle>Invoices</AppCardTitle>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Select value={providerFilter} onValueChange={setProviderFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All providers</SelectItem>
-                  {providers.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.firstName} {provider.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={docStatusFilter} onValueChange={setDocStatusFilter}>
-                <SelectTrigger className="w-[190px]">
-                  <SelectValue placeholder="Document status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOC_STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={financeStatusFilter} onValueChange={setFinanceStatusFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Financial status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FINANCE_STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-              <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+      <AppCard className="border-none shadow-sm overflow-hidden bg-white">
+        <AppCardHeader className="bg-slate-50/50 border-b-0 py-6 px-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <AppCardTitle className="text-lg font-bold">Clinical Ledger</AppCardTitle>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={providerFilter} onValueChange={setProviderFilter}>
+              <SelectTrigger className="w-44 h-10 rounded-xl bg-white border-slate-200">
+                <SelectValue placeholder="Provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Providers</SelectItem>
+                {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.lastName}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={financeStatusFilter} onValueChange={setFinanceStatusFilter}>
+              <SelectTrigger className="w-44 h-10 rounded-xl bg-white border-slate-200">
+                <SelectValue placeholder="Balance" />
+              </SelectTrigger>
+              <SelectContent>
+                {FINANCE_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm h-10 items-center">
+              <div className="pl-2 pr-1 text-slate-400">
+                <Calendar className="h-3.5 w-3.5" />
+              </div>
+              <AppInput 
+                type="date" 
+                className="border-none bg-transparent h-8 text-xs font-bold text-slate-700 focus-visible:ring-0 w-32 px-1" 
+                value={dateFrom} 
+                onChange={e => setDateFrom(e.target.value)} 
+              />
+              <div className="px-1 text-slate-300 font-bold">|</div>
+              <AppInput 
+                type="date" 
+                className="border-none bg-transparent h-8 text-xs font-bold text-slate-700 focus-visible:ring-0 w-32 px-1" 
+                value={dateTo} 
+                onChange={e => setDateTo(e.target.value)} 
+              />
             </div>
           </div>
         </AppCardHeader>
-        <AppCardContent>
-          {isLoading ? (
-            <div className="flex min-h-[240px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
-            </div>
-          ) : invoices.length === 0 ? (
-            <AppEmptyState
-              title="No invoices found"
-              description="Create a front-desk checkout or finalize appointment invoices to see them here."
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-200/80 hover:bg-transparent">
-                    <TableHead>Patient</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Appt Date</TableHead>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Finance</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Refunded</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead>History</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.patient?.name ?? '—'}</TableCell>
-                      <TableCell>
-                        {invoice.provider
-                          ? `${invoice.provider.firstName} ${invoice.provider.lastName}`
-                          : 'Walk-in / non-provider'}
-                      </TableCell>
-                      <TableCell>{formatDate(invoice.appointment?.startTime)}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={invoice.status} variant="invoice" />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={invoice.financialStatus} variant="invoice" />
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.totalAmount)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.totalPaid)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.totalRefunded)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.outstandingAmount)}</TableCell>
-                      <TableCell className="max-w-[280px]">
-                        <div className="space-y-1 text-xs text-slate-600">
-                          {(invoice.payments ?? []).length === 0 ? (
-                            <span>No payments recorded</span>
-                          ) : (
-                            (invoice.payments ?? []).map((payment) => (
-                              <div key={payment.id}>
-                                {formatCurrency(payment.amount)} • {payment.paymentChannel === 'MANUAL' ? 'Manual/offline' : payment.paymentChannel ?? 'Stripe/online'}
-                                {payment.paymentMethod ? ` • ${payment.paymentMethod}` : ''}
-                                {payment.refundForPaymentId ? ' • refund entry' : ''}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {Number(invoice.outstandingAmount) > 0 && invoice.status !== 'DRAFT' && invoice.status !== 'CANCELLED' && (
-                            <AppButton size="sm" onClick={() => setPaymentInvoice(invoice)}>
-                              Collect
-                            </AppButton>
-                          )}
-                          {(invoice.payments ?? []).some(
-                            (payment) =>
-                              Number(payment.amount) > 0 &&
-                              refundableRemaining(payment, invoice.payments ?? []) > 0
-                          ) && (
-                            <AppButton size="sm" variant="outline" onClick={() => setRefundInvoice(invoice)}>
-                              Refund
-                            </AppButton>
-                          )}
-                          {invoice.status === 'DRAFT' && invoice.appointmentId && (
-                            <AppButton size="sm" variant="outline" asChild>
-                              <Link href={`/dashboard/provider/appointments/${invoice.appointmentId}`}>
-                                Open
-                              </Link>
-                            </AppButton>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+        <AppCardContent className="p-0">
+          <AppTable
+            columns={[
+              { 
+                key: 'patient', 
+                header: 'Patient', 
+                render: (i) => (
+                  <div>
+                    <p className="font-bold text-slate-900">{i.patient?.name ?? '—'}</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter mt-0.5">Inv: {i.id.slice(-6).toUpperCase()}</p>
+                  </div>
+                ) 
+              },
+              { 
+                key: 'finance', 
+                header: 'Status', 
+                render: (i) => (
+                  <div className="flex flex-col gap-1">
+                    <StatusBadge status={i.status} variant="invoice" />
+                    <StatusBadge status={i.financialStatus} variant="invoice" className="bg-transparent border-slate-100 text-[10px]" />
+                  </div>
+                ) 
+              },
+              { 
+                key: 'amounts', 
+                header: 'Amounts', 
+                className: 'text-right',
+                render: (i) => (
+                  <div className="text-right">
+                    <p className="text-sm font-black text-slate-900">{formatCurrency(i.totalAmount)}</p>
+                    <p className="text-[10px] text-emerald-600 font-bold">Paid: {formatCurrency(i.totalPaid)}</p>
+                  </div>
+                ) 
+              },
+              {
+                key: 'outstanding',
+                header: 'Balance',
+                className: 'text-right',
+                render: (i) => (
+                  <span className={cn(
+                    "font-black",
+                    Number(i.outstandingAmount) > 0 ? "text-amber-600" : "text-slate-400"
+                  )}>
+                    {formatCurrency(i.outstandingAmount)}
+                  </span>
+                )
+              },
+              {
+                key: 'actions',
+                header: '',
+                className: 'text-right',
+                render: (i) => (
+                  <div className="flex justify-end gap-2 pr-4">
+                    {Number(i.outstandingAmount) > 0 && i.status !== 'DRAFT' && i.status !== 'CANCELLED' && (
+                      <AppButton size="sm" className="rounded-full shadow-md" onClick={() => setPaymentInvoice(i)}>
+                        Collect
+                      </AppButton>
+                    )}
+                    <AppButton variant="ghost" size="sm" className="rounded-full" asChild>
+                      <Link href={`/dashboard/front-desk/invoices/${i.id}`}>Review</Link>
+                    </AppButton>
+                  </div>
+                )
+              }
+            ]}
+            data={invoices}
+            keyExtractor={(i) => i.id}
+          />
         </AppCardContent>
       </AppCard>
 
+      {/* Modals for Payment and Refund */}
       <AppModal
         open={Boolean(paymentInvoice)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPaymentInvoice(null);
-            setPaymentAmount('');
-            setPaymentNotes('');
-          }
-        }}
-        title="Record Manual Payment"
-        description={
-          paymentInvoice
-            ? `Outstanding balance: ${formatCurrency(paymentInvoice.outstandingAmount)}`
-            : undefined
-        }
+        onOpenChange={(open) => !open && setPaymentInvoice(null)}
+        title="Collect Payment"
+        description={paymentInvoice ? `Recording manual payment for ${paymentInvoice.patient?.name}. Balance: ${formatCurrency(paymentInvoice.outstandingAmount)}` : ''}
         primaryAction={{
-          label: collectMutation.isPending ? 'Recording...' : 'Record Payment',
+          label: collectMutation.isPending ? 'Processing...' : 'Confirm Payment',
           onClick: submitManualPayment,
           disabled: collectMutation.isPending,
         }}
         content={
-          <div className="space-y-4">
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-              <SelectTrigger>
-                <SelectValue placeholder="Payment method" />
-              </SelectTrigger>
-              <SelectContent>
-                {MANUAL_PAYMENT_METHODS.map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    {method.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              value={paymentAmount}
-              onChange={(event) => setPaymentAmount(event.target.value)}
-              placeholder="Amount (leave blank for full outstanding)"
-              inputMode="decimal"
-            />
-            <Input
-              value={paymentNotes}
-              onChange={(event) => setPaymentNotes(event.target.value)}
-              placeholder="Optional notes"
-            />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400">Payment Method</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="h-12 rounded-2xl">
+                  <SelectValue placeholder="Select Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MANUAL_PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400">Amount ($)</label>
+              <AppInput 
+                value={paymentAmount} 
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentAmount(e.target.value)} 
+                placeholder="Leave blank for full balance"
+                className="h-12 rounded-2xl"
+              />
+            </div>
           </div>
         }
       />
-
-      <AppModal
-        open={Boolean(refundInvoice)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRefundInvoice(null);
-            setRefundPaymentId('');
-            setRefundAmount('');
-          }
-        }}
-        title="Refund Payment"
-        description="Choose a recorded payment and optionally enter a partial refund amount."
-        primaryAction={{
-          label: refundMutation.isPending ? 'Refunding...' : 'Refund Payment',
-          onClick: submitRefund,
-          disabled: refundMutation.isPending,
-        }}
-        content={
-          <div className="space-y-4">
-            <Select value={refundPaymentId} onValueChange={setRefundPaymentId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select payment" />
-              </SelectTrigger>
-              <SelectContent>
-                {eligibleRefundPayments.map((payment) => (
-                  <SelectItem key={payment.id} value={payment.id}>
-                    {formatCurrency(payment.amount)} • {payment.paymentMethod ?? payment.paymentChannel ?? 'Payment'} • refundable {formatCurrency(refundableRemaining(payment, refundInvoice?.payments ?? []))}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              value={refundAmount}
-              onChange={(event) => setRefundAmount(event.target.value)}
-              placeholder="Refund amount (leave blank for full remaining refundable)"
-              inputMode="decimal"
-            />
-            <p className="text-sm text-slate-600">
-              Partial refunds are only supported on flows where proportional side-effect reversal is safe.
-            </p>
-          </div>
-        }
-      />
-    </div>
+    </PageContainer>
   );
 }

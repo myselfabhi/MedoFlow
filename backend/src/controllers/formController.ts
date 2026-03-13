@@ -122,9 +122,11 @@ export const getResponsesByPatient = asyncHandler(
       err.code = 'validation_error';
       throw err;
     }
+    const isStaff = req.user!.role === 'SUPER_ADMIN' || req.user!.role === 'FRONT_DESK' || req.user!.role === 'PROVIDER';
     const responses = await formService.getResponsesByPatient(
       clinicId,
-      patientId
+      patientId,
+      isStaff
     );
     successResponse(res, 200, 'Responses retrieved', { responses });
   }

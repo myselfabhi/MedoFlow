@@ -34,6 +34,7 @@ import {
   AppBadge,
   AppTable,
 } from '@/components/ui-system';
+import { PageContainer } from '@/components/layout';
 import {
   Dialog,
   DialogContent,
@@ -502,7 +503,7 @@ export default function FormsPage() {
     });
 
   return (
-    <div className="space-y-6">
+    <PageContainer className="space-y-8">
       <AppPageHeader
         title="Form Templates"
         description="Manage intake and visit forms shown to patients."
@@ -512,42 +513,45 @@ export default function FormsPage() {
               setEditingTemplate(null);
               setDialogOpen(true);
             }}
+            className="rounded-full shadow-md px-6"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 mr-2" />
             New Template
           </AppButton>
         }
       />
 
-      <AppCard>
-        <AppCardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">All Templates</h2>
+      <AppCard className="border-none shadow-sm overflow-hidden">
+        <AppCardHeader className="bg-slate-50/50 border-b-0 py-6 px-8">
+          <h2 className="text-lg font-bold text-slate-900">All Templates</h2>
         </AppCardHeader>
-        <AppCardContent>
+        <AppCardContent className="p-0">
           {isLoading && (
-            <div className="space-y-3">
+            <div className="p-8 space-y-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-10 w-full rounded-xl" />
               ))}
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
+            <div className="m-8 rounded-2xl border border-danger/20 bg-danger/5 p-6 text-sm text-danger">
               Failed to load templates. Please try again.
             </div>
           )}
 
           {!isLoading && !error && (!templates || templates.length === 0) && (
-            <AppEmptyState
-              title="No form templates yet"
-              description="Create a template to collect patient information before or after appointments."
-              actionLabel="New Template"
-              onAction={() => {
-                setEditingTemplate(null);
-                setDialogOpen(true);
-              }}
-            />
+            <div className="p-12">
+              <AppEmptyState
+                title="No form templates yet"
+                description="Create a template to collect patient information before or after appointments."
+                actionLabel="New Template"
+                onAction={() => {
+                  setEditingTemplate(null);
+                  setDialogOpen(true);
+                }}
+              />
+            </div>
           )}
 
           {!isLoading && !error && templates && templates.length > 0 && (
@@ -557,22 +561,22 @@ export default function FormsPage() {
                   key: 'name',
                   header: 'Name',
                   render: (t) => (
-                    <span className="font-medium text-slate-900">{t.name}</span>
+                    <span className="font-bold text-slate-900">{t.name}</span>
                   ),
                 },
                 {
                   key: 'scope',
                   header: 'Scope',
                   render: (t) => (
-                    <div className="flex flex-col gap-0.5">
-                      <AppBadge variant="secondary">
+                    <div className="flex flex-col gap-1">
+                      <AppBadge variant="secondary" className="w-fit">
                         {SCOPE_LABELS[t.scope] ?? t.scope}
                       </AppBadge>
                       {t.discipline && (
-                        <span className="text-xs text-slate-500">{t.discipline.name}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t.discipline.name}</span>
                       )}
                       {t.service && (
-                        <span className="text-xs text-slate-500">{t.service.name}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t.service.name}</span>
                       )}
                     </div>
                   ),
@@ -581,33 +585,34 @@ export default function FormsPage() {
                   key: 'fields',
                   header: 'Fields',
                   render: (t) => (
-                    <span className="text-slate-600">{t.fields.length} field{t.fields.length !== 1 ? 's' : ''}</span>
+                    <span className="text-slate-600 font-medium">{t.fields.length} field{t.fields.length !== 1 ? 's' : ''}</span>
                   ),
                 },
                 {
                   key: 'created',
                   header: 'Created',
                   render: (t) => (
-                    <span className="text-slate-600">{formatDate(t.createdAt)}</span>
+                    <span className="text-slate-500 text-xs font-medium">{formatDate(t.createdAt)}</span>
                   ),
                 },
                 {
                   key: 'actions',
-                  header: 'Actions',
+                  header: '',
                   className: 'text-right',
                   render: (t) => (
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 pr-4">
                       <AppButton
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(t)}
+                        className="rounded-full font-bold"
                       >
                         Edit
                       </AppButton>
                       <AppButton
                         variant="ghost"
                         size="sm"
-                        className="text-danger hover:bg-danger/10"
+                        className="text-danger hover:bg-danger/10 rounded-full font-bold"
                         onClick={() => handleDisable(t.id, t.name)}
                         disabled={disableMutation.isPending}
                       >
@@ -632,6 +637,6 @@ export default function FormsPage() {
         }}
         editing={editingTemplate}
       />
-    </div>
+    </PageContainer>
   );
 }

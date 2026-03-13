@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import {
   Sheet,
   SheetContent,
@@ -17,8 +18,11 @@ import {
 } from '@/lib/patientTimelineApi';
 import { getPlansByPatient } from '@/lib/treatmentPlanApi';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/badge';
+import {
+  AppCard,
+  AppCardContent,
+  AppBadge,
+} from '@/components/ui-system';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { PatientFilesSection } from '@/components/PatientFilesSection';
 import { format } from 'date-fns';
@@ -60,9 +64,9 @@ function TimelineTab({ patientId, clinicId }: { patientId: string; clinicId?: st
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
       </div>
     );
   }
@@ -101,32 +105,32 @@ function TimelineTab({ patientId, clinicId }: { patientId: string; clinicId?: st
   items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pr-2">
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No timeline events yet.</p>
+        <p className="text-sm text-muted-foreground text-center py-8 italic">No timeline events yet.</p>
       ) : (
         items.map((item, i) => (
-          <Card key={`${item.type}-${item.id ?? i}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <Badge variant="outline" className="mb-1 text-xs">
+          <AppCard key={`${item.type}-${item.id ?? i}`} className="border-none shadow-sm hover:shadow-md transition-shadow">
+            <AppCardContent className="p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <AppBadge variant="secondary" className="mb-2 text-[10px] uppercase font-black tracking-widest">
                     {item.type}
-                  </Badge>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                  </AppBadge>
+                  <p className="font-bold text-slate-900 truncate">{item.title}</p>
+                  <p className="text-xs font-medium text-slate-400 mt-1">{formatDate(item.date)}</p>
                 </div>
                 {item.id && item.type === 'Appointment' && (
-                  <a
+                  <Link
                     href={`/dashboard/provider/appointments/${item.id}`}
-                    className="text-xs text-primary-600 hover:underline"
+                    className="text-xs font-black text-primary-600 hover:text-primary-700 uppercase tracking-tighter shrink-0"
                   >
                     View
-                  </a>
+                  </Link>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </AppCardContent>
+          </AppCard>
         ))
       )}
     </div>
@@ -143,31 +147,31 @@ function TreatmentPlansTab({ patientId }: { patientId: string }) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pr-2">
       {plans.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No treatment plans yet.</p>
+        <p className="text-sm text-muted-foreground text-center py-8 italic">No treatment plans yet.</p>
       ) : (
         plans.map((plan) => (
-          <Card key={plan.id}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium">{plan.name}</p>
-                  <p className="text-xs text-muted-foreground">
+          <AppCard key={plan.id} className="border-none shadow-sm">
+            <AppCardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-900 truncate">{plan.name}</p>
+                  <p className="text-xs font-medium text-slate-500 mt-1">
                     {plan.discipline.name} · {plan.sessionsCompleted}/{plan.totalSessions} sessions
                   </p>
                 </div>
-                <StatusBadge status={plan.status} variant="treatmentPlan" />
+                <StatusBadge status={plan.status} variant="treatmentPlan" className="shrink-0" />
               </div>
-            </CardContent>
-          </Card>
+            </AppCardContent>
+          </AppCard>
         ))
       )}
     </div>
@@ -187,10 +191,25 @@ export function PatientRecordSheet({
           <SheetTitle>Patient Record</SheetTitle>
         </SheetHeader>
         <Tabs defaultValue="timeline" className="mt-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="plans">Plans</TabsTrigger>
-            <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 bg-slate-100 p-1 rounded-2xl h-12">
+            <TabsTrigger 
+              value="timeline" 
+              className="rounded-xl font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
+            >
+              Timeline
+            </TabsTrigger>
+            <TabsTrigger 
+              value="plans" 
+              className="rounded-xl font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
+            >
+              Plans
+            </TabsTrigger>
+            <TabsTrigger 
+              value="files" 
+              className="rounded-xl font-bold text-sm data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
+            >
+              Files
+            </TabsTrigger>
           </TabsList>
           <ScrollArea className="h-[calc(100vh-12rem)] mt-4">
             <TabsContent value="timeline" className="mt-0">
