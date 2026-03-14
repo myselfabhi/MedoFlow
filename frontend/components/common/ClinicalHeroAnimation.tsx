@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { 
   FileText, 
   Calendar, 
@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export function ClinicalHeroAnimation() {
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -24,7 +24,7 @@ export function ClinicalHeroAnimation() {
     },
   };
 
-  const floatingVariants = {
+  const floatingVariants: Variants = {
     animate: (i: number) => ({
       y: [0, -15, 0],
       transition: {
@@ -35,7 +35,7 @@ export function ClinicalHeroAnimation() {
     }),
   };
 
-  const cardVariants = {
+  const cardVariants: Variants = {
     hidden: { opacity: 0, scale: 0.8, y: 20 },
     visible: { opacity: 1, scale: 1, y: 0 },
   };

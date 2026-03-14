@@ -250,8 +250,8 @@ function BookingPageContent() {
   const nextStep = () => setStep(s => Math.min(s + 1, 3));
   const prevStep = () => setStep(s => Math.max(s - 1, 0));
 
-  const formatTime = (d: string) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const formatTime = (d: string | Date) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const formatDate = (d: string | Date) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   if (!clinicId) {
     return (
