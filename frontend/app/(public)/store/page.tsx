@@ -13,12 +13,14 @@ import {
 } from '@/components/ui-system';
 import { getClinics, getPublicClinicProducts, getPublicClinicPackages, getPublicClinicMemberships } from '@/lib/clinicApi';
 import api from '@/lib/api';
-import { ShoppingCart, Package, Tags, ShoppingBag, CheckCircle2, Star, ShieldCheck } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { ShoppingCart, Package, Tags, ShoppingBag, CheckCircle2, Star, ShieldCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 function StorefrontPageContent() {
+  const { user, isAuthenticated } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const tab = searchParams.get('tab') || 'products';
@@ -56,6 +58,12 @@ function StorefrontPageContent() {
   }, []);
 
   const addToCart = async (item: any, type: string) => {
+    if (!isAuthenticated) {
+      toast.error('Please login to add items to your cart');
+      router.push('/login?returnUrl=/store');
+      return;
+    }
+
     try {
       await api.post('/carts/items', {
         itemType: type,
@@ -65,8 +73,7 @@ function StorefrontPageContent() {
       toast.success(`Added ${item.name} to cart`);
     } catch (error) {
       console.error('Failed to add to cart', error);
-      toast.error('Please login to add items to your cart');
-      router.push('/login?returnUrl=/store');
+      toast.error('Could not add item to cart. Please try again.');
     }
   };
 
@@ -74,12 +81,17 @@ function StorefrontPageContent() {
     <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 space-y-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
+          {isAuthenticated && (
+            <div className="flex items-center gap-2 text-primary-600 font-bold text-sm uppercase tracking-widest mb-2">
+              <User className="h-4 w-4" /> Welcome back, {user?.name.split(' ')[0]}
+            </div>
+          )}
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">Clinic Store</h1>
           <p className="text-lg text-slate-500 max-w-2xl">
             Curated health products and wellness plans designed to support your clinical journey.
           </p>
         </div>
-        <AppButton asChild variant="outline" className="rounded-full h-12 px-6">
+        <AppButton asChild variant="outline" className="rounded-full h-12 px-6 border-slate-200">
           <Link href="/checkout">
             <ShoppingCart className="mr-2 h-5 w-5" /> View Cart
           </Link>

@@ -1,7 +1,13 @@
+'use client';
+
 import Link from 'next/link';
 import { AppButton } from '@/components/ui-system';
+import { useAuth } from '@/contexts/AuthContext';
+import { ShoppingCart, LayoutDashboard, LogIn } from 'lucide-react';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-md">
@@ -29,11 +35,25 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2">
-              Login
-            </Link>
+            {!isLoading && isAuthenticated ? (
+              <div className="flex items-center gap-4">
+                <span className="hidden sm:inline text-sm font-medium text-slate-500">
+                  Welcome, <span className="text-slate-900">{user?.name.split(' ')[0]}</span>
+                </span>
+                <AppButton asChild variant="ghost" size="sm" className="rounded-full text-slate-600">
+                  <Link href="/dashboard">
+                    <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard
+                  </Link>
+                </AppButton>
+              </div>
+            ) : (
+              <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-2 flex items-center gap-2">
+                <LogIn className="h-4 w-4" /> Login
+              </Link>
+            )}
+            
             <AppButton asChild size="sm" className="rounded-full px-5">
-              <Link href="/#book">
+              <Link href="/store">
                 Book Appointment
               </Link>
             </AppButton>

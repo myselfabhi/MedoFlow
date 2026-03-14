@@ -68,27 +68,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (!isProtectedRoute(pathname)) {
-      setIsLoading(false);
-      return;
-    }
-    if (user && getAccessToken()) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    const restoreSession = async () => {
+    const initAuth = async () => {
+      // If we already have a user in state, just finish loading
+      if (user) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const restoredUser = await getCurrentUser();
-        if (!restoredUser) {
-          clearAccessToken();
+        // If on a protected route and no user found, redirect
+        if (!restoredUser && isProtectedRoute(pathname)) {
+          router.push('/login');
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        if (isProtectedRoute(pathname)) {
+          router.push('/login');
         }
       } finally {
         setIsLoading(false);
       }
     };
-    restoreSession();
-  }, [pathname, getCurrentUser, user]);
+
+    initAuth();
+    // We want to run this when the app mounts and when pathname changes 
+    // to enforce protection, but getCurrentUser is memoized.
+  }, [pathname, getCurrentUser, router]);
 
   const value: AuthContextType = {
     user,
