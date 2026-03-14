@@ -42,7 +42,7 @@ export function ClinicalHeroAnimation() {
 
   return (
     <motion.div 
-      className="relative w-full h-full flex items-center justify-center p-8"
+      className="relative w-full h-full flex items-center justify-center"
       variants={containerVariants}
       initial="hidden"
       animate="visible"

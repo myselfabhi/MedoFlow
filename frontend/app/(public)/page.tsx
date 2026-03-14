@@ -83,38 +83,38 @@ export default function PublicHomePage() {
   return (
     <div className="flex flex-col gap-0">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-slate-50 py-20 lg:py-32">
+      <section className="relative overflow-hidden bg-slate-50 py-10 lg:py-16">
         <div className="container relative z-10 mx-auto px-4 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
+          <div className="flex flex-col lg:flex-row items-center gap-8">
             <motion.div 
-              className="flex-1 text-center lg:text-left space-y-8"
+              className="flex-1 text-center lg:text-left space-y-5"
               initial="hidden"
               animate="visible"
               variants={staggerContainer}
             >
-              <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-xs font-bold uppercase tracking-wider">
+              <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-[10px] font-bold uppercase tracking-wider">
                 <Star className="h-3 w-3 fill-current" />
                 Premium Self-Pay Care
               </motion.div>
-              <motion.h1 variants={fadeUp} className="text-5xl lg:text-7xl font-black tracking-tight text-slate-900 leading-[1.1]">
+              <motion.h1 variants={fadeUp} className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 leading-[1.1]">
                 Better care through <span className="text-primary-600">better operations.</span>
               </motion.h1>
-              <motion.p variants={fadeUp} className="text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
+              <motion.p variants={fadeUp} className="text-base lg:text-lg text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
                 Experience a new standard of healthcare. Direct, transparent, and focused on your outcomes. No insurance complexity, just pure care.
               </motion.p>
               <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                <AppButton size="lg" className="h-14 px-8 rounded-full text-base font-bold shadow-xl shadow-primary-100" asChild>
+                <AppButton size="lg" className="h-12 lg:h-14 px-8 rounded-full text-base font-bold shadow-xl shadow-primary-100" asChild>
                   <Link href="#book">
                     Book Appointment <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                 </AppButton>
-                <AppButton variant="outline" size="lg" className="h-14 px-8 rounded-full text-base bg-white font-bold border-slate-200" asChild>
+                <AppButton variant="outline" size="lg" className="h-12 lg:h-14 px-8 rounded-full text-base bg-white font-bold border-slate-200" asChild>
                   <Link href="#services">
                     Explore Services
                   </Link>
                 </AppButton>
               </motion.div>
-              <motion.div variants={fadeUp} className="flex items-center gap-6 justify-center lg:justify-start pt-4 text-sm text-slate-500 font-bold uppercase tracking-wider">
+              <motion.div variants={fadeUp} className="flex items-center gap-6 justify-center lg:justify-start pt-1 text-xs text-slate-500 font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Transparent Pricing
                 </div>
@@ -125,7 +125,7 @@ export default function PublicHomePage() {
             </motion.div>
             
             <motion.div 
-              className="flex-1 relative w-full max-w-xl"
+              className="flex-1 relative w-full max-w-md"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
@@ -133,7 +133,7 @@ export default function PublicHomePage() {
               <div className="absolute -top-12 -right-12 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50" />
               <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-blue-100 rounded-full blur-3xl opacity-50" />
               
-              <div className="relative z-10 w-full aspect-square lg:aspect-[4/5]">
+              <div className="relative z-10 w-full aspect-square lg:aspect-square">
                 <ClinicalHeroAnimation />
               </div>
             </motion.div>
