@@ -1,12 +1,15 @@
 'use client';
 
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { AppButton } from '@/components/ui-system';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShoppingCart, LayoutDashboard, LogIn } from 'lucide-react';
+import { ShoppingCart, LayoutDashboard, LogIn, ChevronDown, ShoppingBag, Tags, Package } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [storeOpen, setStoreOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-white">
@@ -23,15 +26,71 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <Link href="/#providers" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
                 Providers
               </Link>
-              <Link href="/store" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
-                Store
-              </Link>
-              <Link href="/store?tab=memberships" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
-                Memberships
-              </Link>
-              <Link href="/store?tab=packages" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
-                Packages
-              </Link>
+              
+              {/* Refined Store Dropdown */}
+              <div 
+                className="relative group"
+                onMouseEnter={() => setStoreOpen(true)}
+                onMouseLeave={() => setStoreOpen(false)}
+              >
+                <Link 
+                  href="/store" 
+                  className={cn(
+                    "flex items-center gap-1 text-sm font-medium transition-colors",
+                    storeOpen ? "text-primary-600" : "text-slate-600 hover:text-primary-600"
+                  )}
+                >
+                  Store <ChevronDown className={cn("h-4 w-4 transition-transform", storeOpen && "rotate-180")} />
+                </Link>
+                
+                {storeOpen && (
+                  <div className="absolute top-full -left-4 w-64 pt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 overflow-hidden">
+                      <Link 
+                        href="/store?tab=products" 
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group/item"
+                        onClick={() => setStoreOpen(false)}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600 group-hover/item:bg-primary-600 group-hover/item:text-white transition-colors">
+                          <ShoppingBag className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">Products</p>
+                          <p className="text-xs text-slate-500">Clinical supplements</p>
+                        </div>
+                      </Link>
+                      
+                      <Link 
+                        href="/store?tab=memberships" 
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group/item"
+                        onClick={() => setStoreOpen(false)}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover/item:bg-emerald-600 group-hover/item:text-white transition-colors">
+                          <Tags className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">Memberships</p>
+                          <p className="text-xs text-slate-500">Recurring care plans</p>
+                        </div>
+                      </Link>
+                      
+                      <Link 
+                        href="/store?tab=packages" 
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group/item"
+                        onClick={() => setStoreOpen(false)}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 group-hover/item:bg-amber-600 group-hover/item:text-white transition-colors">
+                          <Package className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">Wellness Packages</p>
+                          <p className="text-xs text-slate-500">Prepaid session bundles</p>
+                        </div>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -52,8 +111,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               </Link>
             )}
             
-            <AppButton asChild size="sm" className="rounded-full px-5">
-              <Link href="/store">
+            <AppButton asChild size="sm" className="rounded-full px-5 shadow-lg shadow-primary-100">
+              <Link href="/#services">
                 Book Appointment
               </Link>
             </AppButton>
