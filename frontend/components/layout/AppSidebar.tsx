@@ -23,6 +23,7 @@ import {
   Stethoscope,
 } from 'lucide-react';
 import { AppButton } from '@/components/ui-system';
+import { AppLogo } from '@/components/common/AppLogo';
 
 interface SidebarItem {
   href: string;
@@ -164,13 +165,8 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
       {/* Header Branding */}
       <div className="h-20 flex items-center px-8">
-        <Link href="/dashboard" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-200 group-hover:scale-110 transition-transform duration-300">
-            <ShieldCheck className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-black tracking-tighter text-slate-900">
-            Medoflow<span className="text-primary-600">.</span>
-          </span>
+        <Link href="/dashboard">
+          <AppLogo size="md" />
         </Link>
       </div>
 

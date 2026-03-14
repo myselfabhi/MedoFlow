@@ -6,6 +6,7 @@ import { AppButton } from '@/components/ui-system';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShoppingCart, LayoutDashboard, LogIn, ChevronDown, ShoppingBag, Tags, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppLogo } from '@/components/common/AppLogo';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -15,11 +16,11 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="text-xl font-bold tracking-tight text-primary-600">
-              Medoflow
+          <div className="flex items-center gap-10">
+            <Link href="/">
+              <AppLogo size="md" />
             </Link>
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="hidden lg:flex items-center gap-8">
               <Link href="/#services" className="text-sm font-medium text-slate-600 hover:text-primary-600 transition-colors">
                 Services
               </Link>
@@ -120,13 +121,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-      <footer className="border-t border-slate-100 bg-slate-50 py-12">
+      <footer className="border-t border-slate-100 bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="col-span-2">
-              <span className="text-xl font-bold text-primary-600">Medoflow</span>
-              <p className="mt-4 text-sm text-slate-500 max-w-xs">
-                Premium healthcare operating system for self-pay clinics. Providing better care through better operations.
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+            <div className="col-span-2 space-y-6">
+              <AppLogo size="lg" />
+              <p className="text-sm text-slate-500 max-w-xs leading-relaxed font-medium">
+                The premium healthcare operating system for US self-pay clinics. Providing better care through better operations.
               </p>
             </div>
             <div>

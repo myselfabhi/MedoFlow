@@ -15,6 +15,7 @@ import {
   AppFormField,
 } from '@/components/ui-system';
 import { ShieldCheck, ArrowRight, Lock, Mail } from 'lucide-react';
+import { AppLogo } from '@/components/common/AppLogo';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -62,10 +63,13 @@ function LoginForm() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Welcome Back</h1>
-        <p className="text-slate-500 font-medium">Access your clinic portal and records.</p>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-6">
+        <AppLogo size="lg" className="justify-start" />
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Welcome Back</h1>
+          <p className="text-slate-500 font-medium">Access your clinic portal and records.</p>
+        </div>
       </div>
 
       <AppCard className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
