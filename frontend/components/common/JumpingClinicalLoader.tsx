@@ -11,23 +11,21 @@ import {
 import { cn } from '@/lib/utils';
 
 const ICONS = [
-  { icon: Stethoscope, color: 'text-primary-600', delay: '0ms' },
-  { icon: Syringe, color: 'text-emerald-600', delay: '150ms' },
-  { icon: Activity, color: 'text-rose-600', delay: '300ms' },
-  { icon: Pill, color: 'text-amber-600', delay: '450ms' },
-  { icon: Thermometer, color: 'text-blue-600', delay: '600ms' },
+  { icon: Stethoscope, delay: '0ms' },
+  { icon: Activity, delay: '200ms' },
+  { icon: Pill, delay: '400ms' },
 ];
 
 export function JumpingClinicalLoader({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center justify-center gap-6", className)}>
+    <div className={cn("flex items-center justify-center gap-4", className)}>
       {ICONS.map((item, index) => (
         <div 
           key={index}
-          className="animate-clinical-jump"
+          className="animate-subtle-float"
           style={{ animationDelay: item.delay }}
         >
-          <item.icon className={cn("h-12 w-12", item.color)} strokeWidth={3} />
+          <item.icon className="h-6 w-6 text-primary-600/60" strokeWidth={2} />
         </div>
       ))}
     </div>

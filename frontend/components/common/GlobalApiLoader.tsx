@@ -43,17 +43,17 @@ function GlobalApiLoaderContent() {
   return (
     <div className={cn(
       "fixed inset-0 z-[9999] flex flex-col items-center justify-center",
-      "bg-white/70 backdrop-blur-md animate-in fade-in duration-300",
-      isNavigating && "bg-slate-50/80" // Slightly different look for navigation
+      "bg-white/40 backdrop-blur-sm animate-in fade-in duration-500",
+      isNavigating && "bg-white/60"
     )}>
-      <div className="space-y-12 text-center">
+      <div className="space-y-6 text-center">
         <JumpingClinicalLoader />
-        <div className="space-y-2">
-          <p className="text-xl font-black text-slate-900 tracking-tight uppercase italic">
-            {isNavigating ? 'Loading Clinic Module' : 'Synchronizing Clinical Data'}
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-600 tracking-wide">
+            Medoflow
           </p>
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.3em]">
-            Medoflow Clinical OS
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+            {isNavigating ? 'Updating Module' : 'Synchronizing Data'}
           </p>
         </div>
       </div>
