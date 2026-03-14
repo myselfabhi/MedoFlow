@@ -28,12 +28,14 @@ import {
   AppButton,
   AppInput,
   AppFormField,
-  StickySummaryPanel
+  StickySummaryPanel,
+  AppCalendar
 } from '@/components/ui-system';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Clock, 
   User, 
   MapPin, 
@@ -44,9 +46,11 @@ import {
   Search,
   Package as PackageIcon,
   CreditCard,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
 
 const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
 
@@ -85,13 +89,16 @@ function BookingPageContent() {
   const [step, setStep] = useState(0);
   const [providerId, setProviderId] = useState<string | null>(providerShortcutId);
   const [providerSearch, setProviderSearch] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [pendingSlot, setPendingSlot] = useState<TimeSlot | null>(null);
   const [patientExists, setPatientExists] = useState<boolean | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [slotHoldId, setSlotHoldId] = useState<string | null>(null);
   const [holdingSlot, setHoldingSlot] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
   const { data: clinic } = useQuery({
     queryKey: ['clinic', clinicId],
@@ -129,12 +136,12 @@ function BookingPageContent() {
     p.providerServices.some((ps) => ps.serviceId === serviceId)
   );
 
-  const selectedProvider = providers?.find(p => p.id === (selectedSlot?.providerId || providerId));
+  const selectedProvider = providers?.find(p => p.id === (selectedSlot?.providerId || pendingSlot?.providerId || providerId));
 
   const { data: slots, isLoading: slotsLoading } = useQuery({
-    queryKey: ['availability', clinicId, serviceId, selectedDate, providerId || 'any'],
-    queryFn: () => getAvailability(clinicId, serviceId, selectedDate, providerId || undefined),
-    enabled: !!clinicId && !!serviceId && !!selectedDate,
+    queryKey: ['availability', clinicId, serviceId, selectedDateStr, providerId || 'any'],
+    queryFn: () => getAvailability(clinicId, serviceId, selectedDateStr, providerId || undefined),
+    enabled: !!clinicId && !!serviceId && !!selectedDateStr,
   });
 
   const {
@@ -171,30 +178,34 @@ function BookingPageContent() {
   };
 
   const handleSlotSelect = async (slot: TimeSlot) => {
-    if (holdingSlot) return;
-    setHoldingSlot(true);
-    try {
-      await releaseCurrentHold();
-      const hold = await createSlotHold({
-        clinicId,
-        providerId: slot.providerId,
-        serviceId,
-        locationId: slot.locationId || locations?.[0]?.id || '',
-        timezone: slot.timezone,
-        startTime: slot.start,
-        endTime: slot.end,
-      });
-      setSlotHoldId(hold.id);
-      setSelectedSlot(slot);
-      if (isAuthenticated) {
-        setStep(3);
-      } else {
-        setStep(2);
+    if (pendingSlot?.start === slot.start) {
+      if (holdingSlot) return;
+      setHoldingSlot(true);
+      try {
+        await releaseCurrentHold();
+        const hold = await createSlotHold({
+          clinicId,
+          providerId: slot.providerId,
+          serviceId,
+          locationId: slot.locationId || locations?.[0]?.id || '',
+          timezone: slot.timezone,
+          startTime: slot.start,
+          endTime: slot.end,
+        });
+        setSlotHoldId(hold.id);
+        setSelectedSlot(slot);
+        if (isAuthenticated) {
+          setStep(3);
+        } else {
+          setStep(2);
+        }
+      } catch (err) {
+        toast.error('Failed to hold slot. It may have just been taken.');
+      } finally {
+        setHoldingSlot(false);
       }
-    } catch (err) {
-      toast.error('Failed to hold slot. It may have just been taken.');
-    } finally {
-      setHoldingSlot(false);
+    } else {
+      setPendingSlot(slot);
     }
   };
 
@@ -357,45 +368,85 @@ function BookingPageContent() {
                 )}
 
                 {step === 1 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                    <div className="grid lg:grid-cols-2 gap-12">
-                      <div className="space-y-6">
-                        <h2 className="text-xl font-bold text-slate-900">Choose Date</h2>
-                        <input 
-                          type="date" 
-                          className="w-full p-4 rounded-2xl border-2 border-slate-100 focus:border-primary-600 outline-none transition-all"
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                          min={new Date().toISOString().split('T')[0]}
+                  <div className="animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 min-h-[450px]">
+                      {/* Calendar Column */}
+                      <div className="flex-1 space-y-4">
+                        <h2 className="text-xl font-bold text-slate-900 px-3">Select a Date</h2>
+                        <AppCalendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              setSelectedDate(date);
+                              setPendingSlot(null);
+                            }
+                          }}
+                          disabled={{ before: new Date() }}
+                          className="rounded-3xl border-none p-0"
                         />
                       </div>
-                      <div className="space-y-6">
-                        <h2 className="text-xl font-bold text-slate-900">Available Times</h2>
-                        {slotsLoading ? (
-                          <div className="grid grid-cols-3 gap-3">
-                            {[1,2,3,4,5,6].map(i => <div key={i} className="h-12 bg-slate-100 animate-pulse rounded-xl" />)}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-3 gap-3">
-                            {slots?.map((slot, i) => (
-                              <button
-                                key={i}
-                                onClick={() => handleSlotSelect(slot)}
-                                className="p-3 rounded-xl border-2 border-slate-100 hover:border-primary-600 hover:bg-primary-50/30 transition-all text-sm font-bold text-slate-700"
-                              >
-                                {formatTime(slot.start)}
-                              </button>
-                            ))}
-                            {slots?.length === 0 && (
-                              <p className="col-span-3 text-center py-12 text-slate-400 bg-slate-50 rounded-2xl">No availability on this date.</p>
-                            )}
-                          </div>
-                        )}
+
+                      {/* Time Slots Column */}
+                      <div className="w-full lg:w-72 space-y-4">
+                        <h2 className="text-xl font-bold text-slate-900">
+                          {format(selectedDate, 'EEEE, MMMM d')}
+                        </h2>
+                        
+                        <div className="relative">
+                          {slotsLoading ? (
+                            <div className="space-y-3">
+                              {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className="h-14 bg-slate-50 animate-pulse rounded-2xl" />
+                              ))}
+                            </div>
+                          ) : (
+                            <ScrollArea className="h-[400px] pr-4">
+                              <div className="space-y-3 pb-8">
+                                {slots?.map((slot, i) => {
+                                  const isPending = pendingSlot?.start === slot.start;
+                                  return (
+                                    <div key={i} className="flex gap-2">
+                                      <button
+                                        onClick={() => handleSlotSelect(slot)}
+                                        className={cn(
+                                          "flex-1 h-14 rounded-2xl border-2 font-bold transition-all duration-200",
+                                          isPending 
+                                            ? "border-slate-400 bg-slate-600 text-white w-1/2" 
+                                            : "border-primary-100 text-primary-600 hover:border-primary-600 hover:bg-primary-50"
+                                        )}
+                                      >
+                                        {format(parseISO(slot.start), 'h:mm a')}
+                                      </button>
+                                      {isPending && (
+                                        <button
+                                          onClick={() => handleSlotSelect(slot)}
+                                          className="h-14 px-6 bg-primary-600 text-white rounded-2xl font-bold animate-in slide-in-from-left-2 fade-in duration-200"
+                                        >
+                                          Confirm
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {slots?.length === 0 && (
+                                  <div className="text-center py-20 px-4 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                                    <Clock className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                                    <p className="text-sm font-medium text-slate-400">No availability</p>
+                                  </div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <AppButton variant="ghost" onClick={prevStep} className="rounded-full">
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Change Provider
-                    </AppButton>
+                    
+                    <div className="mt-12 pt-8 border-t border-slate-100">
+                      <AppButton variant="ghost" onClick={prevStep} className="rounded-full font-bold text-slate-400 hover:text-primary-600">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Change Provider
+                      </AppButton>
+                    </div>
                   </div>
                 )}
 

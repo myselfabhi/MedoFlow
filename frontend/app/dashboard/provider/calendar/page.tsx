@@ -33,17 +33,15 @@ import {
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { AppointmentSheet } from '@/components/calendar/AppointmentSheet';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-const SLOT_HEIGHT_PX = 40;
-const STATUS_BADGE: Record<string, string> = {
-  CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
-  COMPLETED: 'bg-green-100 text-green-800 border-green-200',
-  CANCELLED: 'bg-gray-100 text-gray-600 border-gray-200',
-  PENDING_PROVIDER_APPROVAL: 'bg-purple-100 text-purple-800 border-purple-200',
-  PENDING_PAYMENT: 'bg-amber-100 text-amber-800 border-amber-200',
-  DRAFT: 'bg-gray-100 text-gray-600 border-gray-200',
-  NO_SHOW: 'bg-gray-100 text-gray-600 border-gray-200',
-  RESCHEDULED: 'bg-gray-100 text-gray-600 border-gray-200',
+const SLOT_HEIGHT_PX = 48;
+const STATUS_COLORS: Record<string, string> = {
+  CONFIRMED: 'border-l-4 border-l-blue-500 bg-blue-50/50',
+  COMPLETED: 'border-l-4 border-l-emerald-500 bg-emerald-50/50',
+  CANCELLED: 'opacity-50 grayscale bg-slate-100',
+  PENDING_PROVIDER_APPROVAL: 'border-l-4 border-l-purple-500 bg-purple-50/50',
+  PENDING_PAYMENT: 'border-l-4 border-l-amber-500 bg-amber-50/50',
 };
 
 export default function ProviderCalendarPage() {
@@ -128,29 +126,40 @@ export default function ProviderCalendarPage() {
         description="Your weekly consultation timeline and availability."
       />
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Week</CardTitle>
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <AppButton variant="outline" size="icon" onClick={handlePrevWeek}>
+      <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
+        <CardHeader className="bg-white border-b border-slate-100 p-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-6">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Schedule</h3>
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                <AppButton variant="ghost" size="icon" onClick={handlePrevWeek} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
                   <ChevronLeft className="h-4 w-4" />
                 </AppButton>
-                <span className="min-w-[180px] text-center font-medium">
+                <div className="px-4 text-xs font-black uppercase tracking-widest text-slate-500 min-w-[140px] text-center">
                   {formatWeekLabel(start, end)}
-                </span>
-                <AppButton variant="outline" size="icon" onClick={handleNextWeek}>
+                </div>
+                <AppButton variant="ghost" size="icon" onClick={handleNextWeek} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
                   <ChevronRight className="h-4 w-4" />
                 </AppButton>
               </div>
+              <AppButton 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full border-slate-200 text-xs font-bold"
+                onClick={() => setWeekStart(getWeekRange(new Date()).start)}
+              >
+                Today
+              </AppButton>
+            </div>
+            
+            <div className="flex items-center gap-4">
               {locations.length > 1 && (
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Location" />
+                  <SelectTrigger className="w-[200px] h-11 rounded-xl border-slate-100 bg-slate-50 font-medium">
+                    <SelectValue placeholder="All Facilities" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All locations</SelectItem>
+                  <SelectContent className="rounded-xl border-slate-100">
+                    <SelectItem value="all">All Facilities</SelectItem>
                     {locations.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>
                         {loc.name}
@@ -162,27 +171,37 @@ export default function ProviderCalendarPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-0">
           <ScrollArea className="w-full">
-            <div className="min-w-[800px]">
+            <div className="min-w-[1000px] bg-white">
               <div
-                className="grid border"
+                className="grid"
                 style={{
-                  gridTemplateColumns: '60px repeat(7, minmax(100px, 1fr))',
-                  gridTemplateRows: `48px repeat(${timeSlots.length}, ${SLOT_HEIGHT_PX}px)`,
+                  gridTemplateColumns: '80px repeat(7, minmax(120px, 1fr))',
+                  gridTemplateRows: `60px repeat(${timeSlots.length}, ${SLOT_HEIGHT_PX}px)`,
                 }}
               >
-                <div className="sticky left-0 z-20 border-b border-r bg-background" />
+                {/* Header Spacer */}
+                <div className="sticky left-0 z-30 border-b border-r border-slate-50 bg-white" />
+                
                 {weekDates.map((d, i) => (
                   <div
                     key={i}
-                    className={`sticky top-0 z-20 border-b bg-background py-2 text-center text-sm font-medium ${
-                      isToday(d) ? 'bg-primary/5' : ''
-                    }`}
+                    className={cn(
+                      "sticky top-0 z-20 border-b border-slate-50 bg-white flex flex-col items-center justify-center transition-colors",
+                      isToday(d) && "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-primary-600"
+                    )}
                   >
-                    {format(d, 'EEE')}
-                    <br />
-                    <span className={isToday(d) ? 'text-primary font-semibold' : ''}>
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.2em]",
+                      isToday(d) ? "text-primary-600" : "text-slate-400"
+                    )}>
+                      {format(d, 'EEE')}
+                    </span>
+                    <span className={cn(
+                      "text-xl font-black mt-0.5",
+                      isToday(d) ? "text-primary-600" : "text-slate-900"
+                    )}>
                       {format(d, 'd')}
                     </span>
                   </div>
@@ -190,8 +209,10 @@ export default function ProviderCalendarPage() {
 
                 {timeSlots.map((slot, rowIdx) => (
                   <React.Fragment key={rowIdx}>
-                    <div className="sticky left-0 z-10 border-b border-r bg-background py-1 pr-2 text-right text-xs text-muted-foreground">
-                      {format(slot, 'h:mm a')}
+                    <div className="sticky left-0 z-10 border-b border-r border-slate-50 bg-white py-1 pr-4 text-right">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {format(slot, 'h a')}
+                      </span>
                     </div>
                     {weekDates.map((d, colIdx) => {
                       const dayApts = appointmentsByDay.get(colIdx) ?? [];
@@ -199,43 +220,50 @@ export default function ProviderCalendarPage() {
                         const { top } = getAppointmentPosition(apt.startTime, apt.endTime);
                         return top === rowIdx;
                       });
+                      
                       return (
                         <div
                           key={`${rowIdx}-${colIdx}`}
-                          className={`relative overflow-visible border-b ${
-                            isToday(d) ? 'bg-primary/5' : 'bg-background'
-                          }`}
+                          className={cn(
+                            "relative border-b border-r border-slate-50 group",
+                            isToday(d) && "bg-primary-50/10"
+                          )}
                           style={{ minHeight: SLOT_HEIGHT_PX }}
                         >
                           {aptToRender && (() => {
-                            const { top, height } = getAppointmentPosition(
+                            const { height } = getAppointmentPosition(
                               aptToRender.startTime,
                               aptToRender.endTime
                             );
-                            if (top !== rowIdx) return null;
-                            const statusClass = STATUS_BADGE[aptToRender.status] ?? 'bg-gray-100';
+                            const statusColor = STATUS_COLORS[aptToRender.status] || 'bg-slate-50';
+                            
                             return (
-                              <Card
+                              <div
                                 key={aptToRender.id}
-                                className="absolute left-0.5 right-0.5 z-10 cursor-pointer overflow-hidden border shadow-sm transition-shadow hover:shadow-md"
+                                className={cn(
+                                  "absolute inset-x-1 z-10 cursor-pointer overflow-hidden rounded-xl p-3 shadow-sm transition-all hover:shadow-md hover:z-20",
+                                  statusColor
+                                )}
                                 style={{
-                                  top: 0,
-                                  height: `${Math.max(1, height) * SLOT_HEIGHT_PX - 2}px`,
+                                  top: '4px',
+                                  height: `${Math.max(1, height) * SLOT_HEIGHT_PX - 8}px`,
                                 }}
                                 onClick={() => handleAppointmentClick(aptToRender)}
                               >
-                                <div className="flex h-full flex-col justify-center p-2">
-                                  <p className="truncate text-xs font-medium">{aptToRender.patient.name}</p>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                <div className="flex h-full flex-col">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="truncate text-xs font-black text-slate-900 uppercase tracking-tight">
+                                      {aptToRender.patient.name}
+                                    </p>
+                                    <span className="text-[9px] font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-100">
+                                      {format(new Date(aptToRender.startTime), 'h:mm')}
+                                    </span>
+                                  </div>
+                                  <p className="truncate text-[10px] font-bold text-slate-500 mt-1">
                                     {aptToRender.service.name}
                                   </p>
-                                  <span
-                                    className={`mt-1 inline-block w-fit rounded px-1.5 py-0.5 text-[10px] font-medium ${statusClass}`}
-                                  >
-                                    {aptToRender.status.replace(/_/g, ' ')}
-                                  </span>
                                 </div>
-                              </Card>
+                              </div>
                             );
                           })()}
                         </div>
@@ -245,7 +273,7 @@ export default function ProviderCalendarPage() {
                 ))}
               </div>
             </div>
-            <ScrollBar orientation="horizontal" />
+            <ScrollBar orientation="horizontal" className="bg-slate-50" />
           </ScrollArea>
         </CardContent>
       </Card>

@@ -12,5 +12,6 @@ export { AppSection } from './AppSection';
 export { AppEmptyState } from './AppEmptyState';
 export { KPIStatCard } from './KPIStatCard';
 export { StickySummaryPanel } from './StickySummaryPanel';
+export { AppCalendar } from './AppCalendar';
 export { theme } from './theme';
 export type { Theme } from './theme';
