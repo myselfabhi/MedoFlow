@@ -43,11 +43,10 @@ function GlobalApiLoaderContent() {
   return (
     <div className={cn(
       "fixed inset-0 z-[9999] flex flex-col items-center justify-center",
-      "bg-white/40 backdrop-blur-sm animate-in fade-in duration-500",
-      isNavigating && "bg-white/60"
+      "bg-white animate-in fade-in duration-500"
     )}>
-      <div className="space-y-6 text-center">
-        <AppLogo showText={false} size="xl" animated={false} className="justify-center scale-[2.4] sm:scale-[2.8]" />
+      <div className="flex flex-col items-center space-y-4 text-center">
+        <AppLogo showText={false} size="xl" animated={false} className="justify-center scale-125" />
         <div className="space-y-1">
           <p className="text-sm font-semibold text-slate-600 tracking-wide">
             Medoflow
