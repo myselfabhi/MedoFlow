@@ -15,7 +15,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-50 border-b border-transparent bg-[#fafafa]/80 backdrop-blur-md">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-12">
-            <Link href="/">
+            <Link href="/" className="group/logo">
               <AppLogo size="md" />
             </Link>
             <nav className="hidden lg:flex items-center gap-8">

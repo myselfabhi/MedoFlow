@@ -165,7 +165,7 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
       {/* Header Branding */}
       <div className="h-20 flex items-center px-8">
-        <Link href="/dashboard">
+        <Link href="/dashboard" className="group/logo">
           <AppLogo size="md" />
         </Link>
       </div>
