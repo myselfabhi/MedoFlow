@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, Variants } from 'framer-motion';
 import { AppButton } from '@/components/ui-system';
 import { ArrowRight, Play, CheckCircle2, ShieldCheck } from 'lucide-react';
@@ -23,6 +24,33 @@ const staggerContainer: Variants = {
 };
 
 export function HeroSection() {
+  const patientRows = [
+    {
+      name: 'Sarah Mitchell',
+      type: 'Wellness Check',
+      time: '9:00 AM',
+      status: 'Confirmed',
+      color: 'text-emerald-600',
+      avatar: '/doctors/doctor-female-1.jpg',
+    },
+    {
+      name: 'James Rodriguez',
+      type: 'Follow up',
+      time: '10:30 AM',
+      status: 'In Room',
+      color: 'text-accent',
+      avatar: '/doctors/doctor-male-1.jpg',
+    },
+    {
+      name: 'Emily Watson',
+      type: 'Consultation',
+      time: '11:45 AM',
+      status: 'Waiting',
+      color: 'text-slate-500',
+      avatar: '/doctors/doctor-female-2.jpg',
+    },
+  ];
+
   return (
     <section className="relative pt-20 pb-24 overflow-hidden bg-[#fafafa]">
       <div className="container mx-auto px-4 text-center relative z-10">
@@ -34,7 +62,7 @@ export function HeroSection() {
         >
           {/* Pill Badge */}
           <motion.div variants={fadeUp} className="flex justify-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 text-accent text-[11px] font-semibold tracking-wide">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold tracking-wide">
               <ShieldCheck className="h-3.5 w-3.5" />
               HIPAA & SOC2 compliant
             </div>
@@ -58,13 +86,13 @@ export function HeroSection() {
           </motion.p>
 
           {/* CTAs */}
-          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center gap-3 justify-center pt-2">
-            <AppButton size="lg" className="h-12 px-6 rounded-full text-sm font-medium bg-primary text-white hover:bg-primary-900 shadow-lg shadow-primary/10" asChild>
+          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <AppButton size="lg" className="px-6 h-12 text-sm font-medium" asChild>
               <Link href="/register">
                 Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </AppButton>
-            <AppButton variant="outline" size="lg" className="h-12 px-6 rounded-full text-sm font-medium border-slate-200 bg-white hover:bg-slate-50 text-slate-700" asChild>
+            <AppButton variant="outline" size="lg" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary px-6 h-12 text-sm font-medium" asChild>
               <Link href="#demo">
                 <Play className="mr-2 h-4 w-4 text-slate-400" /> Watch Workflow
               </Link>
@@ -120,8 +148,14 @@ export function HeroSection() {
               {/* Header inside App */}
               <div className="flex justify-between items-end mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center">
-                     <div className="w-full h-full bg-primary/20" />
+                  <div className="relative h-10 w-10 overflow-hidden rounded-full border border-white/70 bg-white">
+                    <Image
+                      src="/doctors/doctor-male-2.jpg"
+                      alt="Doctor profile"
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 font-medium">Good morning</p>
@@ -151,14 +185,18 @@ export function HeroSection() {
 
               {/* Patient List */}
               <div className="bg-white border border-slate-100 rounded-xl shadow-[0_1px_2px_0_rgb(0,0,0,0.05)] overflow-hidden flex-1 flex flex-col">
-                {[
-                  { name: 'Sarah Mitchell', type: 'Wellness Check', time: '9:00 AM', status: 'Confirmed', color: 'text-emerald-600' },
-                  { name: 'James Rodriguez', type: 'Follow up', time: '10:30 AM', status: 'In Room', color: 'text-accent' },
-                  { name: 'Emily Watson', type: 'Consultation', time: '11:45 AM', status: 'Waiting', color: 'text-slate-500' }
-                ].map((p, i) => (
+                {patientRows.map((p, i) => (
                   <div key={i} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-100" />
+                      <div className="relative h-8 w-8 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                        <Image
+                          src={p.avatar}
+                          alt={`${p.name} profile`}
+                          fill
+                          sizes="32px"
+                          className="object-cover"
+                        />
+                      </div>
                       <div>
                         <p className="text-xs font-bold text-slate-900">{p.name}</p>
                         <p className="text-[10px] text-slate-500">{p.type}</p>

@@ -17,14 +17,17 @@ import {
   CreditCard, 
   Activity,
   AlertCircle,
-  ArrowUpRight,
-  ArrowDownRight
+  ArrowUpRight
 } from 'lucide-react';
 import { AppButton } from '@/components/ui-system';
 import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+
+  if (user && user.role !== 'SUPER_ADMIN') {
+    return null;
+  }
   
   const { data, isLoading } = useQuery({
     queryKey: ['admin-overview'],

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { AppButton } from '@/components/ui-system';
 import { AppLogo } from '@/components/common/AppLogo';
+import { UserAvatar } from '@/components/common/UserAvatar';
 
 interface SidebarItem {
   href: string;
@@ -56,6 +57,8 @@ const patientSections: SidebarSection[] = [
     items: [
       { href: '/dashboard/memberships', label: 'Memberships', icon: Tags },
       { href: '/store', label: 'Clinic Store', icon: ShoppingCart },
+      { href: '/store?tab=products', label: 'Products', icon: ShoppingCart },
+      { href: '/store?tab=packages', label: 'Packages', icon: Package },
     ]
   }
 ];
@@ -79,6 +82,14 @@ const providerSections: SidebarSection[] = [
     title: 'Insights',
     items: [
       { href: '/dashboard/analytics', label: 'Performance', icon: BarChart3 },
+    ]
+  },
+  {
+    title: 'Commerce',
+    items: [
+      { href: '/store', label: 'Store', icon: ShoppingCart },
+      { href: '/store?tab=products', label: 'Products', icon: ShoppingCart },
+      { href: '/store?tab=packages', label: 'Packages', icon: Package },
     ]
   }
 ];
@@ -148,6 +159,12 @@ const frontDeskSections: SidebarSection[] = [
     items: [
       { href: '/dashboard/front-desk/invoices', label: 'Ledger', icon: Receipt },
     ]
+  },
+  {
+    title: 'Commerce',
+    items: [
+      { href: '/store', label: 'Store', icon: ShoppingCart },
+    ]
   }
 ];
 
@@ -162,46 +179,47 @@ export function AppSidebar() {
     : [];
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[280px] flex-col border-r border-[#29486D] bg-[#1E3A5F] text-white">
       {/* Header Branding */}
-      <div className="h-20 flex items-center px-8">
+      <div className="flex h-20 items-center px-8">
         <Link href="/dashboard" className="group/logo">
-          <AppLogo size="md" />
+          <AppLogo size="lg" variant="light" />
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-10 custom-scrollbar">
+      <nav className="custom-scrollbar flex-1 space-y-10 overflow-y-auto px-4 py-6">
         {sections.map((section) => (
           <div key={section.title} className="space-y-2">
-            <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+            <p className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
               {section.title}
             </p>
             <div className="space-y-1">
               {section.items.map((item) => {
-                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                const itemPath = item.href.split('?')[0];
+                const isActive = pathname === itemPath || (itemPath !== '/dashboard' && pathname.startsWith(itemPath));
                 const Icon = item.icon;
                 return (
                   <Link
                     key={`${item.href}-${item.label}`}
                     href={item.href}
                     className={cn(
-                      'flex items-center justify-between group rounded-2xl px-4 py-3 text-sm transition-all duration-200',
+                      'group relative flex items-center justify-between rounded-2xl px-4 py-3 text-sm transition-all duration-200',
                       isActive
-                        ? 'bg-primary-50 text-primary-700 font-bold'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-white/8 font-bold text-white'
+                        : 'text-white/70 hover:bg-white/6 hover:text-white'
                     )}
                   >
+                    {isActive && (
+                      <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-white" />
+                    )}
                     <div className="flex items-center gap-3">
                       <Icon className={cn(
                         'h-5 w-5 transition-colors',
-                        isActive ? 'text-primary-600' : 'text-slate-400 group-hover:text-slate-600'
+                        isActive ? 'text-white' : 'text-white/45 group-hover:text-white/80'
                       )} />
                       {item.label}
                     </div>
-                    {isActive && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary-600 animate-in fade-in zoom-in duration-300" />
-                    )}
                   </Link>
                 );
               })}
@@ -211,15 +229,18 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer Profile */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-        <div className="flex items-center justify-between bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 font-black text-slate-500">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </div>
+            <UserAvatar
+              seed={`${user?.id ?? ''}-${user?.name ?? ''}`}
+              alt={user?.name ?? 'User'}
+              className="h-10 w-10 shrink-0 rounded-xl border border-white/20"
+              sizes="40px"
+            />
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-900 truncate">{user?.name}</p>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate">
+              <p className="truncate text-sm font-bold text-white">{user?.name}</p>
+              <p className="truncate text-[10px] font-black uppercase tracking-tighter text-white/55">
                 {user?.role.replace('_', ' ')}
               </p>
             </div>
@@ -228,7 +249,7 @@ export function AppSidebar() {
             variant="ghost" 
             size="icon" 
             onClick={logout}
-            className="rounded-xl h-9 w-9 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+            className="h-9 w-9 rounded-xl text-white/55 hover:bg-white/10 hover:text-white"
           >
             <LogOut className="h-4 w-4" />
           </AppButton>
@@ -237,4 +258,3 @@ export function AppSidebar() {
     </aside>
   );
 }
-

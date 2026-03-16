@@ -17,10 +17,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ShoppingCart, Package, Tags, ShoppingBag, CheckCircle2, Star, ShieldCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
+import { useCart } from '@/hooks/useCart';
+import { toast } from 'sonner'; // Assuming toast is imported from sonner
 
 function StorefrontPageContent() {
   const { user, isAuthenticated } = useAuth();
+  const { addToCart, totalItems } = useCart(); // Use the addToCart and totalItems from the hook
   const searchParams = useSearchParams();
   const router = useRouter();
   const tab = searchParams.get('tab') || 'products';
@@ -57,25 +59,8 @@ function StorefrontPageContent() {
     fetchData();
   }, []);
 
-  const addToCart = async (item: any, type: string) => {
-    if (!isAuthenticated) {
-      toast.error('Please login to add items to your cart');
-      router.push('/login?returnUrl=/store');
-      return;
-    }
-
-    try {
-      await api.post('/carts/items', {
-        itemType: type,
-        itemId: item.id,
-        quantity: 1,
-      });
-      toast.success(`Added ${item.name} to cart`);
-    } catch (error) {
-      console.error('Failed to add to cart', error);
-      toast.error('Could not add item to cart. Please try again.');
-    }
-  };
+  // The local addToCart function is removed as per instructions,
+  // and the useCart hook's addToCart will be used directly.
 
   return (
     <div className="container mx-auto py-12 px-4 sm:px-6 lg:px-8 space-y-12">
@@ -91,9 +76,17 @@ function StorefrontPageContent() {
             Curated health products and wellness plans designed to support your clinical journey.
           </p>
         </div>
-        <AppButton asChild variant="outline" className="rounded-full h-12 px-6 border-slate-200">
+        <AppButton asChild variant="outline" className="rounded-full h-12 px-6 border-slate-200 relative">
           <Link href="/checkout">
-            <ShoppingCart className="mr-2 h-5 w-5" /> View Cart
+            <div className="relative">
+              <ShoppingCart className="mr-2 h-5 w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
+                  {totalItems}
+                </span>
+              )}
+            </div>
+            View Cart
           </Link>
         </AppButton>
       </div>

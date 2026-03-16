@@ -83,6 +83,8 @@ const letterGroups = [
   { id: 'w', paths: letterW },
 ];
 
+const markViewBox = '120 250 420 470';
+
 export function AppLogo({
   className,
   variant = 'dark',
@@ -98,19 +100,22 @@ export function AppLogo({
       <div
         style={{ height: activeHeight.height }}
         className={cn(
-          "relative w-auto aspect-[1416/768] shrink-0",
+          "relative w-auto shrink-0",
+          showText ? "aspect-[1416/768]" : "aspect-[420/470]",
           animated && "group-hover/logo:scale-110 transition-transform duration-300"
         )}
       >
         <svg
-          viewBox="0 0 1416 768"
+          viewBox={showText ? '0 0 1416 768' : markViewBox}
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-full"
-          aria-label="Medoflow"
+          aria-label={showText ? 'Medoflow' : 'Medoflow mark'}
           role="img"
         >
-          {letterGroups.map((group, groupIndex) => {
+          {letterGroups
+            .filter((group) => showText || group.id === 'icon')
+            .map((group, groupIndex) => {
             const isIcon = group.id === 'icon';
             const inner = (
               <g
@@ -143,15 +148,16 @@ export function AppLogo({
                 })}
               </g>
             );
-            // Wrap icon in a scale group so it's visually larger than the text
-            if (isIcon) {
+            // Only upscale icon when full wordmark is shown.
+            // In mark-only mode, extra SVG scaling can clip the left edge.
+            if (isIcon && showText) {
               return (
                 <g key="icon-scale" transform="translate(230, 380) scale(1.2) translate(-230, -380)">
                   {inner}
                 </g>
               );
             }
-            // Shift text letters right to add gap after the M icon
+            // Shift text letters right to add gap after the M icon.
             return (
               <g key={`${group.id}-offset`} transform="translate(40, 0)">
                 {inner}

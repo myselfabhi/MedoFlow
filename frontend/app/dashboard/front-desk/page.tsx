@@ -26,7 +26,6 @@ import {
   Users,
   Clock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', {
@@ -38,6 +37,10 @@ function formatTime(iso: string) {
 export default function FrontDeskDashboardPage() {
   const { user } = useAuth();
   const clinicId = user?.clinicId ?? '';
+
+  if (user && user.role !== 'FRONT_DESK') {
+    return null;
+  }
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices'],

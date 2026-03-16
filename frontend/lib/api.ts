@@ -2,17 +2,38 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-let accessToken: string | null = null;
+// Key for local storage persistence
+const TOKEN_KEY = 'medoflow_access_token';
+
+// Initial check for existing token in storage
+const getStoredToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  return null;
+};
+
+let accessToken: string | null = getStoredToken();
 let refreshPromise: Promise<string | null> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  }
 };
 
 export const getAccessToken = () => accessToken;
 
 export const clearAccessToken = () => {
   accessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+  }
 };
 
 const refreshAccessToken = async (): Promise<string | null> => {
@@ -25,7 +46,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
         { withCredentials: true }
       );
       const token = data?.data?.accessToken ?? null;
-      if (token) setAccessToken(token);
+      if (token) {
+        setAccessToken(token);
+      }
       return token;
     } catch {
       clearAccessToken();
@@ -57,6 +80,7 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    // Don't retry if not a 401 or if it's already a retry
     if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
       return Promise.reject(error);
     }
@@ -68,14 +92,20 @@ api.interceptors.response.use(
 
     originalRequest._retry = true;
 
+    // Try to get a new token
     const newToken = await refreshAccessToken();
+    
     if (newToken) {
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return api(originalRequest);
     }
 
+    // Only redirect if absolutely failed to refresh AND it's a critical non-auth route
     if (!isAuthEndpoint && typeof window !== 'undefined') {
-      window.location.href = '/login';
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/dashboard')) {
+        window.location.href = `/login?returnUrl=${encodeURIComponent(pathname)}`;
+      }
     }
 
     return Promise.reject(error);

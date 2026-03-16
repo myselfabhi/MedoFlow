@@ -18,7 +18,7 @@ function AppBadge({ className, variant = 'outline', ...props }: AppBadgeProps) {
         variant === 'success' && 'bg-success/10 text-success border-success/20',
         variant === 'warning' && 'bg-warning/10 text-warning border-warning/20',
         (variant === 'destructive' || variant === 'danger') && 'bg-destructive/10 text-destructive border-destructive/20',
-        (variant === 'accent' || variant === 'default') && 'bg-accent/10 text-accent border-accent/20',
+        (variant === 'accent' || variant === 'default') && 'bg-primary/10 text-primary border-primary/20',
         (variant === 'neutral' || variant === 'secondary') && 'bg-muted/10 text-muted-foreground border-border',
         variant === 'outline' && 'border-border text-muted-foreground bg-transparent',
         className

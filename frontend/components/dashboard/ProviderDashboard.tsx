@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProviderAppointments } from '@/lib/patientApi';
-import { getInvoices } from '@/lib/invoiceApi';
 import { getTreatmentPlans } from '@/lib/treatmentPlanApi';
 import {
   AppCard,
@@ -18,15 +17,14 @@ import {
 import { PageContainer } from '@/components/layout';
 import { 
   Calendar, 
-  CreditCard, 
-  FileText, 
   CalendarDays, 
-  ArrowRight, 
   Activity,
   Video,
   User,
-  Clock
+  Clock,
+  ChevronRight
 } from 'lucide-react';
+import { cn, getGreetingName } from '@/lib/utils';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', {
@@ -38,6 +36,10 @@ function formatTime(iso: string) {
 export function ProviderDashboard() {
   const { user } = useAuth();
   const clinicId = user?.clinicId ?? '';
+
+  if (user && user.role !== 'PROVIDER') {
+    return null;
+  }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -56,7 +58,7 @@ export function ProviderDashboard() {
     enabled: !!clinicId,
   });
 
-  const todayAppointments = appointments.filter((a) => {
+  const todayAppointments = (appointments || []).filter((a) => {
     const d = new Date(a.startTime);
     return d >= today && d <= todayEnd;
   });
@@ -75,7 +77,7 @@ export function ProviderDashboard() {
   return (
     <PageContainer className="space-y-8">
       <AppPageHeader 
-        title={`Welcome, ${user?.name?.split(' ')[0] || 'Provider'}`} 
+        title={`Welcome, ${getGreetingName(user?.name, 'Provider')}`} 
         description="Here is what your clinical day looks like." 
       />
 
@@ -85,31 +87,31 @@ export function ProviderDashboard() {
           value={isLoading ? '...' : upcomingToday.length}
           icon={CalendarDays}
           description="Scheduled consultations"
-          iconClassName="text-blue-600 bg-blue-50"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
         />
         <KPIStatCard 
           label="Active Plans"
           value={isLoading ? '...' : plans.length}
           icon={Activity}
           description="Patients under your care"
-          iconClassName="text-purple-600 bg-purple-50"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
         />
         <KPIStatCard 
           label="Next Break"
           value="12:30 PM"
           icon={Clock}
           description="Based on your schedule"
-          iconClassName="text-amber-600 bg-amber-50"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
         />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main Schedule */}
         <div className="lg:col-span-2 space-y-6">
-          <AppCard className="border-none shadow-sm overflow-hidden">
-            <AppCardHeader className="flex flex-row items-center justify-between bg-slate-50/50 border-b-0 py-6">
+          <AppCard className="overflow-hidden border border-[#E5E7EB] shadow-none">
+            <AppCardHeader className="flex flex-row items-center justify-between border-b border-[#E5E7EB] bg-[#FAFAFA] py-6">
               <AppCardTitle className="text-xl font-bold">Clinical Queue</AppCardTitle>
-              <AppButton asChild size="sm" variant="outline" className="bg-white">
+              <AppButton asChild size="sm" variant="outline" className="border-[#E5E7EB] bg-white text-[#1E3A5F] hover:bg-[#FAFAFA]">
                 <Link href="/dashboard/provider/calendar">Full Calendar</Link>
               </AppButton>
             </AppCardHeader>
@@ -130,7 +132,7 @@ export function ProviderDashboard() {
                       key={apt.id}
                       className={cn(
                         "flex items-center justify-between px-6 py-5 transition-colors hover:bg-slate-50",
-                        currentAppointment?.id === apt.id && "bg-primary-50/30"
+                        currentAppointment?.id === apt.id && "bg-[#F0FDFA]"
                       )}
                     >
                       <div className="flex items-start gap-4">
@@ -141,7 +143,7 @@ export function ProviderDashboard() {
                           <p className="font-bold text-slate-900 flex items-center gap-2">
                             {apt.patient?.name ?? 'Patient'}
                             {currentAppointment?.id === apt.id && (
-                              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+                              <span className="inline-flex items-center rounded-full bg-[#F0FDFA] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0F766E]">
                                 Current
                               </span>
                             )}
@@ -159,7 +161,7 @@ export function ProviderDashboard() {
                             </a>
                           </AppButton>
                         )}
-                        <AppButton size="sm" className="rounded-full shadow-sm" asChild>
+                        <AppButton size="sm" className="rounded-lg bg-[#0D9488] text-white shadow-none hover:bg-[#0F766E]" asChild>
                           <Link href={`/dashboard/provider/appointments/${apt.id}`}>
                             Open Charts
                           </Link>
@@ -175,20 +177,20 @@ export function ProviderDashboard() {
 
         {/* Side Actions / Insights */}
         <div className="space-y-6">
-          <AppCard className="bg-primary-600 text-white overflow-hidden">
+          <AppCard className="overflow-hidden border border-[#2B476A] bg-[#1E3A5F] text-white">
             <AppCardContent className="p-8 space-y-6">
               <h3 className="text-lg font-bold">Ready for Scribe?</h3>
-              <p className="text-primary-100 text-sm leading-relaxed">
+              <p className="text-sm leading-relaxed text-white/75">
                 Use Medoflow AI Scribe to automatically document your consultations and generate SOAP notes in seconds.
               </p>
-              <AppButton className="w-full bg-white text-primary-600 hover:bg-primary-50 border-none rounded-full font-bold">
+              <AppButton className="w-full rounded-lg border-none bg-white font-bold text-[#1E3A5F] hover:bg-white/90">
                 Learn how it works
               </AppButton>
             </AppCardContent>
           </AppCard>
 
-          <AppCard>
-            <AppCardHeader>
+          <AppCard className="overflow-hidden border border-[#E5E7EB] shadow-none">
+            <AppCardHeader className="border-b border-[#E5E7EB] bg-[#FAFAFA]">
               <AppCardTitle>Quick Links</AppCardTitle>
             </AppCardHeader>
             <AppCardContent className="p-0">
@@ -220,29 +222,5 @@ export function ProviderDashboard() {
         </div>
       </div>
     </PageContainer>
-  );
-}
-
-// Helper for conditional classes
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
-}
-
-function ChevronRight(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m9 18 6-6-9-6" />
-    </svg>
   );
 }

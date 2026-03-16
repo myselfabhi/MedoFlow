@@ -21,9 +21,9 @@ const setRefreshTokenCookie = (res: Response, token: string): void => {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: crossOrigin ? 'none' : 'strict',
+    sameSite: isProduction ? 'strict' : 'lax', // Use lax for local dev to allow cross-port requests
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/api/v1/auth',
+    path: '/', // Ensure it's sent for all requests
   });
 };
 
@@ -32,8 +32,8 @@ const clearRefreshTokenCookie = (res: Response): void => {
   res.clearCookie(REFRESH_TOKEN_COOKIE, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: crossOrigin ? 'none' : 'strict',
-    path: '/api/v1/auth',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    path: '/',
   });
 };
 

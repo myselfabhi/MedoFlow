@@ -46,5 +46,12 @@ export default function DashboardPage() {
     );
   }
 
-  return <PatientDashboard />;
+  return (
+    <div className="mx-auto max-w-2xl px-6 py-16 text-center">
+      <h1 className="text-2xl font-bold text-slate-900">Dashboard Unavailable</h1>
+      <p className="mt-2 text-sm text-slate-600">
+        Your account role does not have a configured dashboard yet. Please contact your clinic administrator.
+      </p>
+    </div>
+  );
 }

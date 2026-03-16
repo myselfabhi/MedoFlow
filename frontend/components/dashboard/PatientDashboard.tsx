@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import api from '@/lib/api';
 import {
   AppCard,
   AppCardHeader,
@@ -13,7 +12,6 @@ import {
   KPIStatCard
 } from '@/components/ui-system';
 import { PageContainer } from '@/components/layout';
-import type { User } from '@/lib/types';
 import { 
   CalendarPlus, 
   Calendar, 
@@ -21,11 +19,11 @@ import {
   Package, 
   ChevronRight, 
   Clock,
-  History,
-  ShoppingBag
+  History
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMyAppointments, getMyPackages, type PatientAppointment } from '@/lib/patientApi';
+import { getMyAppointments, getMyInvoices, getMyPackages, type PatientAppointment } from '@/lib/patientApi';
+import { getGreetingName } from '@/lib/utils';
 
 export function PatientDashboard() {
   const { user, isLoading: userLoading } = useAuth();
@@ -42,11 +40,18 @@ export function PatientDashboard() {
     enabled: !!user,
   });
 
-  const upcoming = appointments
-    .filter((a: PatientAppointment) => new Date(a.startTime) > new Date() && a.status !== 'CANCELLED')
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ['patient-invoices'],
+    queryFn: () => getMyInvoices(),
+    enabled: !!user,
+  });
+
+  const appointmentsList = appointments || [];
+  const upcoming = appointmentsList
+    .filter((a: PatientAppointment) => a && a.startTime && new Date(a.startTime) > new Date() && a.status !== 'CANCELLED')
     .sort((a: PatientAppointment, b: PatientAppointment) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-  const isLoading = userLoading || appointmentsLoading || packagesLoading;
+  const isLoading = userLoading || appointmentsLoading || packagesLoading || invoicesLoading;
 
   if (userLoading) {
     return (
@@ -56,12 +61,26 @@ export function PatientDashboard() {
     );
   }
 
+  if (user && user.role !== 'PATIENT') {
+    return null;
+  }
+
   const bookHref = user?.clinicId ? `/clinic/${user.clinicId}` : '/';
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number') return value;
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const outstandingBalance = (invoices || []).reduce(
+    (sum, invoice: any) => sum + toNumber(invoice?.outstandingAmount),
+    0
+  );
 
   return (
     <PageContainer className="space-y-8">
       <AppPageHeader
-        title={`Hello, ${user?.name?.split(' ')[0] || 'Patient'}`}
+        title={`Hello, ${getGreetingName(user?.name, 'Patient')}`}
         description="Welcome to your care portal. Manage your health journey here."
         actions={
           <AppButton asChild className="rounded-full px-6 shadow-md">
@@ -78,30 +97,30 @@ export function PatientDashboard() {
           label="Upcoming Visits"
           value={isLoading ? '...' : upcoming.length}
           icon={Calendar}
-          iconClassName="text-blue-600 bg-blue-50"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
           description="Your scheduled care"
         />
         <KPIStatCard 
           label="Active Packages"
-          value={isLoading ? '...' : packages.length}
+          value={isLoading ? '...' : (packages || []).length}
           icon={Package}
-          iconClassName="text-purple-600 bg-purple-50"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
           description="Pre-paid health sessions"
         />
         <KPIStatCard 
-          label="Total Spent"
-          value="$450.00"
+          label="Outstanding Balance"
+          value={isLoading ? '...' : `$${outstandingBalance.toFixed(2)}`}
           icon={CreditCard}
-          iconClassName="text-emerald-600 bg-emerald-50"
-          description="Patient ledger summary"
+          iconClassName="text-[#1E3A5F] bg-[#F4F4F5]"
+          description="Amount due across invoices"
         />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Upcoming Appointments */}
         <div className="lg:col-span-2 space-y-6">
-          <AppCard className="border-none shadow-sm overflow-hidden">
-            <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+          <AppCard className="overflow-hidden border border-[#E5E7EB] shadow-none">
+            <AppCardHeader className="border-b border-[#E5E7EB] bg-[#FAFAFA] py-6">
               <AppCardTitle className="text-xl font-bold">Upcoming Appointments</AppCardTitle>
             </AppCardHeader>
             <AppCardContent className="p-0">
@@ -110,21 +129,21 @@ export function PatientDashboard() {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
                 </div>
               ) : upcoming.length === 0 ? (
-                <div className="p-12 text-center text-slate-500">
-                  <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="h-8 w-8 opacity-20" />
+                  <div className="p-12 text-center text-slate-500">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#F4F4F5]">
+                      <Calendar className="h-8 w-8 opacity-20" />
+                    </div>
+                    <p className="font-medium">No upcoming appointments.</p>
+                    <AppButton variant="ghost" asChild className="mt-2 text-[#0D9488] hover:bg-[#F0FDFA] hover:text-[#0F766E]">
+                      <Link href={bookHref}>Schedule your next visit →</Link>
+                    </AppButton>
                   </div>
-                  <p className="font-medium">No upcoming appointments.</p>
-                  <AppButton variant="ghost" asChild className="mt-2 text-primary-600">
-                    <Link href={bookHref}>Schedule your next visit →</Link>
-                  </AppButton>
-                </div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {upcoming.map((apt: PatientAppointment) => (
                     <div key={apt.id} className="flex items-center justify-between px-6 py-5 hover:bg-slate-50 transition-colors">
                       <div className="flex gap-4">
-                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-slate-100 text-slate-900 border border-slate-200">
+                          <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-slate-900">
                           <span className="text-[10px] uppercase font-bold text-slate-500">{new Date(apt.startTime).toLocaleString('en-US', { month: 'short' })}</span>
                           <span className="text-lg font-black leading-none">{new Date(apt.startTime).getDate()}</span>
                         </div>
@@ -137,7 +156,7 @@ export function PatientDashboard() {
                           </div>
                         </div>
                       </div>
-                      <AppButton variant="ghost" size="sm" asChild className="rounded-full">
+                      <AppButton variant="ghost" size="sm" asChild className="rounded-lg text-[#0D9488] hover:bg-[#F0FDFA] hover:text-[#0F766E]">
                         <Link href={`/dashboard/patient/appointments/${apt.id}`}>Details</Link>
                       </AppButton>
                     </div>
@@ -148,8 +167,8 @@ export function PatientDashboard() {
           </AppCard>
 
           {/* Recent History Shortcut */}
-          <AppCard className="border-none shadow-sm overflow-hidden">
-            <AppCardHeader className="bg-slate-50/50 border-b-0 py-6">
+          <AppCard className="overflow-hidden border border-[#E5E7EB] shadow-none">
+            <AppCardHeader className="border-b border-[#E5E7EB] bg-[#FAFAFA] py-6">
               <AppCardTitle className="text-xl font-bold">Recent Care Summaries</AppCardTitle>
             </AppCardHeader>
             <AppCardContent className="p-0">
@@ -163,20 +182,20 @@ export function PatientDashboard() {
 
         {/* Side Actions */}
         <div className="space-y-6">
-          <AppCard className="bg-slate-900 text-white overflow-hidden">
+          <AppCard className="overflow-hidden border border-[#2B476A] bg-[#1E3A5F] text-white">
             <AppCardContent className="p-8 space-y-6">
               <h3 className="text-lg font-bold">Visit our Store</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
+              <p className="text-sm leading-relaxed text-white/75">
                 Purchase recommended supplements and wellness packages directly from your portal.
               </p>
-              <AppButton className="w-full bg-primary-600 hover:bg-primary-700 border-none rounded-full font-bold shadow-lg" asChild>
+              <AppButton className="w-full rounded-lg border-none bg-white font-bold text-[#1E3A5F] hover:bg-white/90" asChild>
                 <Link href="/store">Explore Store</Link>
               </AppButton>
             </AppCardContent>
           </AppCard>
 
-          <AppCard>
-            <AppCardHeader>
+          <AppCard className="overflow-hidden border border-[#E5E7EB] shadow-none">
+            <AppCardHeader className="border-b border-[#E5E7EB] bg-[#FAFAFA]">
               <AppCardTitle>Quick Links</AppCardTitle>
             </AppCardHeader>
             <AppCardContent className="p-0">

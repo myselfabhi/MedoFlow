@@ -67,7 +67,7 @@ export function ChaosToClaritySection() {
           >
             <div className="flex justify-between items-start mb-4 relative z-20">
               <h3 className="text-xl font-bold font-display text-primary">The Medoflow Way</h3>
-              <span className="px-2.5 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest">After</span>
+              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest">After</span>
             </div>
             <p className="text-sm text-slate-600 mb-10 relative z-20 leading-relaxed">
               Everything in sync. One platform. Zero integration headaches.
@@ -81,7 +81,7 @@ export function ChaosToClaritySection() {
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
-                className="absolute w-14 h-14 bg-accent rounded-full flex items-center justify-center text-white font-bold text-xl shadow-[0_0_40px_-10px_hsl(172_89%_32%/0.4)] z-20"
+                className="absolute w-14 h-14 bg-primary rounded-full flex items-center justify-center text-white font-bold text-xl shadow-[0_0_40px_-10px_rgba(30,58,95,0.4)] z-20"
               >
                 M
               </motion.div>
@@ -108,7 +108,7 @@ export function ChaosToClaritySection() {
               <OrbitNode icon={<CreditCard />} label="Payments" angle={20} radius={100} delay={0.7} />
               <OrbitNode icon={<BarChart />} label="Analytics" angle={-30} radius={120} delay={0.8} />
 
-              <div className="absolute inset-0 bg-accent/5 blur-[60px] rounded-full z-0" />
+              <div className="absolute inset-0 bg-primary/5 blur-[60px] rounded-full z-0" />
             </div>
           </motion.div>
         </div>
@@ -149,7 +149,7 @@ function OrbitNode({ icon, label, angle, radius, delay }: { icon: React.ReactNod
       }}
       className="absolute flex flex-col items-center gap-1.5 z-10"
     >
-      <div className="w-8 h-8 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-accent">
+      <div className="w-8 h-8 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-primary">
         {React.cloneElement(icon as React.ReactElement, { className: 'w-3.5 h-3.5' })}
       </div>
       <span className="text-[9px] font-bold text-slate-500 bg-white/60 px-1.5 py-0.5 rounded shadow-sm backdrop-blur-sm uppercase tracking-wider">{label}</span>

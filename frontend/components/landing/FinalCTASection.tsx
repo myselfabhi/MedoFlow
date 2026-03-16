@@ -17,12 +17,12 @@ export function FinalCTASection() {
         </p>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <AppButton size="lg" className="rounded-full bg-primary text-white hover:bg-primary-900 px-8 h-12 text-sm font-medium" asChild>
+          <AppButton size="lg" className="px-8 h-12 text-sm font-medium" asChild>
             <Link href="#demo">
               Book a Demo <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
           </AppButton>
-          <AppButton variant="outline" size="lg" className="rounded-full bg-white border-slate-200 text-slate-700 hover:bg-slate-50 px-8 h-12 text-sm font-medium" asChild>
+          <AppButton variant="outline" size="lg" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-primary px-8 h-12 text-sm font-medium" asChild>
             <Link href="/register">
               Start Free Trial
             </Link>

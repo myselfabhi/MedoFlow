@@ -3,8 +3,8 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useIsFetching, useIsMutating } from '@tanstack/react-query';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { JumpingClinicalLoader } from './JumpingClinicalLoader';
 import { cn } from '@/lib/utils';
+import { AppLogo } from './AppLogo';
 
 function GlobalApiLoaderContent() {
   const isFetching = useIsFetching();
@@ -47,7 +47,7 @@ function GlobalApiLoaderContent() {
       isNavigating && "bg-white/60"
     )}>
       <div className="space-y-6 text-center">
-        <JumpingClinicalLoader />
+        <AppLogo showText={false} size="xl" animated={false} className="justify-center scale-[2.4] sm:scale-[2.8]" />
         <div className="space-y-1">
           <p className="text-sm font-semibold text-slate-600 tracking-wide">
             Medoflow

@@ -69,15 +69,15 @@ function SetPasswordForm() {
 
   if (!token) {
     return (
-      <AppCard>
+      <AppCard className="border border-border shadow-card rounded-2xl bg-card">
         <AppCardHeader>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Set Password</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Set Password</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Invalid or missing invite link. Please contact your administrator to request a new invite.
           </p>
         </AppCardHeader>
         <AppCardContent>
-          <AppButton asChild variant="outline" className="w-full">
+          <AppButton asChild variant="outline" className="w-full rounded-xl">
             <Link href="/login">Back to login</Link>
           </AppButton>
         </AppCardContent>
@@ -87,10 +87,10 @@ function SetPasswordForm() {
 
   if (success) {
     return (
-      <AppCard>
+      <AppCard className="border border-border shadow-card rounded-2xl bg-card">
         <AppCardContent className="flex flex-col items-center gap-4 py-8">
-          <p className="text-center text-slate-900 font-medium">Password set successfully.</p>
-          <p className="text-center text-sm text-slate-500">
+          <p className="text-center text-foreground font-medium">Password set successfully.</p>
+          <p className="text-center text-sm text-muted-foreground">
             Redirecting to login...
           </p>
         </AppCardContent>
@@ -99,10 +99,10 @@ function SetPasswordForm() {
   }
 
   return (
-    <AppCard>
+    <AppCard className="border border-border shadow-card rounded-2xl bg-card">
       <AppCardHeader>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Set your password</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Set your password</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Create a password to access your Medoflow account.
         </p>
       </AppCardHeader>
@@ -115,13 +115,14 @@ function SetPasswordForm() {
           className="space-y-4"
         >
           {error && (
-            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive font-medium">{error}</div>
           )}
           <AppFormField label="Password" htmlFor="password" error={errors.password?.message}>
             <AppInput
               id="password"
               type="password"
               autoComplete="new-password"
+              className="rounded-xl border-input"
               {...register('password')}
             />
           </AppFormField>
@@ -130,20 +131,21 @@ function SetPasswordForm() {
               id="confirmPassword"
               type="password"
               autoComplete="new-password"
+              className="rounded-xl border-input"
               {...register('confirmPassword')}
             />
           </AppFormField>
           <AppButton
             type="submit"
             disabled={isSubmitting}
-            className="w-full"
+            className="w-full rounded-xl"
           >
             {isSubmitting ? 'Setting password...' : 'Set password'}
           </AppButton>
         </form>
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
+          <Link href="/login" className="font-semibold text-primary hover:text-primary-700 transition-colors">
             Sign in
           </Link>
         </p>
@@ -156,8 +158,8 @@ export default function SetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <AppCard>
-          <AppCardContent className="py-12 text-center text-slate-500">Loading...</AppCardContent>
+        <AppCard className="border border-border bg-card rounded-2xl">
+          <AppCardContent className="py-12 text-center text-muted-foreground">Loading...</AppCardContent>
         </AppCard>
       }
     >

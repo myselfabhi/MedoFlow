@@ -64,7 +64,7 @@ export function ROICalculatorSection() {
                   max="20" 
                   value={staff}
                   onChange={(e) => setStaff(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-accent hover:accent-accent/80 transition-all"
+                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-700 transition-all"
                 />
                 <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>1 person</span>
@@ -87,7 +87,7 @@ export function ROICalculatorSection() {
                   max="40" 
                   value={hours}
                   onChange={(e) => setHours(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-accent hover:accent-accent/80 transition-all"
+                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-700 transition-all"
                 />
                 <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>5 hours</span>
