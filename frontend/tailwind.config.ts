@@ -78,8 +78,8 @@ const config: Config = {
         sm: 'calc(0.75rem - 4px)',
       },
       boxShadow: {
-        card: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        card: '0 8px 30px rgb(0 0 0 / 0.04)',
+        'card-hover': '0 16px 40px rgb(0 0 0 / 0.08)',
         glass: '0 8px 32px 0 rgba(0, 0, 0, 0.08)',
         glow: '0 0 40px -10px rgba(13, 148, 136, 0.3)',
       },

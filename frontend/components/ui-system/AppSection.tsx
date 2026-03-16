@@ -21,7 +21,7 @@ export function AppSection({
       {(title || description) && (
         <div>
           {title && (
-            <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>
           )}
           {description && (
             <p className="mt-1 text-sm text-slate-600">{description}</p>

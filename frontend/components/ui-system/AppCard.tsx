@@ -13,7 +13,7 @@ const AppCard = React.forwardRef<HTMLDivElement, AppCardProps>(
     <div
       ref={ref}
       className={cn(
-        'rounded-lg border border-border bg-card shadow-card transition-shadow',
+        'rounded-2xl border border-slate-100 bg-card shadow-card transition-shadow',
         hover && 'hover:shadow-card-hover',
         className
       )}
@@ -32,7 +32,7 @@ const AppCardHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'border-b border-border px-6 py-4',
+      'border-b border-slate-100 px-6 py-4',
       className
     )}
     {...props}
@@ -67,7 +67,7 @@ const AppCardFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex items-center gap-2 border-t border-border px-6 py-4',
+      'flex items-center gap-2 border-t border-slate-100 px-6 py-4',
       className
     )}
     {...props}

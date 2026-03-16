@@ -85,6 +85,7 @@ const letterGroups = [
 
 export function AppLogo({
   className,
+  variant = 'dark',
   showText = true,
   size = 'md',
   animated = true,
@@ -121,14 +122,25 @@ export function AppLogo({
                   animationDelay: `${groupIndex * 0.07}s`,
                 } : undefined}
               >
-                {group.paths.map((path, pathIndex) => (
-                  <path
-                    key={pathIndex}
-                    d={path.d}
-                    fill={path.fill}
-                    transform={path.transform}
-                  />
-                ))}
+                {group.paths.map((path, pathIndex) => {
+                  // For light variant, override dark text fills to white (keep icon teal fills intact)
+                  let fill = path.fill;
+                  if (variant === 'light' && !isIcon) {
+                    const upper = fill.toUpperCase();
+                    // Override dark navy fills, keep light inner fills (FBFCFD, FDFDFE)
+                    if (upper.startsWith('#2') || upper.startsWith('#3') || upper === '#1E3A5F') {
+                      fill = '#FFFFFF';
+                    }
+                  }
+                  return (
+                    <path
+                      key={pathIndex}
+                      d={path.d}
+                      fill={fill}
+                      transform={path.transform}
+                    />
+                  );
+                })}
               </g>
             );
             // Wrap icon in a scale group so it's visually larger than the text

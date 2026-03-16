@@ -32,7 +32,7 @@ const AppButton = React.forwardRef<HTMLButtonElement, AppButtonProps>(
         variant={variantMap[variant]}
         size={size}
         className={cn(
-          'rounded-lg font-medium transition-colors',
+          'rounded-xl font-medium transition-colors',
           isPrimary && 'bg-accent text-accent-foreground hover:bg-accent/90',
           variant === 'secondary' && 'bg-muted/20 text-foreground hover:bg-muted/30',
           variant === 'outline' && 'border-border text-foreground hover:bg-subtle',

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppLogo } from '@/components/common/AppLogo';
 
 export default function AuthLayout({
   children,
@@ -13,10 +14,10 @@ export default function AuthLayout({
           <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-primary-600 blur-[120px]" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500 blur-[100px]" />
         </div>
-        
+
         <div className="relative z-10 max-w-md space-y-8 text-center lg:text-left">
-          <Link href="/" className="inline-block text-3xl font-black tracking-tighter text-white">
-            Medoflow<span className="text-primary-500">.</span>
+          <Link href="/" className="inline-block">
+            <AppLogo size="lg" variant="light" animated />
           </Link>
           <div className="space-y-4">
             <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
@@ -27,7 +28,7 @@ export default function AuthLayout({
               The modern operating system for premium self-pay clinics. Join hundreds of providers delivering better outcomes.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-6 pt-8">
             <div className="space-y-2">
               <p className="text-2xl font-bold text-white">100%</p>
@@ -42,11 +43,11 @@ export default function AuthLayout({
       </div>
 
       {/* Right side: Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-slate-50 md:bg-white">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-[#fafafa] md:bg-white">
         <div className="w-full max-w-[400px] space-y-8">
           <div className="md:hidden text-center mb-8">
-            <Link href="/" className="text-2xl font-black tracking-tighter text-primary-600">
-              Medoflow.
+            <Link href="/">
+              <AppLogo size="md" />
             </Link>
           </div>
           {children}

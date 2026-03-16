@@ -25,8 +25,8 @@ export function AppEmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-[var(--radius)]',
-        'border border-dashed border-slate-200 bg-slate-50/50 py-12 px-6 text-center',
+        'flex flex-col items-center justify-center rounded-2xl',
+        'border border-dashed border-slate-100 bg-slate-50/50 py-12 px-6 text-center',
         className
       )}
     >

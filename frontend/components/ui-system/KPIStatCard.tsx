@@ -33,7 +33,7 @@ export function KPIStatCard({
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</p>
           {Icon && (
-            <div className={cn('p-2 rounded-lg bg-slate-50', iconClassName)}>
+            <div className={cn('p-2 rounded-xl bg-slate-50', iconClassName)}>
               <Icon className="h-4 w-4" />
             </div>
           )}

@@ -12,7 +12,7 @@ const AppInput = React.forwardRef<HTMLInputElement, AppInputProps>(
     <Input
       ref={ref}
       className={cn(
-        'rounded-[12px] border-slate-200 bg-white text-slate-900 placeholder:text-muted',
+        'rounded-[12px] border-slate-200/80 bg-white text-slate-900 placeholder:text-muted',
         'focus-visible:ring-accent/20 focus-visible:border-accent',
         className
       )}

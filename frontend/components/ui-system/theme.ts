@@ -29,9 +29,9 @@ export const theme = {
     },
   },
   radius: {
-    lg: '16px',
-    md: '12px',
-    sm: '8px',
+    lg: '24px',
+    md: '16px',
+    sm: '12px',
   },
   spacing: {
     page: '1.5rem', // 24px = p-6
@@ -39,7 +39,7 @@ export const theme = {
     card: '1.5rem', // p-6
   },
   shadow: {
-    card: '0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)',
+    card: '0 8px 30px rgb(0 0 0 / 0.04)',
   },
 } as const;
 

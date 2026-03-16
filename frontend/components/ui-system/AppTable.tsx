@@ -41,10 +41,10 @@ export function AppTable<T>({
   className,
 }: AppTableProps<T>) {
   return (
-    <div className={cn('w-full overflow-x-auto', className)}>
+    <div className={cn('w-full overflow-x-auto rounded-2xl border border-slate-100', className)}>
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border hover:bg-transparent">
+          <TableRow className="border-b border-slate-100 hover:bg-transparent">
             {columns.map((col) => (
               <TableHead
                 key={col.key}
@@ -77,7 +77,7 @@ export function AppTable<T>({
             data.map((item) => (
               <TableRow
                 key={keyExtractor(item)}
-                className="border-b border-border text-sm hover:bg-subtle transition-colors"
+                className="border-b border-slate-100 text-sm hover:bg-subtle transition-colors"
               >
                 {columns.map((col) => (
                   <TableCell

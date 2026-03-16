@@ -14,7 +14,7 @@ function AppBadge({ className, variant = 'outline', ...props }: AppBadgeProps) {
     <Badge
       variant="outline"
       className={cn(
-        'rounded-md border px-2.5 py-0.5 text-xs font-medium',
+        'rounded-full border px-2.5 py-0.5 text-xs font-medium',
         variant === 'success' && 'bg-success/10 text-success border-success/20',
         variant === 'warning' && 'bg-warning/10 text-warning border-warning/20',
         (variant === 'destructive' || variant === 'danger') && 'bg-destructive/10 text-destructive border-destructive/20',

@@ -46,7 +46,7 @@ export function AppModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          'rounded-[var(--radius)] border-slate-200 bg-card shadow-card max-w-lg',
+          'rounded-3xl border-slate-100 bg-card shadow-card max-w-lg',
           className
         )}
       >

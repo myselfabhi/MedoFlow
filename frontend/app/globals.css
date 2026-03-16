@@ -45,6 +45,12 @@
   }
 }
 
+@layer base {
+  body {
+    @apply bg-[#fafafa];
+  }
+}
+
 @keyframes logoLetterIn {
   0% {
     opacity: 0;
