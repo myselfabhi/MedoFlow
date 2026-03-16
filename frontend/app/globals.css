@@ -46,8 +46,27 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-[#fafafa];
+  }
+  ::selection {
+    background-color: rgba(13, 148, 136, 0.15);
+    color: #1E3A5F;
+  }
+}
+
+@layer utilities {
+  .ai-gradient-text {
+    background: linear-gradient(135deg, #1C8B81 0%, #1A6B7A 50%, #223C58 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .ai-gradient-bg {
+    background: linear-gradient(135deg, #1C8B81 0%, #1A6B7A 50%, #223C58 100%);
   }
 }
 

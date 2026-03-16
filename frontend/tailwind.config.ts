@@ -82,6 +82,7 @@ const config: Config = {
         'card-hover': '0 16px 40px rgb(0 0 0 / 0.08)',
         glass: '0 8px 32px 0 rgba(0, 0, 0, 0.08)',
         glow: '0 0 40px -10px rgba(13, 148, 136, 0.3)',
+        'glow-lg': '0 0 60px -15px rgba(28, 139, 129, 0.4)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
@@ -120,6 +121,14 @@ const config: Config = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.85' },
         },
+        'marquee': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        'pulse-glow': {
+          '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+          '50%': { opacity: '0.8', transform: 'scale(1.05)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -128,6 +137,8 @@ const config: Config = {
         'buoyancy': 'buoyancy 4s infinite ease-in-out',
         'logo-entrance': 'logo-entrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         'logo-pulse': 'logo-pulse 3s ease-in-out infinite',
+        'marquee': 'marquee 30s linear infinite',
+        'pulse-glow': 'pulse-glow 4s ease-in-out infinite',
       },
     },
   },

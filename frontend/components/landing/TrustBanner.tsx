@@ -1,42 +1,50 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Shield, Lock, FileText } from 'lucide-react';
+import { ScrollReveal } from './ScrollReveal';
+
+const specialties = [
+  'Primary Care',
+  'Dermatology',
+  'Mental Health',
+  'Orthopedics',
+  'Pediatrics',
+  'Cardiology',
+  'Med Spas',
+  'Wellness Clinics',
+  'Internal Medicine',
+  'Neurology',
+];
 
 export function TrustBanner() {
-  return (
-    <section className="py-16 bg-[#fafafa] border-b border-slate-100">
-      <div className="container mx-auto px-4">
-        {/* Security Features */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 mb-12">
-          <div className="flex items-center gap-2.5 text-slate-500 text-sm font-medium">
-            <Shield className="h-4 w-4 text-slate-400" />
-            <span>HIPAA Compliant</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-slate-500 text-sm font-medium">
-            <Lock className="h-4 w-4 text-slate-400" />
-            <span>SOC2 Type II</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-slate-500 text-sm font-medium">
-            <FileText className="h-4 w-4 text-slate-400" />
-            <span>256-bit Encryption</span>
-          </div>
-        </div>
+  // Double the list for seamless marquee
+  const doubled = [...specialties, ...specialties];
 
-        {/* Trusted By text */}
-        <div className="text-center space-y-6">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-            Trusted by forward-thinking practices across the country
+  return (
+    <section className="py-14 bg-white border-y border-slate-100 overflow-hidden">
+      <div className="container mx-auto px-4 mb-8">
+        <ScrollReveal>
+          <p className="text-center text-xs font-semibold text-slate-400 uppercase tracking-[0.2em]">
+            Trusted by forward-thinking practices across every specialty
           </p>
-          
-          <div className="flex flex-wrap justify-center gap-x-10 gap-y-4 text-lg font-display font-bold text-slate-200/80">
-            <span>Vitality Medical</span>
-            <span>Evergreen Clinic</span>
-            <span>Summit Health</span>
-            <span>Wellness Partners</span>
-            <span>Horizon Care</span>
-          </div>
+        </ScrollReveal>
+      </div>
+
+      {/* Marquee */}
+      <div className="relative">
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10" />
+
+        <div className="flex animate-marquee">
+          {doubled.map((name, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 mx-6 px-6 py-3 rounded-full border border-slate-100 bg-slate-50/50 text-sm font-display font-semibold text-slate-400 hover:text-slate-600 hover:border-slate-200 hover:bg-white transition-all duration-300 cursor-default"
+            >
+              {name}
+            </div>
+          ))}
         </div>
       </div>
     </section>
