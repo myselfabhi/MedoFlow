@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans } from 'next/font/google';
+import { Inter, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SystemModalProvider } from '@/components/system/SystemModalProvider';
@@ -7,10 +7,15 @@ import { QueryProvider } from '@/components/QueryProvider';
 import { GlobalApiLoader } from '@/components/common/GlobalApiLoader';
 import { Toaster } from '@/components/ui/sonner';
 
-const ibmPlexSans = IBM_Plex_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-ibm-plex-sans',
+  variable: '--font-inter',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-dm-sans',
 });
 
 export const metadata: Metadata = {
@@ -25,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${ibmPlexSans.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${dmSans.variable} font-sans antialiased bg-white`}>
         <QueryProvider>
           <AuthProvider>
             <SystemModalProvider>
