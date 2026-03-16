@@ -9,15 +9,22 @@ import { Server } from 'http';
 const PORT = process.env.PORT || 3000;
 let server: Server;
 
-const connectDatabase = async (): Promise<void> => {
-  try {
-    await prisma.$connect();
-  } catch (error) {
-    console.error(
-      'Database connection failed:',
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    process.exit(1);
+const connectDatabase = async (retries = 5, delay = 3000): Promise<void> => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await prisma.$connect();
+      console.log('Database connected successfully.');
+      return;
+    } catch (error) {
+      console.error(
+        `Database connection failed (attempt ${attempt}/${retries}):`,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      if (attempt === retries) {
+        process.exit(1);
+      }
+      await new Promise((r) => setTimeout(r, delay));
+    }
   }
 };
 

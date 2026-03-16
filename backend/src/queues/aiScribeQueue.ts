@@ -42,12 +42,32 @@ const redisConfig = process.env.REDIS_URL ? parseRedisUrl(REDIS_URL) : connectio
 
 export const AI_SCRIBE_QUEUE_NAME = 'ai-scribe-processing';
 
-export const aiScribeQueue = new Queue(AI_SCRIBE_QUEUE_NAME, {
-  connection: redisConfig,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 5000 },
-    removeOnComplete: 100,
+let _aiScribeQueue: Queue | null = null;
+
+export function getAiScribeQueue(): Queue {
+  if (!_aiScribeQueue) {
+    _aiScribeQueue = new Queue(AI_SCRIBE_QUEUE_NAME, {
+      connection: redisConfig,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 100,
+      },
+    });
+  }
+  return _aiScribeQueue;
+}
+
+/**
+ * Lazy-initialized queue export. Calling .add() etc. will create the Redis
+ * connection on first use instead of at import time, preventing crash loops
+ * when Redis is unavailable at startup.
+ */
+export const aiScribeQueue = new Proxy({} as Queue, {
+  get(_target, prop) {
+    const queue = getAiScribeQueue();
+    const value = (queue as any)[prop];
+    return typeof value === 'function' ? value.bind(queue) : value;
   },
 });
 
