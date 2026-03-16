@@ -42,9 +42,11 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Expose port
 EXPOSE 3000
 
-# Run migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Run migrations, conditionally seed, then start server
+# Set SEED_ON_DEPLOY=true in Railway env vars to seed demo data on first deploy
+CMD ["sh", "-c", "npx prisma migrate deploy && if [ \"$SEED_ON_DEPLOY\" = \"true\" ]; then npx ts-node prisma/seed_demo.ts; fi && node dist/server.js"]
