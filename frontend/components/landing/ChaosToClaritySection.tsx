@@ -10,129 +10,149 @@ export function ChaosToClaritySection() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold font-display text-primary mb-3">
+          <motion.h2 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-4xl font-bold font-display text-primary mb-3"
+          >
             From chaos to clarity
-          </h2>
-          <p className="text-base text-slate-500">
+          </motion.h2>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-base text-slate-500"
+          >
             See the difference a unified platform makes for your practice
-          </p>
+          </motion.p>
         </div>
 
         {/* Comparison Grid */}
         <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {/* Before: The Integration Tax */}
-          <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm relative overflow-hidden min-h-[400px]">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm relative overflow-hidden min-h-[400px]"
+          >
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold font-display text-slate-900">The Integration Tax</h3>
-              <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-[10px] font-bold uppercase tracking-wider">Before</span>
+              <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-[10px] font-bold uppercase tracking-widest">Before</span>
             </div>
-            <p className="text-sm text-slate-500 mb-10">
+            <p className="text-sm text-slate-500 mb-10 leading-relaxed">
               Fragmented tools waste hours every week and create gaps in patient care.
             </p>
 
             {/* Scattered Icons */}
-            <div className="relative h-64 w-full">
-              <motion.div 
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-4 left-4 p-4 bg-white border border-slate-100 shadow-md rounded-2xl"
-              >
-                <Mail className="h-6 w-6 text-slate-400" />
-              </motion.div>
-              
-              <motion.div 
-                animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute top-12 right-12 p-4 bg-white border border-slate-100 shadow-md rounded-2xl"
-              >
-                <Calendar className="h-6 w-6 text-slate-400" />
-              </motion.div>
-
-              <motion.div 
-                animate={{ x: [0, -5, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute bottom-12 right-4 p-4 bg-white border border-slate-100 shadow-md rounded-2xl"
-              >
-                <Database className="h-6 w-6 text-slate-400" />
-              </motion.div>
-
-              <motion.div 
-                animate={{ x: [0, 5, 0] }}
-                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-                className="absolute bottom-4 right-16 p-4 bg-white border border-slate-100 shadow-md rounded-2xl z-10"
-              >
-                <CreditCard className="h-6 w-6 text-slate-400" />
-              </motion.div>
-
-              {/* Broken connection line */}
-              <div className="absolute top-1/2 left-1/4 p-4 border border-dashed border-slate-200 rounded-2xl">
+            <div className="relative h-56 w-full mt-10">
+              <ScatteredIcon icon={<Mail />} top="10%" left="15%" delay={0} />
+              <ScatteredIcon icon={<Calendar />} top="15%" right="15%" delay={1} />
+              <ScatteredIcon icon={<Database />} bottom="25%" right="10%" delay={0.5} />
+              <ScatteredIcon icon={<CreditCard />} bottom="5%" right="25%" delay={1.5} />
+              <div className="absolute top-1/2 left-1/4 p-4 border border-dashed border-slate-200 rounded-2xl opacity-40">
                 <Activity className="h-6 w-6 text-slate-300" />
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* After: The Medoflow Way */}
-          <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200 shadow-sm relative overflow-hidden min-h-[400px]">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="bg-slate-50 rounded-3xl p-8 border border-slate-200 shadow-sm relative overflow-hidden min-h-[400px]"
+          >
             <div className="flex justify-between items-start mb-4 relative z-20">
               <h3 className="text-xl font-bold font-display text-primary">The Medoflow Way</h3>
-              <span className="px-2.5 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider">After</span>
+              <span className="px-2.5 py-1 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest">After</span>
             </div>
-            <p className="text-sm text-slate-600 mb-10 relative z-20">
+            <p className="text-sm text-slate-600 mb-10 relative z-20 leading-relaxed">
               Everything in sync. One platform. Zero integration headaches.
             </p>
 
             {/* Orbital Diagram */}
-            <div className="relative h-64 w-full flex items-center justify-center">
-              {/* Center Node */}
-              <div className="absolute w-16 h-16 bg-accent rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-xl z-20">
+            <div className="relative h-64 w-full flex items-center justify-center mt-6">
+              {/* Center Node - with glow shadow */}
+              <motion.div 
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
+                className="absolute w-14 h-14 bg-accent rounded-full flex items-center justify-center text-white font-bold text-xl shadow-[0_0_40px_-10px_hsl(172_89%_32%/0.4)] z-20"
+              >
                 M
-              </div>
+              </motion.div>
 
-              {/* Rings */}
-              <div className="absolute w-48 h-48 border border-slate-200 rounded-full" />
-              <div className="absolute w-72 h-72 border border-slate-200 rounded-full" />
-              <div className="absolute w-96 h-96 border border-slate-100 rounded-full" />
+              {/* Rings with subtle rotation */}
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                className="absolute w-40 h-40 border border-slate-200/50 rounded-full"
+              />
+              <motion.div 
+                animate={{ rotate: -360 }}
+                transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
+                className="absolute w-60 h-60 border border-slate-200/30 rounded-full"
+              />
+              <div className="absolute w-80 h-80 border border-slate-100/20 rounded-full" />
 
               {/* Nodes on rings */}
-              <OrbitNode icon={<Users />} label="Patients" angle={-90} radius={80} delay={0} />
-              <OrbitNode icon={<Calendar />} label="Scheduling" angle={-160} radius={110} delay={0.2} />
-              <OrbitNode icon={<MessagesSquare />} label="Messaging" angle={160} radius={110} delay={0.4} />
-              <OrbitNode icon={<FileText />} label="Charting" angle={110} radius={130} delay={0.6} />
-              <OrbitNode icon={<ShoppingBag />} label="Commerce" angle={50} radius={130} delay={0.8} />
-              <OrbitNode icon={<CreditCard />} label="Payments" angle={20} radius={110} delay={1.0} />
-              <OrbitNode icon={<BarChart />} label="Analytics" angle={-30} radius={130} delay={1.2} />
+              <OrbitNode icon={<Users />} label="Patients" angle={-90} radius={70} delay={0.2} />
+              <OrbitNode icon={<Calendar />} label="Scheduling" angle={-160} radius={100} delay={0.3} />
+              <OrbitNode icon={<MessagesSquare />} label="Messaging" angle={160} radius={100} delay={0.4} />
+              <OrbitNode icon={<FileText />} label="Charting" angle={110} radius={120} delay={0.5} />
+              <OrbitNode icon={<ShoppingBag />} label="Commerce" angle={50} radius={120} delay={0.6} />
+              <OrbitNode icon={<CreditCard />} label="Payments" angle={20} radius={100} delay={0.7} />
+              <OrbitNode icon={<BarChart />} label="Analytics" angle={-30} radius={120} delay={0.8} />
 
-              <div className="absolute inset-0 bg-accent/5 blur-[80px] rounded-full z-0" />
+              <div className="absolute inset-0 bg-accent/5 blur-[60px] rounded-full z-0" />
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
   );
 }
 
-// Helper component for orbital nodes
+function ScatteredIcon({ icon, top, left, right, bottom, delay }: any) {
+  return (
+    <motion.div 
+      animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay }}
+      className="absolute p-3 bg-white border border-slate-100 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] rounded-xl"
+      style={{ top, left, right, bottom }}
+    >
+      {React.cloneElement(icon as React.ReactElement, { className: 'w-5 h-5 text-slate-400' })}
+    </motion.div>
+  );
+}
+
 function OrbitNode({ icon, label, angle, radius, delay }: { icon: React.ReactNode, label: string, angle: number, radius: number, delay: number }) {
-  // Convert angle to radians
   const rad = (angle * Math.PI) / 180;
   const x = Math.cos(rad) * radius;
   const y = Math.sin(rad) * radius;
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0 }}
-      whileInView={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+      whileInView={{ opacity: 1, scale: 1, x, y }}
       viewport={{ once: true }}
-      transition={{ delay: delay, duration: 0.5, type: 'spring' }}
-      className="absolute flex flex-col items-center gap-2 z-10"
-      style={{ 
-        transform: `translate(${x}px, ${y}px)` 
+      transition={{ 
+        delay, 
+        duration: 0.6, 
+        type: 'spring',
+        stiffness: 100,
+        damping: 15
       }}
+      className="absolute flex flex-col items-center gap-1.5 z-10"
     >
-      <div className="w-10 h-10 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-accent">
-        {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
+      <div className="w-8 h-8 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-accent">
+        {React.cloneElement(icon as React.ReactElement, { className: 'w-3.5 h-3.5' })}
       </div>
-      <span className="text-[10px] font-medium text-slate-500 bg-white/80 px-2 py-0.5 rounded backdrop-blur-sm">{label}</span>
+      <span className="text-[9px] font-bold text-slate-500 bg-white/60 px-1.5 py-0.5 rounded shadow-sm backdrop-blur-sm uppercase tracking-wider">{label}</span>
     </motion.div>
   );
 }

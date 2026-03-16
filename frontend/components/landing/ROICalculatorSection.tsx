@@ -1,16 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, useSpring, useTransform, animate } from 'framer-motion';
 import { Users, Clock, TrendingUp } from 'lucide-react';
 
 export function ROICalculatorSection() {
-  const [staff, setStaff] = useState(3);
+  const [staff, setStaff] = useState(4);
   const [hours, setHours] = useState(15);
+  const [displayValue, setDisplayValue] = useState(46800);
 
-  // Simple mock calculation logic to make it interactive if desired,
-  // but we can stick to static visual based on the image for now.
-  const calcSavings = staff * hours * 52 * 15; // Rough heuristic for visual
+  // Logic: (Staff * Hours * Hourly Wage * Automation Rate * Weeks)
+  // Heuristic: $46,800 is the anchor for (4 staff, 15 hours).
+  // Formula: staff * hours * 26 (avg wage) * 0.6 (automation) * 52 (weeks)
+  const calculateROI = (s: number, h: number) => {
+    return Math.round(s * h * 26 * 0.6 * 52);
+  };
+
+  useEffect(() => {
+    const newValue = calculateROI(staff, hours);
+    const controls = animate(displayValue, newValue, {
+      duration: 0.8,
+      ease: [0.4, 0, 0.2, 1],
+      onUpdate: (latest) => setDisplayValue(Math.round(latest))
+    });
+    return () => controls.stop();
+  }, [staff, hours]);
+
+  const daysFreed = ((staff * hours * 0.6) / 8).toFixed(1);
+  const hoursYear = (staff * hours * 0.6 * 52).toLocaleString();
+  const fte = (staff * hours * 0.6 / 40).toFixed(2);
 
   return (
     <section className="py-24 bg-[#fafafa]">
@@ -26,26 +44,29 @@ export function ROICalculatorSection() {
         </div>
 
         {/* Calculator Card */}
-        <div className="max-w-4xl mx-auto bg-white rounded-[2rem] p-8 md:p-10 shadow-sm border border-slate-100">
+        <div className="max-w-4xl mx-auto bg-white rounded-[2rem] p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,04)] border border-slate-100">
           <div className="grid md:grid-cols-2 gap-10">
             
             {/* Left: Inputs */}
             <div className="space-y-8">
               {/* Staff Slider */}
               <div>
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center gap-2 text-slate-700 text-sm font-medium">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2 text-slate-700 text-sm font-bold uppercase tracking-widest">
                     <Users className="w-4 h-4 text-slate-400" />
                     Admin Staff
                   </div>
-                  <span className="text-xl font-bold font-display text-slate-900">{staff}</span>
+                  <span className="text-2xl font-bold font-display text-slate-900">{staff}</span>
                 </div>
-                {/* Mock Slider Track */}
-                <div className="relative w-full h-1.5 bg-slate-100 rounded-full mt-2">
-                  <div className="absolute left-0 top-0 h-full bg-accent rounded-full w-[15%]" />
-                  <div className="absolute top-1/2 -translate-y-1/2 left-[15%] w-4 h-4 bg-white border-2 border-accent rounded-full shadow cursor-grab" />
-                </div>
-                <div className="flex justify-between mt-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="20" 
+                  value={staff}
+                  onChange={(e) => setStaff(parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-accent hover:accent-accent/80 transition-all"
+                />
+                <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>1 person</span>
                   <span>20 people</span>
                 </div>
@@ -53,76 +74,96 @@ export function ROICalculatorSection() {
 
               {/* Hours Slider */}
               <div>
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center gap-2 text-slate-700 text-sm font-medium">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2 text-slate-700 text-sm font-bold uppercase tracking-widest">
                     <Clock className="w-4 h-4 text-slate-400" />
-                    Admin Hours/Week <span className="text-[10px] w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-slate-400 cursor-help">?</span>
+                    Admin Hours/Week
                   </div>
-                  <span className="text-xl font-bold font-display text-slate-900">{hours}h</span>
+                  <span className="text-2xl font-bold font-display text-slate-900">{hours}h</span>
                 </div>
-                {/* Mock Slider Track */}
-                <div className="relative w-full h-1.5 bg-slate-100 rounded-full mt-2">
-                  <div className="absolute left-0 top-0 h-full bg-accent rounded-full w-[40%]" />
-                  <div className="absolute top-1/2 -translate-y-1/2 left-[40%] w-4 h-4 bg-white border-2 border-accent rounded-full shadow cursor-grab" />
-                </div>
-                <div className="flex justify-between mt-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                <input 
+                  type="range" 
+                  min="5" 
+                  max="40" 
+                  value={hours}
+                  onChange={(e) => setHours(parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-accent hover:accent-accent/80 transition-all"
+                />
+                <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>5 hours</span>
-                  <span>30 hours</span>
+                  <span>40 hours</span>
                 </div>
               </div>
 
               {/* Info Box */}
-              <div className="bg-slate-50 rounded-xl p-3 text-[11px] text-slate-500 flex gap-2">
-                <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center shrink-0 mt-0.5">i</div>
-                <div>
-                  <span className="font-medium text-slate-700 block mb-0.5">How we calculate this</span>
+              <div className="bg-slate-50 rounded-xl p-4 text-[11px] text-slate-500 flex gap-3 border border-slate-100">
+                <div className="w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center shrink-0 text-[10px] font-bold">i</div>
+                <div className="leading-relaxed">
+                  <span className="font-bold text-slate-700 block mb-0.5 uppercase tracking-wider text-[9px]">How we calculate this</span>
                   Based on US healthcare admin wages ($22–$28/hr avg) and 60% automation across scheduling, intake, follow-ups, and commerce tasks.
                 </div>
               </div>
             </div>
 
             {/* Right: Output */}
-            <div className="bg-slate-100/50 rounded-2xl p-6 border border-slate-200 text-center flex flex-col justify-center">
+            <div className="bg-slate-100/40 rounded-2xl p-8 border border-slate-200 text-center flex flex-col justify-center relative overflow-hidden">
               <div className="w-10 h-10 bg-slate-200 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <TrendingUp className="w-5 h-5 text-slate-600" />
               </div>
-              <p className="text-xs font-medium text-slate-500 mb-1">Admin Capacity Freed Annually</p>
-              <h3 className="text-4xl font-bold font-display text-slate-900 mb-1">$35,100</h3>
-              <p className="text-[10px] text-slate-400 mb-6 uppercase tracking-wider">worth of time reallocated to patient care</p>
+              <p className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Admin Capacity Freed Annually</p>
+              <h3 className="text-5xl font-bold font-display text-slate-900 mb-2">
+                ${displayValue.toLocaleString()}
+              </h3>
+              <p className="text-[10px] text-slate-400 mb-8 font-medium">worth of time reallocated to patient care</p>
 
-              <div className="border-t border-slate-200 pt-4 grid grid-cols-3 gap-3">
+              <div className="border-t border-slate-200 pt-6 grid grid-cols-3 gap-3">
                 <div>
-                  <p className="text-lg font-bold text-slate-900">3.4</p>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">days/week freed</p>
+                  <p className="text-xl font-bold text-slate-900">{daysFreed}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">days/week freed</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-slate-900">1,404</p>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">hours/year</p>
+                  <p className="text-xl font-bold text-slate-900">{hoursYear}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">hours/year</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-slate-900">0.68</p>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">FTE equivalent</p>
+                  <p className="text-xl font-bold text-slate-900">{fte}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">FTE equivalent</p>
                 </div>
               </div>
-              <p className="text-[9px] text-slate-400 mt-5">Time reallocated to higher-value work — not headcount reduction</p>
+              <p className="text-[9px] text-slate-400 mt-6 italic font-medium">Time reallocated to higher-value work — not headcount reduction</p>
             </div>
           </div>
         </div>
 
         {/* Bottom Stats */}
-        <div className="max-w-4xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-          <div>
+        <div className="max-w-4xl mx-auto mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            whileInView={{ opacity: 1, y: 0 }} 
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
+          >
             <p className="text-2xl font-bold font-display text-slate-900 mb-1">12–20h</p>
-            <p className="text-xs text-slate-500">Admin time saved / week <br/><span className="text-[9px] text-slate-400 uppercase tracking-wider">for Clinics</span></p>
-          </div>
-          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Admin time saved / week <br/><span className="text-[9px] lowercase opacity-60">for Clinics</span></p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            whileInView={{ opacity: 1, y: 0 }} 
+            viewport={{ once: true }} 
+            transition={{ delay: 0.1, duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
+          >
             <p className="text-2xl font-bold font-display text-slate-900 mb-1">5–10%</p>
-            <p className="text-xs text-slate-500">More revenue per patient</p>
-          </div>
-          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">More revenue per patient</p>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            whileInView={{ opacity: 1, y: 0 }} 
+            viewport={{ once: true }} 
+            transition={{ delay: 0.2, duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
+          >
             <p className="text-2xl font-bold font-display text-slate-900 mb-1">20–35%</p>
-            <p className="text-xs text-slate-500">Reduction in patient no-shows</p>
-          </div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Reduction in patient no-shows</p>
+          </motion.div>
         </div>
 
       </div>

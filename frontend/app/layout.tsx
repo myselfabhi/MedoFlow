@@ -19,8 +19,12 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Medoflow',
-  description: 'Clinical SaaS Platform',
+  title: 'Medoflow | The Operating System for Modern Clinics',
+  description: 'Stop piecing together scheduling, EHR, and billing tools. Run your entire practice on one unified timeline, from patient intake to revenue.',
+  icons: {
+    icon: '/Medoflow-logo.svg',
+    apple: '/medoflow-icon.png',
+  },
 };
 
 export default function RootLayout({

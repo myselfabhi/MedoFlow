@@ -73,17 +73,22 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: '0.5rem',
-        md: '0.375rem',
-        sm: '0.25rem',
+        lg: '0.75rem',
+        md: 'calc(0.75rem - 2px)',
+        sm: 'calc(0.75rem - 4px)',
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(0 0 0 / 0.04)',
-        'card-hover': '0 2px 8px -2px rgb(0 0 0 / 0.06), 0 4px 12px -4px rgb(0 0 0 / 0.04)',
+        card: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        glass: '0 8px 32px 0 rgba(0, 0, 0, 0.08)',
+        glow: '0 0 40px -10px rgba(13, 148, 136, 0.3)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
         display: ['var(--font-dm-sans)', 'DM Sans', 'system-ui', 'sans-serif'],
+      },
+      transitionTimingFunction: {
+        medoflow: 'cubic-bezier(0.4, 0, 0.6, 1)',
       },
       keyframes: {
         'accordion-down': {
@@ -94,21 +99,24 @@ const config: Config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
-        'subtle-float': {
+        'medoflow-float': {
           '0%, 100%': { 
             transform: 'translateY(0)',
-            opacity: '0.5'
           },
           '50%': { 
-            transform: 'translateY(-6px)',
-            opacity: '1'
+            transform: 'translateY(-10px)',
           },
         },
+        'buoyancy': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' }
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'subtle-float': 'subtle-float 2s infinite ease-in-out',
+        'float': 'medoflow-float 6s infinite ease-in-out',
+        'buoyancy': 'buoyancy 4s infinite ease-in-out',
       },
     },
   },

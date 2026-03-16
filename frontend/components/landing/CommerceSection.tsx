@@ -43,8 +43,12 @@ export function CommerceSection() {
 
           {/* Right: Mockup */}
           <div className="flex-1 w-full max-w-lg">
-            {/* Main Checkout Card */}
-            <div className="bg-[#243346] rounded-3xl p-6 border border-white/5 shadow-2xl relative">
+            {/* Main Checkout Card - with floating animation */}
+            <motion.div 
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="bg-[#243346] rounded-3xl p-6 border border-white/5 shadow-2xl relative"
+            >
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
                   <CreditCard className="w-6 h-6 text-accent" />
@@ -87,7 +91,7 @@ export function CommerceSection() {
               <div className="w-full py-4 rounded-xl bg-accent text-white text-center font-bold shadow-lg shadow-accent/20">
                 Charge Card
               </div>
-            </div>
+            </motion.div>
 
             {/* Metric Cards Bottom */}
             <div className="grid grid-cols-3 gap-4 mt-4">

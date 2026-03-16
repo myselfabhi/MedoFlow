@@ -8,43 +8,36 @@ interface AppLogoProps {
   className?: string;
   variant?: 'light' | 'dark' | 'primary';
   showText?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
+
+const sizeMap = {
+  xs: { height: 16 },
+  sm: { height: 20 },
+  md: { height: 28 },
+  lg: { height: 36 },
+  xl: { height: 48 },
+};
 
 export function AppLogo({ 
   className, 
-  variant = 'primary', // Kept for compatibility, though we use an image now
   showText = true,
   size = 'md' 
 }: AppLogoProps) {
   
-  const sizeMap = {
-    sm: { height: 24, width: showText ? 100 : 24 },
-    md: { height: 32, width: showText ? 133 : 32 },
-    lg: { height: 48, width: showText ? 200 : 48 },
-    xl: { height: 64, width: showText ? 266 : 64 },
-  };
+  const activeHeight = sizeMap[size];
 
-  const activeSize = sizeMap[size];
-
-  // We are using the high-res PNGs now. 
-  // If showText is true, we use the full logo, else just the icon.
-  const src = showText ? '/medoflow-logo.png' : '/medoflow-icon.png';
-
-  // Ensure styling uses CSS to contain the original logo safely, 
-  // as the images might have padding.
   return (
-    <div className={cn("flex items-center select-none", className)}>
+    <div className={cn("flex items-center gap-2 select-none", className)}>
       <div 
-        style={{ height: activeSize.height }}
-        className="relative flex items-center"
+        style={{ height: activeHeight.height }}
+        className="relative w-auto aspect-[1376/768] shrink-0"
       >
         <Image 
-          src={src} 
-          alt="Medoflow Logo" 
-          width={1376}
-          height={768}
-          className="h-[150%] w-auto object-contain -ml-4" // Compensate for potential padding in the image
+          src="/Medoflow-logo.svg" 
+          alt="Medoflow" 
+          fill
+          className="object-contain"
           priority
         />
       </div>

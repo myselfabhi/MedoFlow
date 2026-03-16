@@ -79,12 +79,17 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.4 }}
           className="mt-16 relative max-w-4xl mx-auto"
         >
-          {/* The Floating Notification */}
+          {/* The Floating Notification - with continuous buoyancy */}
           <motion.div
             initial={{ opacity: 0, x: 20, y: -20 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 1.2, duration: 0.5, type: "spring" }}
-            className="absolute -right-8 top-16 z-20 bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 flex items-center gap-4 hidden md:flex"
+            animate={{ opacity: 1, x: 0, y: [0, -6, 0] }}
+            transition={{ 
+              delay: 1.2, 
+              duration: 0.5, 
+              type: "spring",
+              y: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+            }}
+            className="absolute -right-8 top-16 z-20 bg-white rounded-2xl p-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] border border-slate-100 flex items-center gap-4 hidden md:flex"
           >
             <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center">
               <CheckCircle2 className="h-6 w-6 text-emerald-500" />
@@ -95,8 +100,8 @@ export function HeroSection() {
             </div>
           </motion.div>
 
-          {/* The Window */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(8,112,184,0.07)] overflow-hidden flex flex-col mx-auto w-full aspect-[16/10] max-h-[600px]">
+          {/* The Window - refined glass shadow */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col mx-auto w-full aspect-[16/10] max-h-[600px]">
             {/* macOS Window Header */}
             <div className="h-12 bg-slate-50 border-b border-slate-100 flex items-center px-4 justify-between">
               <div className="flex gap-2">
@@ -130,22 +135,22 @@ export function HeroSection() {
 
               {/* Metrics Row */}
               <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-[0_1px_2px_0_rgb(0,0,0,0.05)]">
                   <p className="text-[10px] text-slate-500 font-medium mb-0.5">Appts</p>
                   <p className="text-xl font-bold text-slate-900 font-display">12</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-[0_1px_2px_0_rgb(0,0,0,0.05)]">
                   <p className="text-[10px] text-slate-500 font-medium mb-0.5">Follow ups</p>
                   <p className="text-xl font-bold text-slate-900 font-display">7</p>
                 </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
+                <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-[0_1px_2px_0_rgb(0,0,0,0.05)]">
                   <p className="text-[10px] text-slate-500 font-medium mb-0.5">Revenue</p>
                   <p className="text-xl font-bold text-accent font-display">$4.2K</p>
                 </div>
               </div>
 
               {/* Patient List */}
-              <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col">
+              <div className="bg-white border border-slate-100 rounded-xl shadow-[0_1px_2px_0_rgb(0,0,0,0.05)] overflow-hidden flex-1 flex flex-col">
                 {[
                   { name: 'Sarah Mitchell', type: 'Wellness Check', time: '9:00 AM', status: 'Confirmed', color: 'text-emerald-600' },
                   { name: 'James Rodriguez', type: 'Follow up', time: '10:30 AM', status: 'In Room', color: 'text-accent' },
