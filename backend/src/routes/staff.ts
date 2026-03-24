@@ -13,9 +13,9 @@ router.use(authorize(Role.SUPER_ADMIN, Role.FRONT_DESK));
 router.use(requireClinic);
 
 router.get('/', staffController.listAllStaff);
-router.delete('/:id', staffController.deactivateStaff);
-// Removed strict validation here because schemas differ between PROVIDER and FRONT_DESK.
-// Schema validation should be handled in the controller or conditionally via middleware.
 router.post('/', staffController.createStaff);
+router.patch('/:id', staffController.updateStaff);
+router.delete('/:id', staffController.deactivateStaff);
+router.post('/:id/link-provider', staffController.linkProviderToAdmin);
 
 export default router;

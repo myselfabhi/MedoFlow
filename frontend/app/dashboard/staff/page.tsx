@@ -18,15 +18,18 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listStaff, deactivateStaff } from '@/lib/staffApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { Trash2, UserPlus, ShieldCheck, Users, Mail, Clock } from 'lucide-react';
+import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil } from 'lucide-react';
 import { AddStaffModal } from './AddStaffModal';
+import { EditStaffModal } from './EditStaffModal';
 import { cn } from '@/lib/utils';
+import type { StaffMember } from '@/lib/staffApi';
 
 export default function StaffPage() {
   const { user } = useAuth();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['staff'],
@@ -154,11 +157,19 @@ export default function StaffPage() {
                 header: '',
                 className: 'text-right',
                 render: (m) => (
-                  <div className="flex justify-end gap-2 pr-4">
+                  <div className="flex justify-end gap-1 pr-4">
+                    <AppButton
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full text-slate-400 hover:text-primary"
+                      onClick={() => setEditingMember(m)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </AppButton>
                     {m.id !== user?.id && m.role !== 'SUPER_ADMIN' ? (
-                      <AppButton 
-                        variant="ghost" 
-                        size="icon" 
+                      <AppButton
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full text-slate-400 hover:text-rose-600"
                         onClick={() => handleDeactivate(m.id, m.name)}
                         disabled={deactivateMutation.isPending}
@@ -178,10 +189,18 @@ export default function StaffPage() {
         </AppCardContent>
       </AppCard>
 
-      <AddStaffModal 
-        open={isModalOpen} 
-        onOpenChange={setIsModalOpen} 
+      <AddStaffModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
       />
+
+      {editingMember && (
+        <EditStaffModal
+          open={!!editingMember}
+          onOpenChange={(open) => { if (!open) setEditingMember(null); }}
+          member={editingMember}
+        />
+      )}
     </PageContainer>
   );
 }

@@ -51,12 +51,14 @@ export interface ClinicDashboardResponse {
         waitlistCount: number;
         waitlistBookedCount: number;
         waitlistConversionRate: number;
+        clinicCapacityRate: number;
       };
       commerce: {
         productRevenue: number;
         packageRevenue: number;
         membershipRevenue: number;
         attachRate: number;
+        ordersCount: number;
         topProducts: Array<{ productId: string; productName: string; revenue: number; quantity: number }>;
       };
       memberships: {

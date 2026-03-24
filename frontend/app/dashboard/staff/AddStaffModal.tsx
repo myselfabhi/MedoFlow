@@ -13,13 +13,65 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { inviteStaff } from '@/lib/staffApi';
+import { inviteStaff, type StaffRole, type Permission } from '@/lib/staffApi';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices } from '@/lib/serviceApi';
 import { useAppToast } from '@/hooks/useAppToast';
 
+// ─── Role config ──────────────────────────────────────────────────────────────
+
+const ROLE_OPTIONS: { value: StaffRole; label: string; description: string }[] = [
+  { value: 'FRONT_DESK', label: 'Front Desk', description: 'Reception & scheduling' },
+  { value: 'PROVIDER', label: 'Provider', description: 'Clinical staff / therapist' },
+  { value: 'ACCOUNTING', label: 'Accounting', description: 'Billing & financial ops' },
+  { value: 'MARKETING', label: 'Marketing', description: 'Growth & promotions' },
+];
+
+// ─── Permissions config ───────────────────────────────────────────────────────
+
+const PERMISSIONS_CONFIG = [
+  {
+    module: 'Clinical',
+    actions: [
+      { action: 'view_patients', label: 'View Patients' },
+      { action: 'manage_appointments', label: 'Manage Appointments' },
+      { action: 'view_records', label: 'View Clinical Records' },
+    ],
+  },
+  {
+    module: 'Financial',
+    actions: [
+      { action: 'view_billing', label: 'View Billing' },
+      { action: 'process_payments', label: 'Process Payments' },
+      { action: 'view_reports', label: 'View Financial Reports' },
+    ],
+  },
+  {
+    module: 'Commerce',
+    actions: [
+      { action: 'manage_products', label: 'Manage Products' },
+      { action: 'manage_memberships', label: 'Manage Memberships' },
+    ],
+  },
+  {
+    module: 'Admin',
+    actions: [
+      { action: 'manage_staff', label: 'Manage Staff' },
+      { action: 'view_analytics', label: 'View Analytics' },
+    ],
+  },
+];
+
+const DEFAULT_PERMISSIONS: Record<string, string[]> = {
+  FRONT_DESK: ['view_patients', 'manage_appointments', 'view_billing', 'process_payments'],
+  ACCOUNTING: ['view_billing', 'process_payments', 'view_reports'],
+  MARKETING: ['manage_products', 'view_analytics'],
+};
+
+// ─── Form schema ──────────────────────────────────────────────────────────────
+
 const staffSchema = z.object({
-  role: z.enum(['FRONT_DESK', 'PROVIDER']),
+  role: z.enum(['FRONT_DESK', 'PROVIDER', 'ACCOUNTING', 'MARKETING']),
   name: z.string().optional(),
   email: z.string().email('Valid email is required'),
   firstName: z.string().optional(),
@@ -27,63 +79,34 @@ const staffSchema = z.object({
   disciplineIds: z.array(z.string()).optional(),
   serviceIds: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
-  if (data.role === 'FRONT_DESK' && (!data.name || data.name.trim() === '')) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Name is required for Front Desk',
-      path: ['name'],
-    });
+  if (data.role !== 'PROVIDER' && (!data.name || data.name.trim() === '')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Full name is required', path: ['name'] });
   }
   if (data.role === 'PROVIDER') {
-    if (!data.firstName || data.firstName.trim() === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'First name is required for Provider',
-        path: ['firstName'],
-      });
-    }
-    if (!data.lastName || data.lastName.trim() === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Last name is required for Provider',
-        path: ['lastName'],
-      });
-    }
-    if (!data.disciplineIds || data.disciplineIds.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Select at least one discipline',
-        path: ['disciplineIds'],
-      });
-    }
-    if (!data.serviceIds || data.serviceIds.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Select at least one service',
-        path: ['serviceIds'],
-      });
-    }
+    if (!data.firstName || data.firstName.trim() === '')
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'First name is required', path: ['firstName'] });
+    if (!data.lastName || data.lastName.trim() === '')
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Last name is required', path: ['lastName'] });
+    if (!data.disciplineIds || data.disciplineIds.length === 0)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select at least one discipline', path: ['disciplineIds'] });
+    if (!data.serviceIds || data.serviceIds.length === 0)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select at least one service', path: ['serviceIds'] });
   }
 });
 
 type StaffFormData = z.infer<typeof staffSchema>;
 
-export function AddStaffModal({ open, onOpenChange }: any) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const toast = useAppToast();
   const queryClient = useQueryClient();
-  const [role, setRole] = useState<'FRONT_DESK' | 'PROVIDER'>('FRONT_DESK');
+  const [role, setRole] = useState<StaffRole>('FRONT_DESK');
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set(DEFAULT_PERMISSIONS['FRONT_DESK']));
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<StaffFormData>({
     resolver: zodResolver(staffSchema),
-    defaultValues: { 
-      role: 'FRONT_DESK', 
-      name: '', 
-      email: '', 
-      firstName: '', 
-      lastName: '',
-      disciplineIds: [],
-      serviceIds: [],
-    },
+    defaultValues: { role: 'FRONT_DESK', name: '', email: '', firstName: '', lastName: '', disciplineIds: [], serviceIds: [] },
   });
 
   const selectedDisciplineIds = watch('disciplineIds') || [];
@@ -101,16 +124,29 @@ export function AddStaffModal({ open, onOpenChange }: any) {
     enabled: open && role === 'PROVIDER',
   });
 
-  // Filter services by selected disciplines
-  const filteredServices = allServices.filter(s => 
-    selectedDisciplineIds.includes(s.discipline.id)
-  );
+  const filteredServices = allServices.filter((s) => selectedDisciplineIds.includes(s.discipline.id));
+
+  const handleRoleChange = (newRole: StaffRole) => {
+    setRole(newRole);
+    setValue('role', newRole as any);
+    setSelectedActions(new Set(DEFAULT_PERMISSIONS[newRole] ?? []));
+  };
+
+  const toggleAction = (action: string) => {
+    setSelectedActions((prev) => {
+      const next = new Set(prev);
+      next.has(action) ? next.delete(action) : next.add(action);
+      return next;
+    });
+  };
 
   const inviteMutation = useMutation({
     mutationFn: (data: any) => inviteStaff(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       reset();
+      setSelectedActions(new Set(DEFAULT_PERMISSIONS['FRONT_DESK']));
+      setRole('FRONT_DESK');
       toast.success('Staff invitation sent');
       onOpenChange(false);
     },
@@ -120,143 +156,175 @@ export function AddStaffModal({ open, onOpenChange }: any) {
   });
 
   const onSubmit = (data: StaffFormData) => {
+    const permissions: Permission[] = Array.from(selectedActions).map((action) => {
+      const module = PERMISSIONS_CONFIG.find((g) => g.actions.some((a) => a.action === action))?.module ?? 'Other';
+      return { module, action };
+    });
+
     const payload = {
       ...data,
-      // The backend createProvider expects 'services' as an array of objects
-      services: data.role === 'PROVIDER' 
-        ? data.serviceIds?.map(id => ({ serviceId: id })) 
-        : undefined
+      permissions: role !== 'PROVIDER' ? permissions : undefined,
+      services: role === 'PROVIDER' ? data.serviceIds?.map((id) => ({ serviceId: id })) : undefined,
     };
     inviteMutation.mutate(payload);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Invite New Staff</DialogTitle>
-          <DialogDescription>Add a new provider or front desk member.</DialogDescription>
+          <DialogTitle>Invite New Team Member</DialogTitle>
+          <DialogDescription>Choose a role, set permissions, then send the invitation.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Role</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="roleGroup"
-                  value="FRONT_DESK"
-                  checked={role === 'FRONT_DESK'}
-                  onChange={() => { setRole('FRONT_DESK'); setValue('role', 'FRONT_DESK'); }}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <span className="text-sm">Front Desk</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="roleGroup"
-                  value="PROVIDER"
-                  checked={role === 'PROVIDER'}
-                  onChange={() => { setRole('PROVIDER'); setValue('role', 'PROVIDER'); }}
-                  className="w-4 h-4 text-primary focus:ring-primary"
-                />
-                <span className="text-sm">Provider</span>
-              </label>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 py-2">
+          {/* Role selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Role</label>
+            <div className="grid grid-cols-2 gap-2">
+              {ROLE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex flex-col cursor-pointer border rounded-xl px-3 py-2.5 transition-colors ${
+                    role === opt.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    className="sr-only"
+                    value={opt.value}
+                    checked={role === opt.value}
+                    onChange={() => handleRoleChange(opt.value)}
+                  />
+                  <span className={`text-sm font-semibold ${role === opt.value ? 'text-primary' : 'text-slate-800'}`}>
+                    {opt.label}
+                  </span>
+                  <span className="text-xs text-slate-400 mt-0.5">{opt.description}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* Email */}
+          <div className="space-y-1">
             <label className="text-sm font-medium">Email</label>
             <AppInput {...register('email')} placeholder="email@clinic.com" />
-            {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
+            {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
           </div>
 
-          {role === 'FRONT_DESK' ? (
-            <div className="space-y-2">
+          {/* Name fields — role-specific */}
+          {role !== 'PROVIDER' ? (
+            <div className="space-y-1">
               <label className="text-sm font-medium">Full Name</label>
               <AppInput {...register('name')} placeholder="Jamie Rivera" />
-              {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+              {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
             </div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">First Name</label>
                   <AppInput {...register('firstName')} placeholder="Jamie" />
-                  {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message}</p>}
+                  {errors.firstName && <p className="text-xs text-red-500">{errors.firstName.message}</p>}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Last Name</label>
                   <AppInput {...register('lastName')} placeholder="Rivera" />
-                  {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message}</p>}
+                  {errors.lastName && <p className="text-xs text-red-500">{errors.lastName.message}</p>}
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium">Disciplines</label>
-                <div className="grid grid-cols-1 gap-2 border rounded-md p-3 max-h-40 overflow-y-auto">
+                <div className="border rounded-xl p-3 max-h-36 overflow-y-auto space-y-1.5 bg-slate-50">
                   {disciplines.length === 0 ? (
-                    <p className="text-xs text-muted-foreground Italics">No disciplines found. Please create one first.</p>
-                  ) : (
-                    disciplines.map(d => (
-                      <label key={d.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          value={d.id}
-                          checked={selectedDisciplineIds.includes(d.id)}
-                          onChange={(e) => {
-                            const current = selectedDisciplineIds;
-                            const newVal = e.target.checked 
-                              ? [...current, d.id]
-                              : current.filter(id => id !== d.id);
-                            setValue('disciplineIds', newVal);
-                          }}
-                        />
-                        {d.name}
-                      </label>
-                    ))
-                  )}
+                    <p className="text-xs text-slate-400 italic">No disciplines found. Create one first.</p>
+                  ) : disciplines.map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        value={d.id}
+                        checked={selectedDisciplineIds.includes(d.id)}
+                        onChange={(e) => {
+                          const newVal = e.target.checked
+                            ? [...selectedDisciplineIds, d.id]
+                            : selectedDisciplineIds.filter((id) => id !== d.id);
+                          setValue('disciplineIds', newVal);
+                        }}
+                        className="accent-primary"
+                      />
+                      {d.name}
+                    </label>
+                  ))}
                 </div>
-                {errors.disciplineIds && <p className="text-sm text-red-500">{errors.disciplineIds.message}</p>}
+                {errors.disciplineIds && <p className="text-xs text-red-500">{errors.disciplineIds.message}</p>}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium">Services</label>
-                <div className="grid grid-cols-1 gap-2 border rounded-md p-3 max-h-40 overflow-y-auto">
+                <div className="border rounded-xl p-3 max-h-36 overflow-y-auto space-y-1.5 bg-slate-50">
                   {selectedDisciplineIds.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">Select disciplines first to see services.</p>
+                    <p className="text-xs text-slate-400 italic">Select disciplines first.</p>
                   ) : filteredServices.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">No services found for selected disciplines.</p>
-                  ) : (
-                    filteredServices.map(s => (
-                      <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          value={s.id}
-                          checked={selectedServiceIds.includes(s.id)}
-                          onChange={(e) => {
-                            const current = selectedServiceIds;
-                            const newVal = e.target.checked 
-                              ? [...current, s.id]
-                              : current.filter(id => id !== s.id);
-                            setValue('serviceIds', newVal);
-                          }}
-                        />
-                        {s.name} ({s.discipline.name})
-                      </label>
-                    ))
-                  )}
+                    <p className="text-xs text-slate-400 italic">No services for selected disciplines.</p>
+                  ) : filteredServices.map((s) => (
+                    <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        value={s.id}
+                        checked={selectedServiceIds.includes(s.id)}
+                        onChange={(e) => {
+                          const newVal = e.target.checked
+                            ? [...selectedServiceIds, s.id]
+                            : selectedServiceIds.filter((id) => id !== s.id);
+                          setValue('serviceIds', newVal);
+                        }}
+                        className="accent-primary"
+                      />
+                      {s.name} <span className="text-slate-400">({s.discipline.name})</span>
+                    </label>
+                  ))}
                 </div>
-                {errors.serviceIds && <p className="text-sm text-red-500">{errors.serviceIds.message}</p>}
+                {errors.serviceIds && <p className="text-xs text-red-500">{errors.serviceIds.message}</p>}
               </div>
             </>
           )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+          {/* Permissions checklist — only for non-provider roles */}
+          {role !== 'PROVIDER' && (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Permissions</label>
+              <div className="border rounded-xl p-4 bg-slate-50 space-y-4">
+                {PERMISSIONS_CONFIG.map((group) => (
+                  <div key={group.module}>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">{group.module}</p>
+                    <div className="space-y-1.5">
+                      {group.actions.map((item) => (
+                        <label key={item.action} className="flex items-center gap-2.5 cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedActions.has(item.action)}
+                            onChange={() => toggleAction(item.action)}
+                            className="w-4 h-4 rounded accent-primary"
+                          />
+                          <span className="text-slate-700">{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <AppButton type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</AppButton>
-            <AppButton type="submit" disabled={inviteMutation.isPending || (role === 'PROVIDER' && disciplines.length === 0)}>
+            <AppButton
+              type="submit"
+              disabled={inviteMutation.isPending || (role === 'PROVIDER' && disciplines.length === 0)}
+            >
               {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
             </AppButton>
           </div>

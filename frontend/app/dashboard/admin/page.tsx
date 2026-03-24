@@ -11,16 +11,19 @@ import {
   AppPageHeader,
 } from '@/components/ui-system';
 import { PageContainer } from '@/components/layout';
-import { 
-  TrendingUp, 
-  Users, 
-  CreditCard, 
+import {
+  TrendingUp,
+  Users,
+  CreditCard,
   Activity,
   AlertCircle,
-  ArrowUpRight
+  ArrowUpRight,
+  ShoppingBag,
+  Gauge,
 } from 'lucide-react';
 import { AppButton } from '@/components/ui-system';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -92,41 +95,43 @@ export default function AdminDashboardPage() {
         <AppCard>
           <AppCardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Active Members</p>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Orders</p>
               <div className="p-2 bg-purple-50 rounded-lg">
-                <Activity className="h-4 w-4 text-purple-600" />
+                <ShoppingBag className="h-4 w-4 text-purple-600" />
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <h3 className="text-2xl font-bold text-slate-900">
-                {isLoading ? '...' : stats?.memberships.activeCount}
+                {isLoading ? '...' : stats?.commerce.ordersCount ?? 0}
               </h3>
-              <span className="flex items-center text-xs font-medium text-slate-600">
-                {stats?.memberships.churnRate}% churn
+              <span className="flex items-center text-xs font-medium text-slate-500">
+                checked out
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-400">Recurring revenue base</p>
+            <p className="mt-1 text-xs text-slate-400">Store orders this period</p>
           </AppCardContent>
         </AppCard>
 
         <AppCard>
           <AppCardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Cancellation Rate</p>
-              <div className="p-2 bg-rose-50 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-rose-600" />
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Clinic Optimum Capacity</p>
+              <div className="p-2 bg-teal-50 rounded-lg">
+                <Gauge className="h-4 w-4 text-teal-600" />
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <h3 className="text-2xl font-bold text-slate-900">
-                {isLoading ? '...' : stats?.operations.cancellationRate.toFixed(1)}%
+                {isLoading ? '...' : (stats?.operations.clinicCapacityRate ?? 0).toFixed(1)}%
               </h3>
-              <span className="flex items-center text-xs font-medium text-rose-600">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                2%
+              <span className={cn(
+                "flex items-center text-xs font-medium",
+                (stats?.operations.clinicCapacityRate ?? 0) >= 70 ? "text-teal-600" : "text-amber-500"
+              )}>
+                {(stats?.operations.clinicCapacityRate ?? 0) >= 70 ? 'Optimal' : 'Below target'}
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-400">Operational risk</p>
+            <p className="mt-1 text-xs text-slate-400">Avg provider utilisation</p>
           </AppCardContent>
         </AppCard>
       </div>
@@ -200,10 +205,6 @@ export default function AdminDashboardPage() {
       </div>
     </PageContainer>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }
 
 function CheckCircle2(props: any) {

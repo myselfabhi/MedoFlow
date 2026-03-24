@@ -113,21 +113,36 @@ export default function PatientsPage() {
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <KPIStatCard 
+        <KPIStatCard
           label="Total Patients"
           value={patients.length}
           icon={User}
           iconClassName="text-blue-600 bg-blue-50"
         />
-        <KPIStatCard 
-          label="New This Month"
-          value="0"
+        <KPIStatCard
+          label="New Patients"
+          value={(() => {
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            // A patient is "new this month" if their earliest appointment is within this month
+            const newCount = patients.filter((p) => {
+              const patientApts = appointments.filter((a) => a.patient?.id === p.id);
+              if (patientApts.length === 0) return false;
+              const earliest = patientApts.reduce((min, a) =>
+                new Date(a.startTime) < new Date(min.startTime) ? a : min
+              );
+              return new Date(earliest.startTime) >= startOfMonth;
+            }).length;
+            return newCount;
+          })()}
           icon={Calendar}
           iconClassName="text-emerald-600 bg-emerald-50"
         />
-        <KPIStatCard 
-          label="Active Consultations"
-          value={appointments.filter(a => a.status === 'COMPLETED').length}
+        <KPIStatCard
+          label="Active Appointments"
+          value={appointments.filter(
+            (a) => a.status === 'CONFIRMED' || a.status === 'PENDING_PROVIDER_APPROVAL' || a.status === 'PENDING_PAYMENT'
+          ).length}
           icon={Clock}
           iconClassName="text-purple-600 bg-purple-50"
         />

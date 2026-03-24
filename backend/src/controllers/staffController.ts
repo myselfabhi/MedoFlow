@@ -30,18 +30,44 @@ export const listFrontDesk = asyncHandler(
   }
 );
 
+export const updateStaff = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const { role, permissions } = req.body;
+    const user = await staffService.updateStaffUser(
+      id,
+      { role, permissions },
+      req.clinicId!,
+      req.user!.id
+    );
+    successResponse(res, 200, 'Staff user updated', { user });
+  }
+);
+
+export const linkProviderToAdmin = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const id = req.params.id as string;
+    const provider = await staffService.linkAdminAsProvider(
+      id,
+      req.clinicId!,
+      req.user!.id
+    );
+    successResponse(res, 200, 'Provider profile linked', { provider });
+  }
+);
+
 export const createStaff = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { role } = req.body;
     
-    if (role === 'FRONT_DESK') {
+    if (['FRONT_DESK', 'ACCOUNTING', 'MARKETING'].includes(role)) {
       const validatedData = frontDeskProvisionSchema.body.parse(req.body);
       const user = await staffService.provisionFrontDeskUser(
-        validatedData,
+        { ...validatedData, role, permissions: req.body.permissions },
         req.clinicId!,
         req.user!.id
       );
-      successResponse(res, 201, 'Front desk user invited', { user });
+      successResponse(res, 201, 'Staff user invited', { user });
     } else if (role === 'PROVIDER') {
       const validatedData = providerCreateSchema.body.parse(req.body);
       const { createProvider } = await import('../services/providerService');

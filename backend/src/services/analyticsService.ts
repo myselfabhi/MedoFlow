@@ -392,6 +392,7 @@ export const aggregateAnalytics = async (
     patientSubscriptions,
     patientPackages,
     waitlistEntries,
+    ordersCount,
   ] = await Promise.all([
     prisma.appointment.findMany({
       where: appointmentWhere,
@@ -462,6 +463,13 @@ export const aggregateAnalytics = async (
         clinicId: scope.clinicId,
         createdAt: { gte: range.dateFrom, lte: range.dateTo },
         ...(scope.providerId ? { providerId: scope.providerId } : {}),
+      },
+    }),
+    prisma.cart.count({
+      where: {
+        clinicId: scope.clinicId,
+        status: 'CHECKED_OUT',
+        updatedAt: { gte: range.dateFrom, lte: range.dateTo },
       },
     }),
   ]);
@@ -677,6 +685,7 @@ export const aggregateAnalytics = async (
       membershipRevenue: grossMembershipRevenue,
       topProducts: [...topProductsMap.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 5),
       attachRate,
+      ordersCount,
       packageSummary,
       membershipSummary: {
         activeCount: patientSubscriptions.filter((subscription) => subscription.status === 'ACTIVE').length,
@@ -792,6 +801,9 @@ export const getClinicCommandCenter = async (
         waitlistCount: current.summary.waitlistCount,
         waitlistBookedCount: current.summary.waitlistBookedCount,
         waitlistConversionRate: current.summary.waitlistConversionRate,
+        clinicCapacityRate: current.summary.providerUtilization.length > 0
+          ? current.summary.providerUtilization.reduce((sum, p) => sum + p.utilizationRate, 0) / current.summary.providerUtilization.length
+          : 0,
       },
       commerce: {
         productRevenue: current.summary.productRevenue,
@@ -799,6 +811,7 @@ export const getClinicCommandCenter = async (
         membershipRevenue: current.summary.membershipRevenue,
         attachRate: current.summary.attachRate,
         topProducts: current.summary.topProducts,
+        ordersCount: current.summary.ordersCount,
       },
       memberships: current.summary.membershipSummary,
       packages: current.summary.packageSummary,
