@@ -125,11 +125,11 @@ export default function PatientAppointmentDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {appointment.meetLink && (
+            {consultationSession?.joinToken && (
               <AppButton size="lg" className="rounded-full shadow-lg shadow-primary-100" asChild>
-                <a href={appointment.meetLink} target="_blank" rel="noopener noreferrer">
+                <Link href={`/dashboard/patient/consultation/${consultationSession.joinToken}`}>
                   <Video className="mr-2 h-5 w-5" /> Join Consultation
-                </a>
+                </Link>
               </AppButton>
             )}
           </div>

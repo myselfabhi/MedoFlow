@@ -180,13 +180,11 @@ export default function ProviderAppointmentDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {appointment.meetLink && (
-              <AppButton variant="outline" className="rounded-full bg-white shadow-sm border-slate-200" asChild>
-                <a href={appointment.meetLink} target="_blank" rel="noopener noreferrer">
-                  <Video className="mr-2 h-4 w-4 text-blue-600" /> Join Virtual Room
-                </a>
-              </AppButton>
-            )}
+            <AppButton variant="outline" className="rounded-full bg-white shadow-sm border-slate-200" asChild>
+              <Link href={`/dashboard/provider/appointments/${id}/consultation`}>
+                <Video className="mr-2 h-4 w-4 text-blue-600" /> Join Virtual Room
+              </Link>
+            </AppButton>
             <AppButton onClick={() => setRecordSheetOpen(true)} className="rounded-full shadow-lg">
               <UserIcon className="mr-2 h-4 w-4" /> Full Clinical Record
             </AppButton>

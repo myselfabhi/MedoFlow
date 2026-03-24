@@ -80,6 +80,33 @@ export const joinByToken = asyncHandler(
     }
 );
 
+/** GET /consultations/join/:token/video-token — Get room info via join token (for patients) */
+export const getVideoTokenByJoinToken = asyncHandler(
+    async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+        const joinToken = req.params.token as string;
+
+        const session = await prisma.consultationSession.findFirst({
+            where: { joinToken },
+        });
+        if (!session) {
+            const err = new Error('Invalid or expired consultation link') as ApiError;
+            err.statusCode = 404;
+            throw err;
+        }
+        if (!session.meetingRoomName || !session.meetingRoomUrl) {
+            const err = new Error('No video room created yet') as ApiError;
+            err.statusCode = 400;
+            throw err;
+        }
+
+        successResponse(res, 200, 'Video room info', {
+            roomUrl: session.meetingRoomUrl,
+            roomName: session.meetingRoomName,
+            token: '',
+        });
+    }
+);
+
 /** GET /consultations/appointment/:appointmentId */
 export const getByAppointment = asyncHandler(
     async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -197,5 +224,71 @@ export const convertToTemplate = asyncHandler(
             clinicId
         );
         successResponse(res, 200, 'Template conversion info', result);
+    }
+);
+
+// ---------------------------------------------------------------------------
+// Jitsi Video Room (free, no payment required)
+// ---------------------------------------------------------------------------
+
+/** POST /consultations/:id/video-room — Create a Jitsi room for the consultation */
+export const createVideoRoom = asyncHandler(
+    async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+        await providerScope(req);
+        const sessionId = req.params.id as string;
+
+        const session = await prisma.consultationSession.findUnique({
+            where: { id: sessionId },
+        });
+        if (!session) {
+            const err = new Error('Consultation session not found') as ApiError;
+            err.statusCode = 404;
+            throw err;
+        }
+
+        // Generate deterministic Jitsi room name — no API call needed
+        const roomName = `MedoFlow-${sessionId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24)}`;
+        const roomUrl = `https://meet.jit.si/${roomName}`;
+
+        // Save to session if not already set
+        if (!session.meetingRoomName) {
+            await prisma.consultationSession.update({
+                where: { id: sessionId },
+                data: { meetingRoomUrl: roomUrl, meetingRoomName: roomName },
+            });
+        }
+
+        successResponse(res, 201, 'Video room ready', {
+            roomUrl: session.meetingRoomUrl || roomUrl,
+            roomName: session.meetingRoomName || roomName,
+            token: '', // Jitsi needs no token
+        });
+    }
+);
+
+/** GET /consultations/:id/video-token — Get room info for authenticated users */
+export const getVideoToken = asyncHandler(
+    async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+        const sessionId = req.params.id as string;
+
+        const session = await prisma.consultationSession.findUnique({
+            where: { id: sessionId },
+        });
+        if (!session) {
+            const err = new Error('Consultation session not found') as ApiError;
+            err.statusCode = 404;
+            throw err;
+        }
+        if (!session.meetingRoomName || !session.meetingRoomUrl) {
+            const err = new Error('No video room created yet') as ApiError;
+            err.statusCode = 400;
+            throw err;
+        }
+
+        successResponse(res, 200, 'Video room info', {
+            roomUrl: session.meetingRoomUrl,
+            roomName: session.meetingRoomName,
+            token: '',
+        });
     }
 );

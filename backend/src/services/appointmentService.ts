@@ -668,7 +668,7 @@ export const createAppointment = async (
       paymentDueAt: requirePrepayment ? slotHeldUntil! : null,
       slotHeldUntil,
       bookingHoldExpiresAt: slotHeldUntil,
-      meetLink: `https://meet.jit.si/MedoFlow-${Math.random().toString(36).substring(2, 8)}-${Date.now().toString(36)}`,
+      meetLink: null, // Video calls are handled via Jitsi in the consultation room
       notes: context?.notes ?? null,
       createdById: performedById ?? null,
       updatedById: performedById ?? null,

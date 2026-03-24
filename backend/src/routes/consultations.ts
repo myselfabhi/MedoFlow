@@ -7,19 +7,24 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
-// --- Public: patient join by token (optional auth for logged-in patients) ---
+// --- Public routes (optional auth) ---
 router.get(
     '/join/:token',
     optionalProtect,
     consultationController.joinByToken
 );
 
+// Public: get video token using the join token (for patients who may not be fully authenticated)
+router.get(
+    '/join/:token/video-token',
+    optionalProtect,
+    consultationController.getVideoTokenByJoinToken
+);
+
 // --- All below require authentication ---
 router.use(protect);
 
 // --- Start consultation from appointment (provider only, needs clinic) ---
-// Note: This route is mounted at /consultations but the appointment start
-// is also accessible via /appointments/:id/consultation/start (see appointmentConsultationRouter)
 router.get(
     '/appointment/:appointmentId',
     authorize(Role.PROVIDER, Role.PATIENT),
@@ -77,6 +82,20 @@ router.post(
     requireClinic,
     authorize(Role.PROVIDER),
     consultationController.convertToTemplate
+);
+
+// --- Daily.co Video Room ---
+router.post(
+    '/:id/video-room',
+    requireClinic,
+    authorize(Role.PROVIDER),
+    consultationController.createVideoRoom
+);
+
+router.get(
+    '/:id/video-token',
+    authorize(Role.PROVIDER, Role.PATIENT),
+    consultationController.getVideoToken
 );
 
 // --- Get session by ID (provider or patient) ---

@@ -1081,6 +1081,8 @@ model ConsultationSession {
   transcriptText    String?            @db.Text
   transcriptStatus  String             @default("NOT_STARTED")
   aiScribeSessionId String?            @unique
+  meetingRoomUrl    String?
+  meetingRoomName   String?
   startedAt         DateTime?
   endedAt           DateTime?
   errorMessage      String?

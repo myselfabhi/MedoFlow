@@ -39,6 +39,8 @@ export interface ConsultationSession {
     transcriptText: string | null;
     transcriptStatus: string;
     aiScribeSessionId: string | null;
+    meetingRoomUrl: string | null;
+    meetingRoomName: string | null;
     startedAt: string | null;
     endedAt: string | null;
     errorMessage: string | null;
@@ -212,6 +214,49 @@ export const getTranscript = async (
     const params = clinicId ? `?clinicId=${clinicId}` : '';
     const { data } = await api.get<ApiRes<TranscriptResult>>(
         `/consultations/${sessionId}/transcript${params}`
+    );
+    return data.data;
+};
+
+// ---------------------------------------------------------------------------
+// Daily.co Video Room
+// ---------------------------------------------------------------------------
+
+export interface VideoRoomResult {
+    roomUrl: string;
+    roomName: string;
+    token: string;
+}
+
+/** POST /consultations/:id/video-room — Create Daily.co room */
+export const createVideoRoom = async (
+    sessionId: string,
+    clinicId?: string
+): Promise<VideoRoomResult> => {
+    const body = clinicId ? { clinicId } : {};
+    const { data } = await api.post<ApiRes<VideoRoomResult>>(
+        `/consultations/${sessionId}/video-room`,
+        body
+    );
+    return data.data;
+};
+
+/** GET /consultations/:id/video-token — Get meeting token (authenticated) */
+export const getVideoToken = async (
+    sessionId: string
+): Promise<VideoRoomResult> => {
+    const { data } = await api.get<ApiRes<VideoRoomResult>>(
+        `/consultations/${sessionId}/video-token`
+    );
+    return data.data;
+};
+
+/** GET /consultations/join/:token/video-token — Get meeting token via join token (for patients) */
+export const getVideoTokenByJoinToken = async (
+    joinToken: string
+): Promise<VideoRoomResult> => {
+    const { data } = await api.get<ApiRes<VideoRoomResult>>(
+        `/consultations/join/${joinToken}/video-token`
     );
     return data.data;
 };

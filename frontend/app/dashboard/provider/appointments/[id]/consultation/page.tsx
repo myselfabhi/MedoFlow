@@ -7,6 +7,7 @@ import * as aiScribeApi from '@/lib/aiScribeApi';
 import { startConsultationRecordingFlow } from '@/lib/consultationRecordingFlow';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useAppToast } from '@/hooks/useAppToast';
+import { JitsiVideoCall } from '@/components/consultation/JitsiVideoCall';
 
 // UI System Components
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -94,6 +95,12 @@ export default function ConsultationRoomPage() {
     const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
     const initialized = useRef(false);
 
+    // ----- Video call state -----
+    const [videoRoom, setVideoRoom] = useState<consultationApi.VideoRoomResult | null>(null);
+    const [videoLoading, setVideoLoading] = useState(false);
+    const [videoActive, setVideoActive] = useState(false);
+    const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+
     const recorder = useAudioRecorder();
     const toast = useAppToast();
 
@@ -103,7 +110,7 @@ export default function ConsultationRoomPage() {
             setTranscribing(true);
             const updated = await aiScribeApi.simulateSession(aiScribeSession.id);
             setAiScribeSession(updated);
-            setTranscript({ 
+            setTranscript({
                 sessionId: session.id,
                 transcript: updated.transcript || '',
                 transcriptStatus: 'COMPLETED',
@@ -189,7 +196,56 @@ export default function ConsultationRoomPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session?.aiScribeSessionId]);
 
-    // ----- Recording controls -----
+    // ----- Video Call Controls -----
+    const handleStartVideoCall = async () => {
+        if (!session) return;
+        try {
+            setVideoLoading(true);
+            setError(null);
+            const room = await consultationApi.createVideoRoom(session.id);
+            setVideoRoom(room);
+            setVideoActive(true);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to create video room';
+            setError(msg);
+        } finally {
+            setVideoLoading(false);
+        }
+    };
+
+    const handleCallEnded = () => {
+        setVideoActive(false);
+        toast.success('Video call ended');
+    };
+
+    const handleRecordingData = (blob: Blob) => {
+        setRecordingBlob(blob);
+        toast.success('Audio captured from video call');
+    };
+
+    // ----- Upload recording from Daily.co -----
+    const handleUploadDailyRecording = async () => {
+        if (!session || !recordingBlob) return;
+        try {
+            setError(null);
+            setUploading(true);
+            const updated = await consultationApi.uploadRecording(session.id, recordingBlob);
+            setSession(updated);
+            setUploading(false);
+
+            setTranscribing(true);
+            const result = await consultationApi.startTranscription(session.id);
+            setSession(result.session);
+            setRecordingBlob(null);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to upload/transcribe';
+            setError(msg);
+            setUploading(false);
+            setTranscribing(false);
+        }
+    };
+
+    // ----- Recording controls (fallback manual recording) -----
     const handleStartRecording = async () => {
         if (!session) return;
         try {
@@ -221,7 +277,7 @@ export default function ConsultationRoomPage() {
         }
     };
 
-    // ----- Upload + Transcribe -----
+    // ----- Upload + Transcribe (manual recording) -----
     const handleUploadAndTranscribe = async () => {
         if (!session || !recorder.audioBlob) return;
         try {
@@ -322,6 +378,8 @@ export default function ConsultationRoomPage() {
 
     if (!session) return null;
 
+    const hasVideoRoom = videoActive && videoRoom;
+
     return (
         <PageContainer>
             {/* Page Header */}
@@ -336,14 +394,26 @@ export default function ConsultationRoomPage() {
                     <AppButton variant="outline" onClick={() => router.back()}>
                         ← Back
                     </AppButton>
-                    {session.appointment?.meetLink && (
-                        <AppButton asChild variant="primary">
-                            <a href={session.appointment.meetLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                </svg>
-                                Join Video Call
-                            </a>
+                    {!videoActive && (
+                        <AppButton
+                            variant="primary"
+                            onClick={handleStartVideoCall}
+                            disabled={videoLoading}
+                            className="flex items-center gap-2 bg-gradient-to-r from-[#1C8B81] to-[#223C58] hover:opacity-90"
+                        >
+                            {videoLoading ? (
+                                <>
+                                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                    Starting...
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Start Video Call
+                                </>
+                            )}
                         </AppButton>
                     )}
                 </div>
@@ -369,12 +439,22 @@ export default function ConsultationRoomPage() {
                 </div>
             )}
 
-            {/* Clinical Rail Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Main Content Area (2/3) */}
-                <div className="lg:col-span-2 space-y-6">
-                    
+            {/* Main Layout — Video + Scribe side-by-side when video is active */}
+            <div className={`grid gap-8 ${hasVideoRoom ? 'grid-cols-1 xl:grid-cols-5' : 'grid-cols-1 lg:grid-cols-3'}`}>
+
+                {/* Left Column — Video + Recording Controls */}
+                <div className={hasVideoRoom ? 'xl:col-span-3 space-y-6' : 'lg:col-span-2 space-y-6'}>
+
+                    {/* Jitsi Video Call */}
+                    {hasVideoRoom && (
+                        <JitsiVideoCall
+                            roomName={videoRoom.roomName}
+                            userName="Provider"
+                            onCallEnded={handleCallEnded}
+                            className="w-full"
+                        />
+                    )}
+
                     {/* Consent Notice */}
                     {session.consentStatus === 'PENDING' && (
                         <AppCard className="border-amber-200 bg-amber-50/50">
@@ -384,11 +464,19 @@ export default function ConsultationRoomPage() {
                                 <p className="text-sm text-amber-700 max-w-md mx-auto">
                                     Recording cannot start until the patient grants consent using the join link. Share the link with the patient so they can join and consent to recording.
                                 </p>
+                                {session.joinToken && (
+                                    <div className="mt-4 p-3 bg-white rounded-lg border border-amber-200">
+                                        <p className="text-xs text-slate-500 mb-1">Patient Join Link:</p>
+                                        <code className="text-xs text-slate-700 break-all select-all">
+                                            {typeof window !== 'undefined' ? `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}` : ''}
+                                        </code>
+                                    </div>
+                                )}
                             </AppCardContent>
                         </AppCard>
                     )}
 
-                    {/* Recording Controls */}
+                    {/* AI Scribe Controls */}
                     <AppCard>
                         <AppCardHeader>
                             <AppCardTitle>AI Scribe Controls</AppCardTitle>
@@ -396,8 +484,18 @@ export default function ConsultationRoomPage() {
                         <AppCardContent>
                             <div className="flex flex-col gap-4">
                                 <div className="flex flex-wrap items-center gap-4">
-                                    {/* Start recording */}
-                                    {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
+                                    {/* Daily.co recording upload */}
+                                    {recordingBlob && !uploading && !transcribing && (
+                                        <AppButton onClick={handleUploadDailyRecording} variant="primary" className="flex items-center gap-2">
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            Upload & Transcribe Call Audio
+                                        </AppButton>
+                                    )}
+
+                                    {/* Manual start recording (fallback when no video call) */}
+                                    {!hasVideoRoom && !recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && !recordingBlob && (
                                         <AppButton
                                             onClick={handleStartRecording}
                                             disabled={session.consentStatus !== 'GRANTED'}
@@ -405,7 +503,7 @@ export default function ConsultationRoomPage() {
                                             className="flex items-center gap-2"
                                         >
                                             <span className="w-2.5 h-2.5 bg-white rounded-full" />
-                                            Start AI Scribe (Share Meeting Tab)
+                                            Start AI Scribe (Manual Recording)
                                         </AppButton>
                                     )}
 
@@ -431,7 +529,7 @@ export default function ConsultationRoomPage() {
                                         </div>
                                     )}
 
-                                    {/* Upload */}
+                                    {/* Upload manual recording */}
                                     {recorder.audioBlob && !uploading && !transcribing && session.recordingStatus !== 'STORED' && (
                                         <AppButton onClick={handleUploadAndTranscribe} variant="primary">
                                             Upload & Transcribe
@@ -440,8 +538,8 @@ export default function ConsultationRoomPage() {
 
                                     {/* Demo Simulator */}
                                     {!recorder.isRecording && !uploading && !transcribing && aiScribeSession?.status === 'RECORDING' && (
-                                        <AppButton 
-                                            onClick={handleSimulateClinicalConversation} 
+                                        <AppButton
+                                            onClick={handleSimulateClinicalConversation}
                                             variant="outline"
                                             className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold"
                                         >
@@ -466,10 +564,24 @@ export default function ConsultationRoomPage() {
                                     )}
                                 </div>
 
-                                {/* Start Recording Hint */}
-                                {!recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && (
+                                {/* Hint for video call recording */}
+                                {hasVideoRoom && !recordingBlob && (
+                                    <p className="text-xs text-slate-500 bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                                        <strong className="text-emerald-700">Tip:</strong> Click the{' '}
+                                        <span className="inline-flex items-center gap-1 bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-800 font-medium">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            AI Scribe
+                                        </span>{' '}
+                                        button in the video controls to record audio for transcription.
+                                    </p>
+                                )}
+
+                                {/* Manual recording hint */}
+                                {!hasVideoRoom && !recorder.isRecording && session.recordingStatus !== 'STOPPED' && session.recordingStatus !== 'STORED' && !recordingBlob && (
                                     <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <strong className="text-slate-700">Important:</strong> To capture the patient's voice, please select the Google Meet tab when prompted and ensure <strong className="text-slate-700">"Share tab audio"</strong> is checked.
+                                        <strong className="text-slate-700">Tip:</strong> Start a video call above for the best experience, or use manual recording to capture audio from your browser.
                                     </p>
                                 )}
 
@@ -477,6 +589,13 @@ export default function ConsultationRoomPage() {
                                 {recorder.audioBlob && !recorder.isRecording && (
                                     <p className="text-sm text-slate-500">
                                         Recording complete · {formatDuration(recorder.duration)} · {(recorder.audioBlob.size / (1024 * 1024)).toFixed(1)} MB
+                                    </p>
+                                )}
+
+                                {/* Daily recording info */}
+                                {recordingBlob && (
+                                    <p className="text-sm text-emerald-600 font-medium">
+                                        Video call audio captured · {(recordingBlob.size / (1024 * 1024)).toFixed(1)} MB — Ready to transcribe
                                     </p>
                                 )}
                             </div>
@@ -545,8 +664,8 @@ export default function ConsultationRoomPage() {
 
                 </div>
 
-                {/* Right Rail (1/3) - Patient Context & Status */}
-                <div className="space-y-6">
+                {/* Right Rail — Patient Context & Status */}
+                <div className={hasVideoRoom ? 'xl:col-span-2 space-y-6' : 'space-y-6'}>
                     <AppCard>
                         <AppCardHeader>
                             <AppCardTitle>Patient Context</AppCardTitle>
@@ -590,6 +709,14 @@ export default function ConsultationRoomPage() {
                                             {statusLabel(session.consentStatus)}
                                         </span>
                                     </div>
+                                    {videoActive && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-600">Video Call</span>
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                                                Active
+                                            </span>
+                                        </div>
+                                    )}
                                     {session.transcriptStatus && session.transcriptStatus !== 'NOT_STARTED' && (
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-600">Transcript</span>
@@ -610,6 +737,35 @@ export default function ConsultationRoomPage() {
                             </div>
                         </AppCardContent>
                     </AppCard>
+
+                    {/* Join Token */}
+                    {session.joinToken && (
+                        <AppCard>
+                            <AppCardHeader>
+                                <AppCardTitle>Patient Join Link</AppCardTitle>
+                            </AppCardHeader>
+                            <AppCardContent>
+                                <p className="text-xs text-slate-500 mb-2">Share this link with the patient to join the consultation:</p>
+                                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                    <code className="text-xs text-slate-700 break-all select-all">
+                                        {typeof window !== 'undefined' ? `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}` : ''}
+                                    </code>
+                                </div>
+                                <AppButton
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3 w-full"
+                                    onClick={() => {
+                                        const link = `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}`;
+                                        navigator.clipboard.writeText(link);
+                                        toast.success('Link copied to clipboard');
+                                    }}
+                                >
+                                    Copy Link
+                                </AppButton>
+                            </AppCardContent>
+                        </AppCard>
+                    )}
 
                     {/* Placeholder for future Vitals / History */}
                     <AppCard>
@@ -636,8 +792,8 @@ export default function ConsultationRoomPage() {
                 content={
                     <div className="space-y-5 mt-2">
                         {['subjective', 'objective', 'assessment', 'plan'].map((field) => (
-                            <AppFormField 
-                                key={field} 
+                            <AppFormField
+                                key={field}
                                 label={field.charAt(0).toUpperCase() + field.slice(1)}
                             >
                                 <Textarea

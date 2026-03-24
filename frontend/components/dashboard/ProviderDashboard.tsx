@@ -154,13 +154,11 @@ export function ProviderDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {apt.meetLink && (
-                          <AppButton variant="ghost" size="icon" className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50" asChild>
-                            <a href={apt.meetLink} target="_blank" rel="noopener noreferrer">
-                              <Video className="h-4 w-4" />
-                            </a>
-                          </AppButton>
-                        )}
+                        <AppButton variant="ghost" size="icon" className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50" asChild>
+                          <Link href={`/dashboard/provider/appointments/${apt.id}/consultation`}>
+                            <Video className="h-4 w-4" />
+                          </Link>
+                        </AppButton>
                         <AppButton size="sm" className="rounded-lg bg-[#0D9488] text-white shadow-none hover:bg-[#0F766E]" asChild>
                           <Link href={`/dashboard/provider/appointments/${apt.id}`}>
                             Open Charts
