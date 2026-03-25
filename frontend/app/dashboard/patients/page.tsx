@@ -15,8 +15,10 @@ import {
   AppEmptyState,
   AppButton,
   KPIStatCard,
-  AppTable
+  AppTable,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { User, Calendar, Search, ArrowRight, Clock, Mail } from 'lucide-react';
@@ -37,7 +39,7 @@ function formatDateTime(iso: string) {
   });
 }
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'FRONT_DESK'] as const;
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'FRONT_DESK', 'STAFF'] as const;
 
 export default function PatientsPage() {
   const router = useRouter();
@@ -45,6 +47,9 @@ export default function PatientsPage() {
   const clinicId = user?.clinicId ?? '';
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
 
   useEffect(() => {
     if (user?.role && !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])) {
@@ -53,8 +58,8 @@ export default function PatientsPage() {
   }, [user?.role, router]);
 
   const { data: appointments = [], isLoading, error } = useQuery({
-    queryKey: ['clinic-appointments', 'patients'],
-    queryFn: () => getClinicAppointments(),
+    queryKey: ['clinic-appointments', 'patients', dateRangeOption],
+    queryFn: () => getClinicAppointments(dateRangeValues.startDate, dateRangeValues.endDate),
     enabled: !!clinicId,
   });
 
@@ -110,6 +115,15 @@ export default function PatientsPage() {
       <AppPageHeader
         title="Patient Directory"
         description="Search clinical records, histories, and patient details."
+        actions={
+          <DateRangeFilter 
+            value={dateRangeOption}
+            onChange={(opt, range) => {
+              setDateRangeOption(opt);
+              setDateRangeValues(range);
+            }}
+          />
+        }
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

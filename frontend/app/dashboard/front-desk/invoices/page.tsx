@@ -25,8 +25,10 @@ import {
   AppModal,
   KPIStatCard,
   AppTable,
-  AppInput
+  AppInput,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppToast } from '@/hooks/useAppToast';
@@ -100,8 +102,9 @@ export default function FrontDeskInvoicesPage() {
   const [docStatusFilter, setDocStatusFilter] = React.useState('ALL');
   const [financeStatusFilter, setFinanceStatusFilter] = React.useState('ALL');
   const [providerFilter, setProviderFilter] = React.useState('ALL');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
+  
+  const [dateRangeOption, setDateRangeOption] = React.useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = React.useState<DateRange>({});
   
   const [paymentInvoice, setPaymentInvoice] = React.useState<Invoice | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState('CASH');
@@ -115,14 +118,14 @@ export default function FrontDeskInvoicesPage() {
   const isAllowed = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['front-desk-invoices', docStatusFilter, financeStatusFilter, providerFilter, dateFrom, dateTo],
+    queryKey: ['front-desk-invoices', docStatusFilter, financeStatusFilter, providerFilter, dateRangeOption],
     queryFn: () =>
       getFilteredInvoices({
         status: docStatusFilter === 'ALL' ? undefined : docStatusFilter,
         financialStatus: financeStatusFilter === 'ALL' ? undefined : financeStatusFilter,
         providerId: providerFilter === 'ALL' ? undefined : providerFilter,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: dateRangeValues.startDate?.toISOString(),
+        dateTo: dateRangeValues.endDate?.toISOString(),
       }),
     enabled: !!clinicId,
   });
@@ -134,12 +137,12 @@ export default function FrontDeskInvoicesPage() {
   });
 
   const { data: financeSummary } = useQuery({
-    queryKey: ['finance-summary', providerFilter, dateFrom, dateTo],
+    queryKey: ['finance-summary', providerFilter, dateRangeOption],
     queryFn: () =>
       getFinanceSummary({
         providerId: providerFilter === 'ALL' ? undefined : providerFilter,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: dateRangeValues.startDate?.toISOString(),
+        dateTo: dateRangeValues.endDate?.toISOString(),
       }),
     enabled: !!clinicId,
   });
@@ -229,11 +232,21 @@ export default function FrontDeskInvoicesPage() {
         title="Billing Operations"
         description="Monitor clinic revenue, collect outstanding balances, and manage refunds."
         actions={
-          <AppButton asChild className="rounded-full px-6 shadow-md">
-            <Link href="/dashboard/front-desk/pos">
-              <ShoppingCart className="mr-2 h-4 w-4" /> New Checkout
-            </Link>
-          </AppButton>
+          <div className="flex gap-4 items-center">
+            <DateRangeFilter 
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt);
+                setDateRangeValues(range);
+              }}
+            />
+            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+            <AppButton asChild className="rounded-full px-6 shadow-md">
+              <Link href="/dashboard/front-desk/pos">
+                <ShoppingCart className="mr-2 h-4 w-4" /> New Checkout
+              </Link>
+            </AppButton>
+          </div>
         }
       />
 
@@ -287,24 +300,6 @@ export default function FrontDeskInvoicesPage() {
                 {FINANCE_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm h-10 items-center">
-              <div className="pl-2 pr-1 text-slate-400">
-                <Calendar className="h-3.5 w-3.5" />
-              </div>
-              <AppInput 
-                type="date" 
-                className="border-none bg-transparent h-8 text-xs font-bold text-slate-700 focus-visible:ring-0 w-32 px-1" 
-                value={dateFrom} 
-                onChange={e => setDateFrom(e.target.value)} 
-              />
-              <div className="px-1 text-slate-300 font-bold">|</div>
-              <AppInput 
-                type="date" 
-                className="border-none bg-transparent h-8 text-xs font-bold text-slate-700 focus-visible:ring-0 w-32 px-1" 
-                value={dateTo} 
-                onChange={e => setDateTo(e.target.value)} 
-              />
-            </div>
           </div>
         </AppCardHeader>
         <AppCardContent className="p-0">

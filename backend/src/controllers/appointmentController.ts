@@ -88,9 +88,16 @@ export const createRecurring = asyncHandler(
 export const getMy = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const options =
+      startDate && endDate
+        ? { startDate: new Date(startDate), endDate: new Date(endDate) }
+        : undefined;
     const appointments = await appointmentService.getAppointmentsByPatient(
       req.user!.id,
-      clinicId
+      clinicId,
+      options
     );
     successResponse(res, 200, 'Appointments retrieved', { appointments });
   }
@@ -148,9 +155,16 @@ export const getByPatient = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const patientId = req.params.patientId as string;
     const clinicId = req.clinicId!;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const options =
+      startDate && endDate
+        ? { startDate: new Date(startDate), endDate: new Date(endDate) }
+        : undefined;
     const appointments = await appointmentService.getAppointmentsByPatient(
       patientId,
-      clinicId
+      clinicId,
+      options
     );
     successResponse(res, 200, 'Appointments retrieved', { appointments });
   }
@@ -183,8 +197,15 @@ export const getProvider = asyncHandler(
 export const getClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId!;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const options =
+      startDate && endDate
+        ? { startDate: new Date(startDate), endDate: new Date(endDate) }
+        : undefined;
     const appointments = await appointmentService.getAppointmentsByClinic(
-      clinicId
+      clinicId,
+      options
     );
     successResponse(res, 200, 'Appointments retrieved', { appointments });
   }

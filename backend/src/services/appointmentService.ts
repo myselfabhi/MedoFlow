@@ -1191,10 +1191,16 @@ export const rescheduleAppointment = async (
 
 export const getAppointmentsByPatient = async (
   patientId: string,
-  clinicId?: string | null
+  clinicId?: string | null,
+  options?: { startDate?: Date; endDate?: Date }
 ) => {
-  const where: { patientId: string; clinicId?: string } = { patientId };
+  const where: Record<string, unknown> = { patientId };
   if (clinicId) where.clinicId = clinicId;
+  if (options?.startDate || options?.endDate) {
+    where.startTime = {};
+    if (options.startDate) (where.startTime as { gte?: Date }).gte = options.startDate;
+    if (options.endDate) (where.startTime as { lte?: Date }).lte = options.endDate;
+  }
   return prisma.appointment.findMany({
     where,
     orderBy: { startTime: 'desc' },
@@ -1234,9 +1240,18 @@ export const getAppointmentsByProvider = async (
   });
 };
 
-export const getAppointmentsByClinic = async (clinicId: string) => {
+export const getAppointmentsByClinic = async (
+  clinicId: string,
+  options?: { startDate?: Date; endDate?: Date }
+) => {
+  const where: Record<string, unknown> = { clinicId };
+  if (options?.startDate || options?.endDate) {
+    where.startTime = {};
+    if (options.startDate) (where.startTime as { gte?: Date }).gte = options.startDate;
+    if (options.endDate) (where.startTime as { lte?: Date }).lte = options.endDate;
+  }
   return prisma.appointment.findMany({
-    where: { clinicId },
+    where,
     orderBy: { startTime: 'desc' },
     include: {
       location: { select: { id: true, name: true } },

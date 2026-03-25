@@ -11,8 +11,10 @@ import {
   AppCardContent,
   AppButton,
   KPIStatCard,
-  AppTable
+  AppTable,
+  DateRangeFilter
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +34,10 @@ export default function StaffPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
 
-  const { data: staff = [], isLoading } = useQuery({
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
+
+  const { data: staff = [], isLoading, refetch } = useQuery({
     queryKey: ['staff'],
     queryFn: () => listStaff(),
     enabled: !!user?.clinicId,
@@ -41,12 +46,16 @@ export default function StaffPage() {
   const deactivateMutation = useMutation({
     mutationFn: deactivateStaff,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
-      toast.success('Staff member deactivated');
+      toast.success('Team member deactivated');
+      refetch();
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message ?? error.message ?? 'Unable to deactivate staff');
-    },
+    onError: () => toast.error('Failed to deactivate member'),
+  });
+
+  const filteredKPIStaff = staff.filter((s) => {
+    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true;
+    const createdAt = new Date(s.createdAt);
+    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate;
   });
 
   const handleDeactivate = (id: string, name: string) => {
@@ -82,17 +91,27 @@ export default function StaffPage() {
         title="Internal Team"
         description="Manage your clinic's administrators and operational support staff."
         actions={
-          <div className="flex gap-2">
-            <Link href="/dashboard/staff/roles">
-              <AppButton variant="outline" className="rounded-full px-5">
-                <Shield className="mr-2 h-4 w-4" />
-                Manage Roles
+          <div className="flex gap-4 items-center">
+            <DateRangeFilter 
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt);
+                setDateRangeValues(range);
+              }}
+            />
+            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+            <div className="flex gap-2">
+              <Link href="/dashboard/staff/roles">
+                <AppButton variant="outline" className="rounded-full px-5">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Manage Roles
+                </AppButton>
+              </Link>
+              <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite Member
               </AppButton>
-            </Link>
-            <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Invite Member
-            </AppButton>
+            </div>
           </div>
         }
       />
@@ -100,19 +119,19 @@ export default function StaffPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <KPIStatCard 
           label="Team Size"
-          value={staff.length}
+          value={filteredKPIStaff.length}
           icon={Users}
           iconClassName="text-blue-600 bg-blue-50"
         />
         <KPIStatCard 
           label="Admins"
-          value={staff.filter(s => s.role === 'SUPER_ADMIN').length}
+          value={filteredKPIStaff.filter(s => s.role === 'SUPER_ADMIN').length}
           icon={ShieldCheck}
           iconClassName="text-purple-600 bg-purple-50"
         />
         <KPIStatCard 
           label="Providers"
-          value={staff.filter(s => !!s.provider).length}
+          value={filteredKPIStaff.filter(s => !!s.provider).length}
           icon={Stethoscope}
           iconClassName="text-emerald-600 bg-emerald-50"
         />

@@ -27,6 +27,7 @@ export interface DashboardService {
   defaultPrice: string;
   discipline: { id: string; name: string };
   recommendedProducts?: { id: string; name: string }[];
+  createdAt: string;
 }
 
 export const getDashboardServices = async (): Promise<DashboardService[]> => {

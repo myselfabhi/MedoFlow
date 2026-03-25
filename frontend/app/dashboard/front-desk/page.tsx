@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInvoices } from '@/lib/invoiceApi';
@@ -12,8 +13,10 @@ import {
   AppCardContent,
   AppPageHeader,
   AppButton,
-  KPIStatCard
+  KPIStatCard,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import { AppTable } from '@/components/ui-system/AppTable';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -38,6 +41,9 @@ export default function FrontDeskDashboardPage() {
   const { user } = useAuth();
   const clinicId = user?.clinicId ?? '';
 
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
+
   if (user && user.role !== 'FRONT_DESK') {
     return null;
   }
@@ -49,25 +55,22 @@ export default function FrontDeskDashboardPage() {
   });
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['clinic-appointments'],
-    queryFn: () => getClinicAppointments(),
+    queryKey: ['clinic-appointments', dateRangeOption],
+    queryFn: () => getClinicAppointments(dateRangeValues.startDate, dateRangeValues.endDate),
     enabled: !!clinicId,
   });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(today);
-  todayEnd.setHours(23, 59, 59, 999);
+  const filteredInvoices = invoices.filter((i) => {
+    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true;
+    const createdAt = new Date(i.createdAt);
+    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate;
+  });
 
-  const unpaidInvoices = invoices.filter(
+  const unpaidInvoices = filteredInvoices.filter(
     (i) => i.status === 'DRAFT' || i.status === 'FINALIZED' || i.status === 'PENDING_PAYMENT'
   );
-  const todayAppointments = appointments.filter((a) => {
-    const d = new Date(a.startTime);
-    return d >= today && d <= todayEnd;
-  });
   
-  const upcomingToday = todayAppointments
+  const upcomingToday = appointments
     .filter((a) => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
@@ -79,21 +82,31 @@ export default function FrontDeskDashboardPage() {
         title="Operations Desk"
         description="Daily clinical management and rapid checkout console."
         actions={
-          <AppButton asChild className="rounded-full px-6 shadow-md">
-            <Link href="/dashboard/front-desk/pos">
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Open POS
-            </Link>
-          </AppButton>
+          <div className="flex gap-4 items-center">
+            <DateRangeFilter 
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt);
+                setDateRangeValues(range);
+              }}
+            />
+            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+            <AppButton asChild className="rounded-full px-6 shadow-md">
+              <Link href="/dashboard/front-desk/pos">
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Open POS
+              </Link>
+            </AppButton>
+          </div>
         }
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <KPIStatCard 
-          label="Todays Schedule"
+          label={dateRangeOption === 'ALL_TIME' ? "All Bookings" : "Period Schedule"}
           value={isLoading ? '...' : upcomingToday.length}
           icon={CalendarDays}
-          description="Appointments remaining"
+          description="Total active appointments"
           iconClassName="text-blue-600 bg-blue-50"
         />
         <KPIStatCard 

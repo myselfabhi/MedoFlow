@@ -10,6 +10,7 @@ export { AppModal } from './AppModal';
 export { AppPageHeader } from './AppPageHeader';
 export { AppSection } from './AppSection';
 export { AppEmptyState } from './AppEmptyState';
+export { DateRangeFilter } from './DateRangeFilter';
 export { KPIStatCard } from './KPIStatCard';
 export { StickySummaryPanel } from './StickySummaryPanel';
 export { AppCalendar } from './AppCalendar';

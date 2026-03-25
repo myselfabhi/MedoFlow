@@ -29,8 +29,10 @@ import {
   AppPageHeader,
   AppEmptyState,
   AppTable,
-  KPIStatCard
+  KPIStatCard,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import {
   Dialog,
@@ -193,6 +195,9 @@ export default function ServicesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<DashboardService | null>(null);
 
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
+
   const clinicId = user?.clinicId ?? undefined;
   const canEdit = user?.role === 'SUPER_ADMIN';
 
@@ -247,6 +252,12 @@ export default function ServicesPage() {
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Failed to archive service'),
   });
 
+  const filteredServices = services.filter((s) => {
+    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true;
+    const createdAt = new Date(s.createdAt);
+    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate;
+  });
+
   const handleAddSubmit = (data: ServiceFormData) => {
     createMutation.mutate({
       name: data.name,
@@ -293,18 +304,30 @@ export default function ServicesPage() {
         title="Clinical Services"
         description="Configure your medical offerings, pricing, and durations."
         actions={
-          canEdit ? (
-            <AppButton onClick={() => setAddOpen(true)} className="rounded-full px-6 shadow-md">
-              <Plus className="mr-2 h-4 w-4" /> Add Service
-            </AppButton>
-          ) : undefined
+          <div className="flex gap-4 items-center">
+            <DateRangeFilter 
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt);
+                setDateRangeValues(range);
+              }}
+            />
+            {canEdit && (
+              <>
+                <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                <AppButton onClick={() => setAddOpen(true)} className="rounded-full px-6 shadow-md">
+                  <Plus className="mr-2 h-4 w-4" /> Add Service
+                </AppButton>
+              </>
+            )}
+          </div>
         }
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <KPIStatCard 
           label="Total Services"
-          value={services.length}
+          value={filteredServices.length}
           icon={ClipboardList}
           iconClassName="text-blue-600 bg-blue-50"
         />
@@ -316,7 +339,7 @@ export default function ServicesPage() {
         />
         <KPIStatCard 
           label="Avg. Session"
-          value={`${Math.round(services.reduce((acc, s) => acc + s.duration, 0) / (services.length || 1))}m`}
+          value={`${Math.round(filteredServices.reduce((acc, s) => acc + s.duration, 0) / (filteredServices.length || 1))}m`}
           icon={Clock}
           iconClassName="text-amber-600 bg-amber-50"
         />
@@ -365,7 +388,7 @@ export default function ServicesPage() {
                 ),
               }
             ]}
-            data={services}
+            data={filteredServices}
             keyExtractor={(s) => s.id}
           />
         </AppCardContent>

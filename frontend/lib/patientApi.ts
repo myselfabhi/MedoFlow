@@ -80,11 +80,18 @@ export interface Prescription {
   provider: { id: string; firstName: string; lastName: string };
 }
 
-export const getMyAppointments = async (): Promise<PatientAppointment[]> => {
+export const getMyAppointments = async (
+  startDate?: Date,
+  endDate?: Date
+): Promise<PatientAppointment[]> => {
+  const search = new URLSearchParams();
+  if (startDate) search.set('startDate', startDate.toISOString());
+  if (endDate) search.set('endDate', endDate.toISOString());
+  const qs = search.toString();
   const { data } = await api.get<{
     success: boolean;
     data: { appointments: PatientAppointment[] };
-  }>('/appointments/my');
+  }>(`/appointments/my${qs ? `?${qs}` : ''}`);
   return data.data.appointments;
 };
 
@@ -123,11 +130,18 @@ export const getProviderAppointments = async (
   return data.data.appointments;
 };
 
-export const getClinicAppointments = async (): Promise<ProviderAppointment[]> => {
+export const getClinicAppointments = async (
+  startDate?: Date,
+  endDate?: Date
+): Promise<ProviderAppointment[]> => {
+  const search = new URLSearchParams();
+  if (startDate) search.set('startDate', startDate.toISOString());
+  if (endDate) search.set('endDate', endDate.toISOString());
+  const qs = search.toString();
   const { data } = await api.get<{
     success: boolean;
     data: { appointments: ProviderAppointment[] };
-  }>('/appointments/clinic');
+  }>(`/appointments/clinic${qs ? `?${qs}` : ''}`);
   return data.data.appointments;
 };
 

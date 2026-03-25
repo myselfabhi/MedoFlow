@@ -1,5 +1,7 @@
 'use client';
 
+import React, { useState } from 'react';
+
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,8 +21,10 @@ import {
   AppPageHeader,
   AppEmptyState,
   AppTable,
-  KPIStatCard
+  KPIStatCard,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Calendar, User, Clock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
@@ -38,14 +42,18 @@ export default function AppointmentsPage() {
   const { user } = useAuth();
   const isProvider = user?.role === 'PROVIDER';
   const isPatient = user?.role === 'PATIENT';
-  const isStaffOrAdmin = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN';
+  const isStaffOrAdmin = user?.role === 'FRONT_DESK' || user?.role === 'SUPER_ADMIN' || user?.role === 'STAFF';
+
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
 
   const { data: appointments = [], isLoading, error } = useQuery({
-    queryKey: ['appointments', user?.role],
+    queryKey: ['appointments', user?.role, dateRangeOption],
     queryFn: async () => {
-      if (isPatient) return getMyAppointments();
-      if (isProvider) return getProviderAppointments(undefined, undefined);
-      if (isStaffOrAdmin) return getClinicAppointments();
+      const { startDate, endDate } = dateRangeValues;
+      if (isPatient) return getMyAppointments(startDate, endDate);
+      if (isProvider) return getProviderAppointments(startDate, endDate);
+      if (isStaffOrAdmin) return getClinicAppointments(startDate, endDate);
       return [] as (PatientAppointment | ProviderAppointment)[];
     },
     enabled: isPatient || isProvider || (isStaffOrAdmin && !!user?.clinicId),
@@ -60,6 +68,15 @@ export default function AppointmentsPage() {
       <AppPageHeader
         title="Clinical Schedule"
         description={subtitle}
+        actions={
+          <DateRangeFilter 
+            value={dateRangeOption}
+            onChange={(opt, range) => {
+              setDateRangeOption(opt);
+              setDateRangeValues(range);
+            }}
+          />
+        }
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

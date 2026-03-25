@@ -9,7 +9,10 @@ import {
   AppCardTitle,
   AppCardContent,
   AppPageHeader,
+  DateRangeFilter,
 } from '@/components/ui-system';
+import React, { useState } from 'react';
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
 import { PageContainer } from '@/components/layout';
 import {
   TrendingUp,
@@ -31,10 +34,16 @@ export default function AdminDashboardPage() {
   if (user && user.role !== 'SUPER_ADMIN') {
     return null;
   }
+
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
   
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-overview'],
-    queryFn: () => getAnalyticsDashboard(),
+    queryKey: ['admin-overview', dateRangeOption],
+    queryFn: () => getAnalyticsDashboard({
+      dateFrom: dateRangeValues.startDate?.toISOString().slice(0, 10),
+      dateTo: dateRangeValues.endDate?.toISOString().slice(0, 10),
+    }),
     enabled: !!user?.clinicId,
   });
 
@@ -46,6 +55,15 @@ export default function AdminDashboardPage() {
       <AppPageHeader
         title="Command Center"
         description="High-level clinic health and financial overview"
+        actions={
+          <DateRangeFilter 
+            value={dateRangeOption}
+            onChange={(opt, range) => {
+              setDateRangeOption(opt);
+              setDateRangeValues(range);
+            }}
+          />
+        }
       />
 
       {/* KPI Stats */}
