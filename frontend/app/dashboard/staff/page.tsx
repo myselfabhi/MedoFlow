@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listStaff, deactivateStaff } from '@/lib/staffApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil, Shield } from 'lucide-react';
+import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil, Shield, Stethoscope, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { AddStaffModal } from './AddStaffModal';
 import { EditStaffModal } from './EditStaffModal';
@@ -111,9 +111,9 @@ export default function StaffPage() {
           iconClassName="text-purple-600 bg-purple-50"
         />
         <KPIStatCard 
-          label="Latest Invite"
-          value="Today"
-          icon={Clock}
+          label="Providers"
+          value={staff.filter(s => !!s.provider).length}
+          icon={Stethoscope}
           iconClassName="text-emerald-600 bg-emerald-50"
         />
       </div>
@@ -159,6 +159,40 @@ export default function StaffPage() {
                 ),
               },
               {
+                key: 'clinicalProfile',
+                header: 'Clinical Profile',
+                render: (m) => {
+                  if (!m.provider) {
+                    return <span className="text-[11px] font-medium text-slate-400">—</span>;
+                  }
+                  
+                  const disciplines = m.provider.disciplines?.map(d => d.discipline.name) || [];
+                  const servicesCount = m.provider.providerServices?.length || 0;
+                  
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap gap-1">
+                        {disciplines.length > 0 ? disciplines.map(d => (
+                          <span key={d} className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 border border-teal-100/50">
+                            {d}
+                          </span>
+                        )) : (
+                          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                            <Stethoscope className="h-3 w-3 text-slate-400" />
+                            Provider
+                          </span>
+                        )}
+                      </div>
+                      {servicesCount > 0 && (
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {servicesCount} {servicesCount === 1 ? 'Service' : 'Services'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+              },
+              {
                 key: 'joined',
                 header: 'Joined On',
                 render: (m) => (
@@ -172,7 +206,19 @@ export default function StaffPage() {
                 header: '',
                 className: 'text-right',
                 render: (m) => (
-                  <div className="flex justify-end gap-1 pr-4">
+                  <div className="flex items-center justify-end gap-1 pr-4">
+                    {m.provider && (
+                      <Link href={`/dashboard/providers/${m.provider.id}/availability`}>
+                        <AppButton
+                          variant="ghost"
+                          size="sm"
+                          className="mr-2 rounded-full font-bold text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                        >
+                          <Calendar className="mr-2 h-3.5 w-3.5" />
+                          Availability
+                        </AppButton>
+                      </Link>
+                    )}
                     <AppButton
                       variant="ghost"
                       size="icon"

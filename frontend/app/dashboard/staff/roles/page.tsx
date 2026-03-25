@@ -524,10 +524,10 @@ export default function RolesPage() {
         description="Define custom roles with granular permissions — just like Shopify."
         actions={
           <div className="flex gap-2">
-            {roles.length === 0 && (
+            {roles.filter((r) => r.isPreset).length === 0 && (
               <AppButton
                 variant="outline"
-                className="rounded-full px-5"
+                className="rounded-full px-5 hover:bg-teal-50 hover:text-teal-600 hover:border-teal-200"
                 onClick={() => seedMutation.mutate()}
                 disabled={seedMutation.isPending}
               >

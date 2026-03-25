@@ -32,7 +32,7 @@ export const listStaff = async (clinicId: string) => {
   return prisma.user.findMany({
     where: {
       clinicId,
-      role: { in: ['SUPER_ADMIN', 'FRONT_DESK', 'ACCOUNTING', 'MARKETING', 'STAFF'] },
+      role: { not: 'PATIENT' },
       isActive: true,
     },
     orderBy: { createdAt: 'asc' },
@@ -46,7 +46,18 @@ export const listStaff = async (clinicId: string) => {
       permissions: true,
       isActive: true,
       createdAt: true,
-      provider: { select: { id: true } },
+      provider: { 
+        select: { 
+          id: true,
+          disciplines: {
+            select: { discipline: { select: { name: true } } }
+          },
+          providerServices: {
+            take: 3,
+            select: { service: { select: { name: true } } }
+          }
+        } 
+      },
     },
   });
 };

@@ -106,7 +106,6 @@ const superAdminSections: SidebarSection[] = [
     title: 'Clinical Registry',
     items: [
       { href: '/dashboard/patients', label: 'Patients', icon: Users },
-      { href: '/dashboard/providers', label: 'Providers', icon: Users },
       { href: '/dashboard/appointments', label: 'Appointments', icon: ClipboardList },
     ]
   },
@@ -174,7 +173,7 @@ export function AppSidebar() {
   
   const sections = user?.role === 'PATIENT' ? patientSections
     : user?.role === 'PROVIDER' ? providerSections
-    : user?.role === 'SUPER_ADMIN' ? superAdminSections
+    : (user?.role === 'SUPER_ADMIN' || user?.role === 'STAFF') ? superAdminSections
     : user?.role === 'FRONT_DESK' ? frontDeskSections
     : [];
 

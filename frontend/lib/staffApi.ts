@@ -17,7 +17,11 @@ export interface StaffMember {
   permissions: Permission[] | null;
   isActive: boolean;
   createdAt: string;
-  provider?: { id: string } | null;
+  provider?: {
+    id: string;
+    disciplines?: { discipline: { name: string } }[];
+    providerServices?: { service: { name: string } }[];
+  } | null;
 }
 
 export const listStaff = async (): Promise<StaffMember[]> => {
