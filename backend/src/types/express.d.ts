@@ -9,6 +9,9 @@ declare global {
         email: string;
         role: Role;
         clinicId: string | null;
+        customRoleId: string | null;
+        customRoleName: string | null;
+        permissions: string[];
       };
       clinicId?: string | null;
       bypassClinicScope?: boolean;

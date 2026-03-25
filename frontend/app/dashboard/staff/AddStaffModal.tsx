@@ -13,76 +13,33 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { inviteStaff, type StaffRole, type Permission } from '@/lib/staffApi';
+import { inviteStaff, type StaffRole } from '@/lib/staffApi';
+import { listRoles, type CustomRole } from '@/lib/roleApi';
 import { getDisciplines } from '@/lib/disciplineApi';
 import { getDashboardServices } from '@/lib/serviceApi';
 import { useAppToast } from '@/hooks/useAppToast';
-
-// ─── Role config ──────────────────────────────────────────────────────────────
-
-const ROLE_OPTIONS: { value: StaffRole; label: string; description: string }[] = [
-  { value: 'FRONT_DESK', label: 'Front Desk', description: 'Reception & scheduling' },
-  { value: 'PROVIDER', label: 'Provider', description: 'Clinical staff / therapist' },
-  { value: 'ACCOUNTING', label: 'Accounting', description: 'Billing & financial ops' },
-  { value: 'MARKETING', label: 'Marketing', description: 'Growth & promotions' },
-];
-
-// ─── Permissions config ───────────────────────────────────────────────────────
-
-const PERMISSIONS_CONFIG = [
-  {
-    module: 'Clinical',
-    actions: [
-      { action: 'view_patients', label: 'View Patients' },
-      { action: 'manage_appointments', label: 'Manage Appointments' },
-      { action: 'view_records', label: 'View Clinical Records' },
-    ],
-  },
-  {
-    module: 'Financial',
-    actions: [
-      { action: 'view_billing', label: 'View Billing' },
-      { action: 'process_payments', label: 'Process Payments' },
-      { action: 'view_reports', label: 'View Financial Reports' },
-    ],
-  },
-  {
-    module: 'Commerce',
-    actions: [
-      { action: 'manage_products', label: 'Manage Products' },
-      { action: 'manage_memberships', label: 'Manage Memberships' },
-    ],
-  },
-  {
-    module: 'Admin',
-    actions: [
-      { action: 'manage_staff', label: 'Manage Staff' },
-      { action: 'view_analytics', label: 'View Analytics' },
-    ],
-  },
-];
-
-const DEFAULT_PERMISSIONS: Record<string, string[]> = {
-  FRONT_DESK: ['view_patients', 'manage_appointments', 'view_billing', 'process_payments'],
-  ACCOUNTING: ['view_billing', 'process_payments', 'view_reports'],
-  MARKETING: ['manage_products', 'view_analytics'],
-};
+import { Shield, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 // ─── Form schema ──────────────────────────────────────────────────────────────
 
 const staffSchema = z.object({
-  role: z.enum(['FRONT_DESK', 'PROVIDER', 'ACCOUNTING', 'MARKETING']),
+  createType: z.enum(['staff', 'provider']),
   name: z.string().optional(),
   email: z.string().email('Valid email is required'),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  customRoleId: z.string().optional(),
   disciplineIds: z.array(z.string()).optional(),
   serviceIds: z.array(z.string()).optional(),
 }).superRefine((data, ctx) => {
-  if (data.role !== 'PROVIDER' && (!data.name || data.name.trim() === '')) {
+  if (data.createType !== 'provider' && (!data.name || data.name.trim() === '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Full name is required', path: ['name'] });
   }
-  if (data.role === 'PROVIDER') {
+  if (data.createType !== 'provider' && !data.customRoleId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a role', path: ['customRoleId'] });
+  }
+  if (data.createType === 'provider') {
     if (!data.firstName || data.firstName.trim() === '')
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'First name is required', path: ['firstName'] });
     if (!data.lastName || data.lastName.trim() === '')
@@ -101,43 +58,48 @@ type StaffFormData = z.infer<typeof staffSchema>;
 export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const toast = useAppToast();
   const queryClient = useQueryClient();
-  const [role, setRole] = useState<StaffRole>('FRONT_DESK');
-  const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set(DEFAULT_PERMISSIONS['FRONT_DESK']));
+  const [createType, setCreateType] = useState<'staff' | 'provider'>('staff');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<StaffFormData>({
     resolver: zodResolver(staffSchema),
-    defaultValues: { role: 'FRONT_DESK', name: '', email: '', firstName: '', lastName: '', disciplineIds: [], serviceIds: [] },
+    defaultValues: { createType: 'staff', name: '', email: '', firstName: '', lastName: '', customRoleId: '', disciplineIds: [], serviceIds: [] },
   });
 
   const selectedDisciplineIds = watch('disciplineIds') || [];
   const selectedServiceIds = watch('serviceIds') || [];
 
+  // Fetch available custom roles
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: listRoles,
+    enabled: open && createType === 'staff',
+  });
+
   const { data: disciplines = [] } = useQuery({
     queryKey: ['disciplines'],
     queryFn: getDisciplines,
-    enabled: open && role === 'PROVIDER',
+    enabled: open && createType === 'provider',
   });
 
   const { data: allServices = [] } = useQuery({
     queryKey: ['dashboard-services'],
     queryFn: getDashboardServices,
-    enabled: open && role === 'PROVIDER',
+    enabled: open && createType === 'provider',
   });
 
   const filteredServices = allServices.filter((s) => selectedDisciplineIds.includes(s.discipline.id));
 
-  const handleRoleChange = (newRole: StaffRole) => {
-    setRole(newRole);
-    setValue('role', newRole as any);
-    setSelectedActions(new Set(DEFAULT_PERMISSIONS[newRole] ?? []));
+  const selectedRole = roles.find((r) => r.id === selectedRoleId);
+
+  const handleTypeChange = (type: 'staff' | 'provider') => {
+    setCreateType(type);
+    setValue('createType', type);
   };
 
-  const toggleAction = (action: string) => {
-    setSelectedActions((prev) => {
-      const next = new Set(prev);
-      next.has(action) ? next.delete(action) : next.add(action);
-      return next;
-    });
+  const handleRoleSelect = (roleId: string) => {
+    setSelectedRoleId(roleId);
+    setValue('customRoleId', roleId);
   };
 
   const inviteMutation = useMutation({
@@ -145,8 +107,8 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       reset();
-      setSelectedActions(new Set(DEFAULT_PERMISSIONS['FRONT_DESK']));
-      setRole('FRONT_DESK');
+      setSelectedRoleId('');
+      setCreateType('staff');
       toast.success('Staff invitation sent');
       onOpenChange(false);
     },
@@ -156,17 +118,19 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
   });
 
   const onSubmit = (data: StaffFormData) => {
-    const permissions: Permission[] = Array.from(selectedActions).map((action) => {
-      const module = PERMISSIONS_CONFIG.find((g) => g.actions.some((a) => a.action === action))?.module ?? 'Other';
-      return { module, action };
-    });
-
-    const payload = {
-      ...data,
-      permissions: role !== 'PROVIDER' ? permissions : undefined,
-      services: role === 'PROVIDER' ? data.serviceIds?.map((id) => ({ serviceId: id })) : undefined,
-    };
-    inviteMutation.mutate(payload);
+    if (createType === 'provider') {
+      inviteMutation.mutate({
+        ...data,
+        role: 'PROVIDER' as StaffRole,
+        services: data.serviceIds?.map((id) => ({ serviceId: id })),
+      });
+    } else {
+      inviteMutation.mutate({
+        ...data,
+        role: 'STAFF' as StaffRole,
+        customRoleId: selectedRoleId,
+      });
+    }
   };
 
   return (
@@ -174,19 +138,22 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Invite New Team Member</DialogTitle>
-          <DialogDescription>Choose a role, set permissions, then send the invitation.</DialogDescription>
+          <DialogDescription>Choose the type of team member and assign a role.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 py-2">
-          {/* Role selection */}
+          {/* Type toggle */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">Role</label>
+            <label className="text-sm font-semibold text-slate-700">Member Type</label>
             <div className="grid grid-cols-2 gap-2">
-              {ROLE_OPTIONS.map((opt) => (
+              {[
+                { value: 'staff' as const, label: 'Staff', desc: 'Admin, front desk, or custom role' },
+                { value: 'provider' as const, label: 'Provider', desc: 'Clinical staff / therapist' },
+              ].map((opt) => (
                 <label
                   key={opt.value}
                   className={`flex flex-col cursor-pointer border rounded-xl px-3 py-2.5 transition-colors ${
-                    role === opt.value
+                    createType === opt.value
                       ? 'border-primary bg-primary/5 text-primary'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}
@@ -195,13 +162,13 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
                     type="radio"
                     className="sr-only"
                     value={opt.value}
-                    checked={role === opt.value}
-                    onChange={() => handleRoleChange(opt.value)}
+                    checked={createType === opt.value}
+                    onChange={() => handleTypeChange(opt.value)}
                   />
-                  <span className={`text-sm font-semibold ${role === opt.value ? 'text-primary' : 'text-slate-800'}`}>
+                  <span className={`text-sm font-semibold ${createType === opt.value ? 'text-primary' : 'text-slate-800'}`}>
                     {opt.label}
                   </span>
-                  <span className="text-xs text-slate-400 mt-0.5">{opt.description}</span>
+                  <span className="text-xs text-slate-400 mt-0.5">{opt.desc}</span>
                 </label>
               ))}
             </div>
@@ -214,13 +181,74 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
             {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
           </div>
 
-          {/* Name fields — role-specific */}
-          {role !== 'PROVIDER' ? (
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Full Name</label>
-              <AppInput {...register('name')} placeholder="Jamie Rivera" />
-              {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
-            </div>
+          {/* Name fields — type-specific */}
+          {createType !== 'provider' ? (
+            <>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Full Name</label>
+                <AppInput {...register('name')} placeholder="Jamie Rivera" />
+                {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+              </div>
+
+              {/* Custom Role Selector */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-700">Assign Role</label>
+                  <Link
+                    href="/dashboard/staff/roles"
+                    className="flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700"
+                  >
+                    Manage Roles <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                {roles.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center">
+                    <Shield className="h-6 w-6 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs text-slate-400">No roles created yet.</p>
+                    <Link
+                      href="/dashboard/staff/roles"
+                      className="text-xs font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      Create roles first →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto border rounded-xl p-3 bg-slate-50">
+                    {roles.map((role) => (
+                      <label
+                        key={role.id}
+                        className={`flex items-center justify-between cursor-pointer rounded-lg px-3 py-2.5 transition-all ${
+                          selectedRoleId === role.id
+                            ? 'bg-teal-50 border border-teal-300 shadow-sm'
+                            : 'bg-white border border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="radio"
+                            name="customRole"
+                            value={role.id}
+                            checked={selectedRoleId === role.id}
+                            onChange={() => handleRoleSelect(role.id)}
+                            className="h-4 w-4 text-teal-600 accent-teal-600"
+                          />
+                          <div>
+                            <span className="text-sm font-semibold text-slate-700">{role.name}</span>
+                            {role.description && (
+                              <p className="text-[11px] text-slate-400">{role.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {role.permissions.length} perms
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {errors.customRoleId && <p className="text-xs text-red-500">{errors.customRoleId.message}</p>}
+              </div>
+            </>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4">
@@ -292,38 +320,11 @@ export function AddStaffModal({ open, onOpenChange }: { open: boolean; onOpenCha
             </>
           )}
 
-          {/* Permissions checklist — only for non-provider roles */}
-          {role !== 'PROVIDER' && (
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">Permissions</label>
-              <div className="border rounded-xl p-4 bg-slate-50 space-y-4">
-                {PERMISSIONS_CONFIG.map((group) => (
-                  <div key={group.module}>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">{group.module}</p>
-                    <div className="space-y-1.5">
-                      {group.actions.map((item) => (
-                        <label key={item.action} className="flex items-center gap-2.5 cursor-pointer text-sm">
-                          <input
-                            type="checkbox"
-                            checked={selectedActions.has(item.action)}
-                            onChange={() => toggleAction(item.action)}
-                            className="w-4 h-4 rounded accent-primary"
-                          />
-                          <span className="text-slate-700">{item.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-end gap-3 pt-4 border-t">
             <AppButton type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</AppButton>
             <AppButton
               type="submit"
-              disabled={inviteMutation.isPending || (role === 'PROVIDER' && disciplines.length === 0)}
+              disabled={inviteMutation.isPending || (createType === 'provider' && disciplines.length === 0) || (createType === 'staff' && roles.length === 0)}
             >
               {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
             </AppButton>

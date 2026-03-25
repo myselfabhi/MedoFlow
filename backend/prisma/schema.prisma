@@ -14,6 +14,7 @@ enum Role {
   ACCOUNTING
   MARKETING
   PATIENT
+  STAFF
 }
 
 enum AppointmentStatus {
@@ -217,21 +218,42 @@ model Clinic {
   carts                     Cart[]
   commissionRules           CommissionRule[]
   commissionRecords         CommissionRecord[]
+  customRoles               CustomRole[]
+}
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  clinicId    String
+  name        String
+  description String?
+  isPreset    Boolean  @default(false)
+  permissions Json     // Array of permission keys: ["appointments.view", "billing.manage"]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  users  User[]
+
+  @@unique([clinicId, name])
+  @@index([clinicId])
 }
 
 model User {
-  id        String   @id @default(cuid())
-  clinicId  String?
-  name      String
-  email     String   @unique
-  password  String
-  role        Role
-  permissions Json?
-  isActive    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  clinicId     String?
+  name         String
+  email        String   @unique
+  password     String
+  role         Role
+  customRoleId String?
+  permissions  Json?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   clinic                        Clinic?                    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  customRole                    CustomRole?                @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
   provider                      Provider?
   passwordSetupTokens           PasswordSetupToken[]
   refreshTokens                 RefreshToken[]
@@ -254,6 +276,8 @@ model User {
   carts                         Cart[]                     @relation("PatientCarts")
   patientPackages               PatientPackage[]           @relation("PatientPackages")
   patientSubscriptions          PatientSubscription[]      @relation("PatientSubscriptions")
+
+  @@index([customRoleId])
 }
 
 model Discipline {

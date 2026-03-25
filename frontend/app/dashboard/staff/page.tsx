@@ -18,7 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listStaff, deactivateStaff } from '@/lib/staffApi';
 import { useAppToast } from '@/hooks/useAppToast';
-import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil } from 'lucide-react';
+import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil, Shield } from 'lucide-react';
+import Link from 'next/link';
 import { AddStaffModal } from './AddStaffModal';
 import { EditStaffModal } from './EditStaffModal';
 import { cn } from '@/lib/utils';
@@ -81,10 +82,18 @@ export default function StaffPage() {
         title="Internal Team"
         description="Manage your clinic's administrators and operational support staff."
         actions={
-          <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Invite Member
-          </AppButton>
+          <div className="flex gap-2">
+            <Link href="/dashboard/staff/roles">
+              <AppButton variant="outline" className="rounded-full px-5">
+                <Shield className="mr-2 h-4 w-4" />
+                Manage Roles
+              </AppButton>
+            </Link>
+            <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite Member
+            </AppButton>
+          </div>
         }
       />
 
@@ -133,14 +142,20 @@ export default function StaffPage() {
               },
               {
                 key: 'role',
-                header: 'System Role',
+                header: 'Role',
                 render: (m) => (
-                  <Badge className="rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-widest" variant={
-                    m.role === 'SUPER_ADMIN' ? 'default' : 
-                    m.role === 'PROVIDER' ? 'outline' : 'secondary'
-                  }>
-                    {m.role.replace('_', ' ')}
-                  </Badge>
+                  <div className="flex flex-col gap-1">
+                    {m.customRole ? (
+                      <span className="text-sm font-semibold text-slate-700">{m.customRole.name}</span>
+                    ) : (
+                      <Badge className="rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-widest w-fit" variant={
+                        m.role === 'SUPER_ADMIN' ? 'default' : 
+                        m.role === 'PROVIDER' ? 'outline' : 'secondary'
+                      }>
+                        {m.role.replace('_', ' ')}
+                      </Badge>
+                    )}
+                  </div>
                 ),
               },
               {

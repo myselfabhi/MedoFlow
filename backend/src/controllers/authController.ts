@@ -48,7 +48,12 @@ export const login = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        customRole: { select: { id: true, name: true, permissions: true } },
+      },
+    });
     if (!user) {
       const err = new Error('Invalid email or password') as ApiError;
       err.statusCode = 401;
@@ -87,6 +92,14 @@ export const login = asyncHandler(
 
     setRefreshTokenCookie(res, refreshToken);
 
+    // Resolve effective permissions
+    let permissions: string[] = [];
+    if (user.role === 'SUPER_ADMIN') {
+      permissions = ['*'];
+    } else if (user.customRole?.permissions) {
+      permissions = user.customRole.permissions as string[];
+    }
+
     successResponse(res, 200, 'Login successful', {
       accessToken,
       user: {
@@ -95,6 +108,9 @@ export const login = asyncHandler(
         email: user.email,
         role: user.role,
         clinicId: user.clinicId,
+        customRoleId: user.customRoleId,
+        customRoleName: user.customRole?.name ?? null,
+        permissions,
       },
     });
   }

@@ -33,10 +33,10 @@ export const listFrontDesk = asyncHandler(
 export const updateStaff = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
-    const { role, permissions } = req.body;
+    const { role, permissions, customRoleId } = req.body;
     const user = await staffService.updateStaffUser(
       id,
-      { role, permissions },
+      { role, permissions, customRoleId },
       req.clinicId!,
       req.user!.id
     );
@@ -58,17 +58,9 @@ export const linkProviderToAdmin = asyncHandler(
 
 export const createStaff = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const { role } = req.body;
+    const { role, customRoleId } = req.body;
     
-    if (['FRONT_DESK', 'ACCOUNTING', 'MARKETING'].includes(role)) {
-      const validatedData = frontDeskProvisionSchema.body.parse(req.body);
-      const user = await staffService.provisionFrontDeskUser(
-        { ...validatedData, role, permissions: req.body.permissions },
-        req.clinicId!,
-        req.user!.id
-      );
-      successResponse(res, 201, 'Staff user invited', { user });
-    } else if (role === 'PROVIDER') {
+    if (role === 'PROVIDER') {
       const validatedData = providerCreateSchema.body.parse(req.body);
       const { createProvider } = await import('../services/providerService');
       const provider = await createProvider(
@@ -78,7 +70,14 @@ export const createStaff = asyncHandler(
       );
       successResponse(res, 201, 'Provider invited', { provider });
     } else {
-      res.status(400).json({ success: false, message: 'Invalid role for staff creation' });
+      // All non-provider staff — works with both legacy roles and custom roles
+      const validatedData = frontDeskProvisionSchema.body.parse(req.body);
+      const user = await staffService.provisionFrontDeskUser(
+        { ...validatedData, role, permissions: req.body.permissions, customRoleId },
+        req.clinicId!,
+        req.user!.id
+      );
+      successResponse(res, 201, 'Staff user invited', { user });
     }
   }
 );

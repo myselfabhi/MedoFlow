@@ -1,6 +1,6 @@
 import api from './api';
 
-export type StaffRole = 'FRONT_DESK' | 'SUPER_ADMIN' | 'PROVIDER' | 'ACCOUNTING' | 'MARKETING';
+export type StaffRole = 'FRONT_DESK' | 'SUPER_ADMIN' | 'PROVIDER' | 'ACCOUNTING' | 'MARKETING' | 'STAFF';
 
 export interface Permission {
   module: string;
@@ -12,6 +12,8 @@ export interface StaffMember {
   name: string;
   email: string;
   role: StaffRole;
+  customRoleId: string | null;
+  customRole: { id: string; name: string; permissions?: string[] } | null;
   permissions: Permission[] | null;
   isActive: boolean;
   createdAt: string;
@@ -32,7 +34,7 @@ export const deactivateStaff = async (id: string): Promise<void> => {
 
 export const updateStaff = async (
   id: string,
-  payload: { role?: StaffRole; permissions?: Permission[] }
+  payload: { role?: StaffRole; permissions?: Permission[]; customRoleId?: string }
 ): Promise<StaffMember> => {
   const { data } = await api.patch<{
     success: boolean;
@@ -56,6 +58,7 @@ export const inviteStaff = async (payload: {
   email: string;
   role: StaffRole;
   permissions?: Permission[];
+  customRoleId?: string;
   // Provider-specific fields:
   firstName?: string;
   lastName?: string;

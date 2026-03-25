@@ -11,7 +11,7 @@ export const listFrontDeskStaff = async (clinicId: string) => {
   return prisma.user.findMany({
     where: {
       clinicId,
-      role: 'FRONT_DESK',
+      role: { in: ['FRONT_DESK', 'STAFF'] },
       isActive: true,
     },
     orderBy: { createdAt: 'asc' },
@@ -20,6 +20,8 @@ export const listFrontDeskStaff = async (clinicId: string) => {
       name: true,
       email: true,
       role: true,
+      customRoleId: true,
+      customRole: { select: { id: true, name: true } },
       isActive: true,
       createdAt: true,
     },
@@ -30,7 +32,7 @@ export const listStaff = async (clinicId: string) => {
   return prisma.user.findMany({
     where: {
       clinicId,
-      role: { in: ['SUPER_ADMIN', 'FRONT_DESK', 'ACCOUNTING', 'MARKETING'] },
+      role: { in: ['SUPER_ADMIN', 'FRONT_DESK', 'ACCOUNTING', 'MARKETING', 'STAFF'] },
       isActive: true,
     },
     orderBy: { createdAt: 'asc' },
@@ -39,6 +41,8 @@ export const listStaff = async (clinicId: string) => {
       name: true,
       email: true,
       role: true,
+      customRoleId: true,
+      customRole: { select: { id: true, name: true, permissions: true } },
       permissions: true,
       isActive: true,
       createdAt: true,
@@ -110,7 +114,7 @@ export const deactivateStaffUser = async (
 
 export const updateStaffUser = async (
   userId: string,
-  data: { role?: string; permissions?: object },
+  data: { role?: string; permissions?: object; customRoleId?: string },
   clinicId: string,
   performedById: string
 ) => {
@@ -139,13 +143,34 @@ export const updateStaffUser = async (
     }
   }
 
+  // If a customRoleId is provided, validate it belongs to this clinic
+  if (data.customRoleId) {
+    const customRole = await prisma.customRole.findUnique({
+      where: { id: data.customRoleId },
+    });
+    if (!customRole || customRole.clinicId !== clinicId) {
+      const err = new Error('Invalid custom role') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  // Determine the system role to use
+  const systemRole = data.customRoleId ? 'STAFF' : (data.role as any) ?? user.role;
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
-      ...(data.role ? { role: data.role as any } : {}),
+      role: systemRole,
+      ...(data.customRoleId !== undefined ? { customRoleId: data.customRoleId || null } : {}),
       ...(data.permissions !== undefined ? { permissions: data.permissions as any } : {}),
     },
-    select: { id: true, name: true, email: true, role: true, permissions: true, isActive: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, role: true,
+      customRoleId: true,
+      customRole: { select: { id: true, name: true, permissions: true } },
+      permissions: true, isActive: true, createdAt: true,
+    },
   });
 
   await auditService.logAudit({
@@ -155,7 +180,7 @@ export const updateStaffUser = async (
     action: 'UPDATE',
     fieldChanged: 'role/permissions',
     oldValue: user.role,
-    newValue: data.role ?? user.role,
+    newValue: data.customRoleId ?? data.role ?? user.role,
     performedById,
   });
 
@@ -213,7 +238,7 @@ export const linkAdminAsProvider = async (
 };
 
 export const provisionFrontDeskUser = async (
-  data: { name: string; email: string; role?: string; permissions?: object },
+  data: { name: string; email: string; role?: string; permissions?: object; customRoleId?: string },
   clinicId: string,
   performedById: string
 ) => {
@@ -237,10 +262,36 @@ export const provisionFrontDeskUser = async (
     throw err;
   }
 
-  const allowedNonProviderRoles = ['FRONT_DESK', 'ACCOUNTING', 'MARKETING'];
-  const assignedRole = data.role && allowedNonProviderRoles.includes(data.role)
-    ? (data.role as any)
-    : 'FRONT_DESK';
+  // Determine role — if customRoleId is provided, use STAFF; otherwise fallback to legacy roles
+  let assignedRole: any;
+  let customRoleId: string | null = null;
+  let roleLabelForEmail = 'Staff';
+
+  if (data.customRoleId) {
+    const customRole = await prisma.customRole.findUnique({
+      where: { id: data.customRoleId },
+    });
+    if (!customRole || customRole.clinicId !== clinicId) {
+      const err = new Error('Invalid custom role') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    assignedRole = 'STAFF';
+    customRoleId = data.customRoleId;
+    roleLabelForEmail = customRole.name;
+  } else {
+    const allowedNonProviderRoles = ['FRONT_DESK', 'ACCOUNTING', 'MARKETING'];
+    assignedRole = data.role && allowedNonProviderRoles.includes(data.role)
+      ? data.role
+      : 'FRONT_DESK';
+
+    const roleLabels: Record<string, string> = {
+      FRONT_DESK: 'Front Desk',
+      ACCOUNTING: 'Accounting',
+      MARKETING: 'Marketing',
+    };
+    roleLabelForEmail = roleLabels[assignedRole] ?? 'Staff';
+  }
 
   const password = await bcrypt.hash(PLACEHOLDER_PASSWORD, 12);
   const user = await prisma.user.create({
@@ -250,6 +301,7 @@ export const provisionFrontDeskUser = async (
       password,
       role: assignedRole,
       clinicId,
+      ...(customRoleId ? { customRoleId } : {}),
       ...(data.permissions ? { permissions: data.permissions as any } : {}),
     },
     select: {
@@ -257,6 +309,8 @@ export const provisionFrontDeskUser = async (
       name: true,
       email: true,
       role: true,
+      customRoleId: true,
+      customRole: { select: { id: true, name: true } },
       permissions: true,
       isActive: true,
       createdAt: true,
@@ -271,17 +325,11 @@ export const provisionFrontDeskUser = async (
   ).replace(/\/$/, '');
   const setupLink = `${frontendUrl}/set-password?token=${token}`;
 
-  const roleLabels: Record<string, string> = {
-    FRONT_DESK: 'Front Desk',
-    ACCOUNTING: 'Accounting',
-    MARKETING: 'Marketing',
-  };
-
   await emailService.sendStaffInviteEmail({
     to: email,
     name: user.name,
     setupLink,
-    roleLabel: roleLabels[user.role] ?? 'Staff',
+    roleLabel: roleLabelForEmail,
   });
 
   await auditService.logAudit({
@@ -291,7 +339,7 @@ export const provisionFrontDeskUser = async (
     action: 'CREATE',
     fieldChanged: 'role',
     oldValue: null,
-    newValue: user.role,
+    newValue: customRoleId ?? user.role,
     performedById,
   });
 

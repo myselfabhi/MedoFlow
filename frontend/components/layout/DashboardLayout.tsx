@@ -48,12 +48,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     const isFrontDeskRoute = pathname === '/dashboard/front-desk' || pathname?.startsWith('/dashboard/front-desk/');
 
-    if (isSuperAdminOnlyRoute && user.role !== 'SUPER_ADMIN') {
+    // SUPER_ADMIN and STAFF (custom roles) can access admin routes
+    if (isSuperAdminOnlyRoute && user.role !== 'SUPER_ADMIN' && user.role !== 'STAFF') {
       router.replace('/dashboard');
       return;
     }
 
-    if (isFrontDeskRoute && user.role !== 'FRONT_DESK' && user.role !== 'SUPER_ADMIN') {
+    if (isFrontDeskRoute && user.role !== 'FRONT_DESK' && user.role !== 'SUPER_ADMIN' && user.role !== 'STAFF') {
       router.replace('/dashboard');
       return;
     }

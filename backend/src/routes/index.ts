@@ -31,6 +31,7 @@ import webhookRoutes from './webhooks';
 import commissionRoutes from './commissions';
 import auditRoutes from './audit';
 import patientRoutes from './patients';
+import roleRoutes from './roles';
 
 const router = Router();
 
@@ -66,5 +67,6 @@ router.use('/inventory', inventoryRoutes);
 router.use('/packages', packageRoutes);
 router.use('/memberships', membershipRoutes);
 router.use('/carts', cartRoutes);
+router.use('/roles', roleRoutes);
 
 export default router;

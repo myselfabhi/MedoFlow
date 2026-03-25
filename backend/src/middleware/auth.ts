@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../utils/tokenUtils';
 import prisma from '../config/prisma';
 import { Role } from '@prisma/client';
 import { ApiError } from '../types/errors';
+import { hasPermission } from '../config/permissions';
 
 export const protect = async (
   req: Request,
@@ -30,6 +31,14 @@ export const protect = async (
         role: true,
         clinicId: true,
         isActive: true,
+        customRoleId: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            permissions: true,
+          },
+        },
       },
     });
 
@@ -45,12 +54,23 @@ export const protect = async (
       throw err;
     }
 
+    // Resolve effective permissions
+    let effectivePermissions: string[] = [];
+    if (user.role === 'SUPER_ADMIN') {
+      effectivePermissions = ['*']; // full access
+    } else if (user.customRole?.permissions) {
+      effectivePermissions = user.customRole.permissions as string[];
+    }
+
     req.user = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role as Role,
       clinicId: user.clinicId,
+      customRoleId: user.customRoleId,
+      customRoleName: user.customRole?.name ?? null,
+      permissions: effectivePermissions,
     };
     next();
   } catch (err) {
@@ -69,6 +89,10 @@ export const protect = async (
   }
 };
 
+/**
+ * System-level role check (enum-based).
+ * SUPER_ADMIN always passes. Other roles must be in the allowlist.
+ */
 export const authorize = (...roles: Role[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
@@ -78,8 +102,48 @@ export const authorize = (...roles: Role[]) => {
       return;
     }
 
+    // SUPER_ADMIN always passes any role check
+    if (req.user.role === 'SUPER_ADMIN') {
+      next();
+      return;
+    }
+
     if (!roles.includes(req.user.role)) {
       const err = new Error('Insufficient permissions') as ApiError;
+      err.statusCode = 403;
+      next(err);
+      return;
+    }
+
+    next();
+  };
+};
+
+/**
+ * Granular permission check — works with custom roles.
+ * SUPER_ADMIN bypasses all checks.
+ * Staff users are checked against their custom role permissions.
+ */
+export const requirePermission = (...requiredKeys: string[]) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      const err = new Error('Authentication required') as ApiError;
+      err.statusCode = 401;
+      next(err);
+      return;
+    }
+
+    // SUPER_ADMIN always has full access
+    if (req.user.role === 'SUPER_ADMIN') {
+      next();
+      return;
+    }
+
+    const userPerms = req.user.permissions ?? [];
+    const hasAll = requiredKeys.every((key) => hasPermission(userPerms, key));
+
+    if (!hasAll) {
+      const err = new Error('You do not have permission to perform this action') as ApiError;
       err.statusCode = 403;
       next(err);
       return;
@@ -113,16 +177,34 @@ export const optionalProtect = async (
         role: true,
         clinicId: true,
         isActive: true,
+        customRoleId: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            permissions: true,
+          },
+        },
       },
     });
 
     if (user && user.isActive) {
+      let effectivePermissions: string[] = [];
+      if (user.role === 'SUPER_ADMIN') {
+        effectivePermissions = ['*'];
+      } else if (user.customRole?.permissions) {
+        effectivePermissions = user.customRole.permissions as string[];
+      }
+
       req.user = {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role as Role,
         clinicId: user.clinicId,
+        customRoleId: user.customRoleId,
+        customRoleName: user.customRole?.name ?? null,
+        permissions: effectivePermissions,
       };
     }
     next();

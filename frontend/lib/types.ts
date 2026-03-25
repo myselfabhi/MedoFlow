@@ -1,4 +1,4 @@
-export type Role = 'SUPER_ADMIN' | 'PROVIDER' | 'FRONT_DESK' | 'PATIENT';
+export type Role = 'SUPER_ADMIN' | 'PROVIDER' | 'FRONT_DESK' | 'PATIENT' | 'STAFF' | 'ACCOUNTING' | 'MARKETING';
 
 export interface User {
   id: string;
@@ -6,6 +6,9 @@ export interface User {
   email: string;
   role: Role;
   clinicId: string | null;
+  customRoleId?: string | null;
+  customRoleName?: string | null;
+  permissions?: string[];
 }
 
 export interface ApiResponse<T> {
