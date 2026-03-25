@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -12,21 +13,23 @@ import {
   KPIStatCard
 } from '@/components/ui-system';
 import { PageContainer } from '@/components/layout';
-import { 
-  CalendarPlus, 
-  Calendar, 
-  CreditCard, 
-  Package, 
-  ChevronRight, 
+import {
+  CalendarPlus,
+  Calendar,
+  CreditCard,
+  Package,
+  ChevronRight,
   Clock,
   History
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMyAppointments, getMyInvoices, getMyPackages, type PatientAppointment } from '@/lib/patientApi';
 import { getGreetingName } from '@/lib/utils';
+import { BookAppointmentModal } from './BookAppointmentModal';
 
 export function PatientDashboard() {
   const { user, isLoading: userLoading } = useAuth();
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ['patient-appointments'],
@@ -65,7 +68,6 @@ export function PatientDashboard() {
     return null;
   }
 
-  const bookHref = user?.clinicId ? `/clinic/${user.clinicId}` : '/';
   const toNumber = (value: unknown) => {
     if (typeof value === 'number') return value;
     const parsed = Number(value ?? 0);
@@ -83,11 +85,9 @@ export function PatientDashboard() {
         title={`Hello, ${getGreetingName(user?.name, 'Patient')}`}
         description="Welcome to your care portal. Manage your health journey here."
         actions={
-          <AppButton asChild className="rounded-full px-6 shadow-md">
-            <Link href={bookHref}>
-              <CalendarPlus className="mr-2 h-4 w-4" />
-              Book New Appointment
-            </Link>
+          <AppButton className="rounded-full px-6 shadow-md" onClick={() => setBookingOpen(true)}>
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Book New Appointment
           </AppButton>
         }
       />
@@ -135,7 +135,7 @@ export function PatientDashboard() {
                     </div>
                     <p className="font-medium">No upcoming appointments.</p>
                     <AppButton variant="ghost" asChild className="mt-2 text-[#0D9488] hover:bg-[#F0FDFA] hover:text-[#0F766E]">
-                      <Link href={bookHref}>Schedule your next visit →</Link>
+                      <button onClick={() => setBookingOpen(true)}>Schedule your next visit →</button>
                     </AppButton>
                   </div>
               ) : (
@@ -226,6 +226,11 @@ export function PatientDashboard() {
           </AppCard>
         </div>
       </div>
+
+      <BookAppointmentModal
+        open={bookingOpen}
+        onOpenChange={setBookingOpen}
+      />
     </PageContainer>
   );
 }
