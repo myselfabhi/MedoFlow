@@ -189,14 +189,14 @@ export default function AdminDashboardPage() {
         </AppCard>
 
         {/* Business Alerts */}
-        <AppCard className="border-l-4 border-l-amber-400 shadow-sm">
+        <AppCard className="border-l-4 border-l-amber-400 shadow-sm flex flex-col">
           <AppCardHeader>
             <AppCardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
               Active Alerts
             </AppCardTitle>
           </AppCardHeader>
-          <AppCardContent className="space-y-4">
+          <AppCardContent className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
             {stats?.alerts.map(alert => (
               <div key={alert.id} className={cn(
                 "flex items-start gap-3 p-3 rounded-lg text-sm border",

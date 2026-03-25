@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import prisma from '../config/prisma';
 import { ApiError } from '../types/errors';
 import * as auditService from './auditService';
@@ -474,4 +475,75 @@ export const createUnavailability = async (
     performedById,
   });
   return created;
+};
+export const getAvailableDatesInRange = async (
+  params: {
+    clinicId: string;
+    serviceId: string;
+    providerId?: string;
+    locationId?: string | null;
+    startDate: string;
+    endDate: string;
+  }
+): Promise<string[]> => {
+  const { clinicId, serviceId, providerId, locationId, startDate, endDate } = params;
+
+  // For each day in the range, check if there's at least one slot.
+  // This is a bit heavy, so we optimize by only checking providers who offer the service.
+  const start = DateTime.fromISO(startDate).startOf('day');
+  const end = DateTime.fromISO(endDate).endOf('day');
+  
+  const availableDates: string[] = [];
+  let current = start;
+
+  // Fetch service to get duration
+  const service = await prisma.service.findUnique({
+    where: { id: serviceId },
+    select: { duration: true }
+  });
+  if (!service) return [];
+
+  // Fetch eligible providers
+  const providers = await prisma.provider.findMany({
+    where: {
+      id: providerId,
+      clinicId,
+      isActive: true,
+      providerServices: { some: { serviceId } }
+    },
+    select: { id: true }
+  });
+
+  const pIds = providers.map(p => p.id);
+  if (pIds.length === 0) return [];
+
+  while (current <= end) {
+    const dStr = current.toISODate()!;
+    let dayHasSlot = false;
+
+    // Check availability for each provider on this day until one is found
+    for (const pid of pIds) {
+      const slots = await getAvailableSlots({
+        providerId: pid,
+        serviceId,
+        serviceDurationMinutes: service.duration,
+        date: dStr,
+        clinicId,
+        locationId: locationId ?? undefined
+      });
+
+      if (slots.length > 0) {
+        dayHasSlot = true;
+        break;
+      }
+    }
+
+    if (dayHasSlot) {
+      availableDates.push(dStr);
+    }
+    
+    current = current.plus({ days: 1 });
+  }
+
+  return availableDates;
 };

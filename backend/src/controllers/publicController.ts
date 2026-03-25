@@ -89,6 +89,15 @@ export const getClinicProviders = asyncHandler(
         providerServices: {
           select: { serviceId: true },
         },
+        providerAvailability: {
+          select: { weekday: true, locationId: true }
+        },
+        providerUnavailability: {
+          where: {
+            date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) }
+          },
+          select: { date: true, startTime: true, endTime: true }
+        }
       },
     });
     successResponse(res, 200, 'Providers retrieved', { providers });
@@ -231,12 +240,12 @@ export const getAvailability = asyncHandler(
       throw err;
     }
 
-    const resolvedLocation = locationId
+    let resolvedLocation = locationId
       ? await prisma.location.findFirst({
           where: { id: locationId, clinicId, isActive: true },
           select: { id: true, timezone: true },
         })
-      : (await prisma.location.findFirst({
+      : await prisma.location.findFirst({
           where: {
             clinicId,
             isActive: true,
@@ -246,19 +255,24 @@ export const getAvailability = asyncHandler(
           },
           orderBy: { createdAt: 'asc' },
           select: { id: true, timezone: true },
-        })) ??
-        (await prisma.location.findFirst({
-          where: { clinicId, isActive: true },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true, timezone: true },
-        }));
+        });
 
+    // Fallback to the first available location if no online/requested location is found
     if (!resolvedLocation) {
-      const err = new Error('Location not found') as ApiError;
-      err.statusCode = 404;
-      err.code = 'validation_error';
-      throw err;
+      resolvedLocation = await prisma.location.findFirst({
+        where: { clinicId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, timezone: true },
+      });
     }
+
+    // If still no location, we allow the request to proceed with a virtual 'None' location 
+    // to search for providers who might have general availability.
+    const effectiveLocationId = resolvedLocation?.id;
+    const effectiveTimezone = resolvedLocation?.timezone ?? 'UTC';
+
+    // Removed strict 404 throw for missing location, as the scheduling service 
+    // can handle null locationId for general availability checks.
 
     let providerIds: string[] = [];
     if (providerId) {
@@ -268,7 +282,8 @@ export const getAvailability = asyncHandler(
           clinicId,
           isActive: true,
           providerServices: { some: { serviceId } },
-          locationAssignments: { some: { locationId: resolvedLocation.id } },
+          // Removed the strict locationAssignment check here to allow the scheduling service
+          // to handle location-specific availability windows more flexibly.
         },
       });
       if (p) providerIds = [p.id];
@@ -278,7 +293,8 @@ export const getAvailability = asyncHandler(
           clinicId,
           isActive: true,
           providerServices: { some: { serviceId } },
-          locationAssignments: { some: { locationId: resolvedLocation.id } },
+          // Allow all providers who offer the service to be checked for availability.
+          // They will only produce slots if they have a valid assignment/availability record.
         },
         select: { id: true },
       });
@@ -290,7 +306,7 @@ export const getAvailability = asyncHandler(
       const providerSlots = await availabilityService.getAvailableSlots({
         providerId: pid,
         serviceId,
-        locationId: resolvedLocation.id,
+        locationId: effectiveLocationId ?? null,
         serviceDurationMinutes: service.duration,
         date,
         clinicId,
@@ -362,5 +378,29 @@ export const releaseSlotHold = asyncHandler(
     successResponse(res, 200, released ? 'Slot hold released' : 'Slot hold not found', {
       released,
     });
+  }
+);
+
+export const getAvailableDatesSummary = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = (req.params.clinicId as string) || (req.query.clinicId as string);
+    const { serviceId, providerId, locationId, startDate, endDate } = req.query as any;
+
+    if (!serviceId || !startDate || !endDate || !clinicId) {
+      const err = new Error('Clinic ID, Service ID, start date, and end date are required') as any;
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const availableDates = await availabilityService.getAvailableDatesInRange({
+      clinicId,
+      serviceId,
+      providerId: providerId || undefined,
+      locationId: locationId || undefined,
+      startDate,
+      endDate,
+    });
+
+    successResponse(res, 200, 'Available dates retrieved', { availableDates });
   }
 );

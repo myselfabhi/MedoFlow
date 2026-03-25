@@ -351,11 +351,11 @@ export default function AnalyticsPage() {
 
             {/* Sidebar Stats */}
             <div className="space-y-8">
-              <AppCard className="border-l-4 border-l-primary-600 shadow-sm">
+              <AppCard className="border-l-4 border-l-primary-600 shadow-sm flex flex-col">
                 <AppCardHeader>
                   <AppCardTitle className="text-base">Business Insights</AppCardTitle>
                 </AppCardHeader>
-                <AppCardContent className="space-y-6">
+                <AppCardContent className="space-y-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                   {clinicData.commandCenter.alerts.map(alert => (
                     <div key={alert.id} className="space-y-1">
                       <div className="flex items-center gap-2">

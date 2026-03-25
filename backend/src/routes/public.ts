@@ -19,6 +19,7 @@ router.get('/clinics/:id/memberships', publicController.getClinicMemberships);
 router.get('/products/:id', publicController.getProduct);
 router.get('/patients/check', publicController.checkPatientExists);
 router.get('/availability', validateRequest(publicAvailabilitySchema), publicController.getAvailability);
+router.get('/availability/summary', publicController.getAvailableDatesSummary);
 router.post('/slots/hold', validateRequest(publicSlotHoldSchema), publicController.createSlotHold);
 router.delete('/slots/hold/:holdId', publicController.releaseSlotHold);
 

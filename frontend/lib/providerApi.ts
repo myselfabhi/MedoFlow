@@ -39,3 +39,20 @@ export const getAvailability = async (
   );
   return data.data.slots;
 };
+
+export const getAvailableDatesSummary = async (
+  clinicId: string,
+  serviceId: string,
+  startDate: string,
+  endDate: string,
+  providerId?: string,
+  locationId?: string
+): Promise<string[]> => {
+  const params = new URLSearchParams({ clinicId, serviceId, startDate, endDate });
+  if (providerId) params.set('providerId', providerId);
+  if (locationId) params.set('locationId', locationId);
+  const { data } = await api.get<{ success: boolean; data: { availableDates: string[] } }>(
+    `/availability/summary?${params}`
+  );
+  return data.data.availableDates;
+};

@@ -27,6 +27,8 @@ export interface Provider {
     location: { id: string; name: string; timezone: string };
   }[];
   providerServices: { serviceId: string }[];
+  providerAvailability?: { weekday: number; locationId: string | null }[];
+  providerUnavailability?: { date: string; startTime: string | null; endTime: string | null }[];
 }
 
 export interface Location {
