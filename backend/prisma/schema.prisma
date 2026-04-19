@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  PLATFORM_ADMIN
   SUPER_ADMIN
   PROVIDER
   FRONT_DESK
@@ -15,6 +16,21 @@ enum Role {
   MARKETING
   PATIENT
   STAFF
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELED
+}
+
+enum TenantPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
 }
 
 enum AppointmentStatus {
@@ -178,8 +194,49 @@ enum CommissionStatus {
   CANCELLED
 }
 
+// ─── Multi-Tenancy: Tenant sits above Clinic ────────────────────────────────
+// One Tenant = one SaaS customer account (may own multiple Clinics/locations)
+// All clinic data is scoped through Clinic → Tenant
+model Tenant {
+  id           String       @id @default(cuid())
+  name         String
+  slug         String       @unique
+  status       TenantStatus @default(TRIAL)
+  plan         TenantPlan   @default(FREE)
+  region       String       @default("us-east-1")
+  dataResidency String?
+  trialEndsAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  clinics Clinic[]
+  brand   Brand?
+
+  @@index([slug])
+  @@index([status])
+}
+
+model Brand {
+  id                   String   @id @default(cuid())
+  tenantId             String   @unique
+  subdomain            String   @unique
+  customDomain         String?  @unique
+  customDomainVerified Boolean  @default(false)
+  logoUrl              String?
+  faviconUrl           String?
+  primaryColor         String   @default("#6366f1")
+  typographyPair       String   @default("inter-inter")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([customDomain])
+}
+
 model Clinic {
   id               String   @id @default(cuid())
+  tenantId         String
   name             String
   email            String
   subscriptionPlan String   @default("free")
@@ -188,6 +245,7 @@ model Clinic {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  tenant                    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   users                     User[]
   disciplines               Discipline[]
   providers                 Provider[]
@@ -219,6 +277,8 @@ model Clinic {
   commissionRules           CommissionRule[]
   commissionRecords         CommissionRecord[]
   customRoles               CustomRole[]
+
+  @@index([tenantId])
 }
 
 model CustomRole {
