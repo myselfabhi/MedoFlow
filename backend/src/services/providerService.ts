@@ -1,128 +1,105 @@
-import bcrypt from 'bcryptjs';
-import prisma from '../config/prisma';
-import { ApiError } from '../types/errors';
-import * as auditService from './auditService';
-import * as passwordSetupService from './passwordSetupService';
-import * as emailService from './emailService';
+import * as argon2 from 'argon2'
+import prisma from '../config/prisma'
+import { ApiError } from '../types/errors'
+import * as auditService from './auditService'
+import * as passwordSetupService from './passwordSetupService'
+import * as emailService from './emailService'
 
 export interface CreateProviderServiceInput {
-  serviceId: string;
-  priceOverride?: number;
+  serviceId: string
+  priceOverride?: number
 }
 
 export interface CreateProviderData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  disciplineIds: string[];
-  locationIds?: string[];
-  userId?: string | null;
-  serviceIds?: string[];
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  disciplineIds: string[]
+  locationIds?: string[]
+  userId?: string | null
+  serviceIds?: string[]
   /** Services with optional price override (takes precedence over serviceIds) */
-  services?: CreateProviderServiceInput[];
+  services?: CreateProviderServiceInput[]
 }
 
-type ClinicWhere = { clinicId?: string } | Record<string, never>;
+type ClinicWhere = { clinicId?: string } | Record<string, never>
 
-const validateDisciplineBelongsToClinic = async (
-  disciplineId: string,
-  clinicId: string
-) => {
+const validateDisciplineBelongsToClinic = async (disciplineId: string, clinicId: string) => {
   const discipline = await prisma.discipline.findFirst({
     where: { id: disciplineId, clinicId },
-  });
+  })
   if (!discipline) {
-    const err = new Error(
-      'Discipline not found or does not belong to this clinic'
-    ) as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Discipline not found or does not belong to this clinic') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  return discipline;
-};
+  return discipline
+}
 
-const validateUserBelongsToClinic = async (
-  userId: string,
-  clinicId: string
-) => {
+const validateUserBelongsToClinic = async (userId: string, clinicId: string) => {
   const user = await prisma.user.findFirst({
     where: { id: userId, clinicId },
-  });
+  })
   if (!user) {
-    const err = new Error(
-      'User not found or does not belong to this clinic'
-    ) as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('User not found or does not belong to this clinic') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  return user;
-};
+  return user
+}
 
 const checkDuplicateProviderUserLink = async (userId: string) => {
   const existing = await prisma.provider.findFirst({
     where: { userId },
-  });
+  })
   if (existing) {
-    const err = new Error('User is already linked to another provider') as ApiError;
-    err.statusCode = 409;
-    throw err;
+    const err = new Error('User is already linked to another provider') as ApiError
+    err.statusCode = 409
+    throw err
   }
-};
+}
 
-const validateServiceBelongsToClinic = async (
-  serviceId: string,
-  clinicId: string
-) => {
+const validateServiceBelongsToClinic = async (serviceId: string, clinicId: string) => {
   const service = await prisma.service.findFirst({
     where: { id: serviceId, clinicId, isActive: true },
-  });
+  })
   if (!service) {
-    const err = new Error(
-      'Service not found or does not belong to this clinic'
-    ) as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Service not found or does not belong to this clinic') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  return service;
-};
+  return service
+}
 
-const validateLocationBelongsToClinic = async (
-  locationId: string,
-  clinicId: string
-) => {
+const validateLocationBelongsToClinic = async (locationId: string, clinicId: string) => {
   const location = await prisma.location.findFirst({
     where: { id: locationId, clinicId, isActive: true },
-  });
+  })
   if (!location) {
-    const err = new Error(
-      'Location not found or does not belong to this clinic'
-    ) as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Location not found or does not belong to this clinic') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  return location;
-};
+  return location
+}
 
-const resolveProviderLocationIds = async (
-  clinicId: string,
-  locationIds?: string[]
-) => {
+const resolveProviderLocationIds = async (clinicId: string, locationIds?: string[]) => {
   if (locationIds?.length) {
     for (const locationId of locationIds) {
-      await validateLocationBelongsToClinic(locationId, clinicId);
+      await validateLocationBelongsToClinic(locationId, clinicId)
     }
-    return Array.from(new Set(locationIds));
+    return Array.from(new Set(locationIds))
   }
 
   const defaultLocations = await prisma.location.findMany({
     where: { clinicId, isActive: true },
     orderBy: { createdAt: 'asc' },
     select: { id: true },
-  });
+  })
 
-  return defaultLocations.map((location) => location.id);
-};
+  return defaultLocations.map((location) => location.id)
+}
 
 /** Re-add a deactivated provider: reactivate user and provider, update details and services. */
 async function reactivateAndUpdateProvider(
@@ -136,20 +113,20 @@ async function reactivateAndUpdateProvider(
   const provider = await prisma.provider.findFirst({
     where: { id: providerId, clinicId },
     include: { user: { select: { id: true } } },
-  });
+  })
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  const providerName = `${data.firstName} ${data.lastName}`.trim();
-  const email = (data.email ?? '').trim().toLowerCase();
+  const providerName = `${data.firstName} ${data.lastName}`.trim()
+  const email = (data.email ?? '').trim().toLowerCase()
 
   if (provider.userId) {
     await prisma.user.update({
       where: { id: provider.userId },
       data: { name: providerName, isActive: true },
-    });
+    })
   }
 
   await prisma.provider.update({
@@ -161,23 +138,23 @@ async function reactivateAndUpdateProvider(
       email,
       phone: data.phone ?? null,
     },
-  });
+  })
 
-  await prisma.providerDiscipline.deleteMany({ where: { providerId } });
+  await prisma.providerDiscipline.deleteMany({ where: { providerId } })
   await prisma.providerDiscipline.createMany({
     data: data.disciplineIds.map((disciplineId) => ({ providerId, disciplineId })),
-  });
+  })
 
-  await prisma.providerLocationAssignment.deleteMany({ where: { providerId } });
+  await prisma.providerLocationAssignment.deleteMany({ where: { providerId } })
   await prisma.providerLocationAssignment.createMany({
     data: locationIds.map((locationId, index) => ({
       providerId,
       locationId,
       isPrimary: index === 0,
     })),
-  });
+  })
 
-  await prisma.providerService.deleteMany({ where: { providerId } });
+  await prisma.providerService.deleteMany({ where: { providerId } })
   for (const item of servicesInput) {
     await prisma.providerService.create({
       data: {
@@ -185,14 +162,18 @@ async function reactivateAndUpdateProvider(
         serviceId: item.serviceId,
         priceOverride: item.priceOverride ?? null,
       },
-    });
+    })
   }
 
   if (provider.userId) {
-    const token = await passwordSetupService.createPasswordSetupToken(provider.userId);
-    const frontendUrl = (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const setupLink = `${frontendUrl}/set-password?token=${token}`;
-    await emailService.sendProviderInviteEmail(email, providerName, setupLink);
+    const token = await passwordSetupService.createPasswordSetupToken(provider.userId)
+    const frontendUrl = (
+      process.env.FRONTEND_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '')
+    const setupLink = `${frontendUrl}/set-password?token=${token}`
+    await emailService.sendProviderInviteEmail(email, providerName, setupLink)
   }
 
   await auditService.logAudit({
@@ -204,7 +185,7 @@ async function reactivateAndUpdateProvider(
     oldValue: false,
     newValue: true,
     performedById,
-  });
+  })
 
   return prisma.provider.findUnique({
     where: { id: providerId },
@@ -222,7 +203,7 @@ async function reactivateAndUpdateProvider(
         },
       },
     },
-  });
+  })
 }
 
 export const createProvider = async (
@@ -231,46 +212,44 @@ export const createProvider = async (
   performedById: string
 ) => {
   if (!process.env.SMTP_HOST && process.env.NODE_ENV === 'production') {
-    const err = new Error(
-      'SMTP is required to invite providers in production'
-    ) as ApiError;
-    err.statusCode = 500;
-    throw err;
+    const err = new Error('SMTP is required to invite providers in production') as ApiError
+    err.statusCode = 500
+    throw err
   }
 
-  const email = (data.email ?? '').trim();
+  const email = (data.email ?? '').trim()
   if (!email) {
-    const err = new Error('Valid email is required.') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Valid email is required.') as ApiError
+    err.statusCode = 400
+    throw err
   }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email)) {
-    const err = new Error('Valid email is required.') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Valid email is required.') as ApiError
+    err.statusCode = 400
+    throw err
   }
 
   if (!data.disciplineIds?.length) {
-    const err = new Error('At least one discipline is required') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('At least one discipline is required') as ApiError
+    err.statusCode = 400
+    throw err
   }
   for (const disciplineId of data.disciplineIds) {
-    await validateDisciplineBelongsToClinic(disciplineId, clinicId);
+    await validateDisciplineBelongsToClinic(disciplineId, clinicId)
   }
 
-  const locationIds = await resolveProviderLocationIds(clinicId, data.locationIds);
+  const locationIds = await resolveProviderLocationIds(clinicId, data.locationIds)
 
   const servicesInput: CreateProviderServiceInput[] =
     data.services && data.services.length > 0
       ? data.services
-      : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? []);
+      : (data.serviceIds?.map((id) => ({ serviceId: id })) ?? [])
 
   if (servicesInput.length === 0) {
-    const err = new Error('Provider must offer at least one service.') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Provider must offer at least one service.') as ApiError
+    err.statusCode = 400
+    throw err
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -278,14 +257,10 @@ export const createProvider = async (
     include: {
       provider: { select: { id: true, clinicId: true, isActive: true } },
     },
-  });
+  })
   if (existingUser) {
-    const existingProvider = existingUser.provider;
-    if (
-      existingProvider &&
-      existingProvider.clinicId === clinicId &&
-      !existingProvider.isActive
-    ) {
+    const existingProvider = existingUser.provider
+    if (existingProvider && existingProvider.clinicId === clinicId && !existingProvider.isActive) {
       return reactivateAndUpdateProvider(
         existingProvider.id,
         data,
@@ -293,16 +268,21 @@ export const createProvider = async (
         locationIds,
         servicesInput,
         performedById
-      );
+      )
     }
-    const err = new Error('A provider with this email already exists.') as ApiError;
-    err.statusCode = 409;
-    throw err;
+    const err = new Error('A provider with this email already exists.') as ApiError
+    err.statusCode = 409
+    throw err
   }
 
-  const providerName = `${data.firstName} ${data.lastName}`.trim();
-  const tempPassword = 'pending-setup';
-  const hashedPassword = await bcrypt.hash(tempPassword, 12);
+  const providerName = `${data.firstName} ${data.lastName}`.trim()
+  const tempPassword = 'pending-setup'
+  const hashedPassword = await argon2.hash(tempPassword, {
+    type: argon2.argon2id,
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  })
 
   const user = await prisma.user.create({
     data: {
@@ -313,12 +293,16 @@ export const createProvider = async (
       clinicId,
     },
     select: { id: true },
-  });
+  })
 
-  const token = await passwordSetupService.createPasswordSetupToken(user.id);
-  const frontendUrl = (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const setupLink = `${frontendUrl}/set-password?token=${token}`;
-  await emailService.sendProviderInviteEmail(email, providerName, setupLink);
+  const token = await passwordSetupService.createPasswordSetupToken(user.id)
+  const frontendUrl = (
+    process.env.FRONTEND_URL ||
+    process.env.APP_URL ||
+    'http://localhost:3000'
+  ).replace(/\/$/, '')
+  const setupLink = `${frontendUrl}/set-password?token=${token}`
+  await emailService.sendProviderInviteEmail(email, providerName, setupLink)
 
   const provider = await prisma.provider.create({
     data: {
@@ -347,18 +331,18 @@ export const createProvider = async (
         },
       },
     },
-  });
+  })
 
   for (const item of servicesInput) {
-      const { serviceId, priceOverride } = item;
-      await validateServiceBelongsToClinic(serviceId, clinicId);
-      await prisma.providerService.create({
-        data: {
-          providerId: provider.id,
-          serviceId,
-          priceOverride: priceOverride ?? null,
-        },
-      });
+    const { serviceId, priceOverride } = item
+    await validateServiceBelongsToClinic(serviceId, clinicId)
+    await prisma.providerService.create({
+      data: {
+        providerId: provider.id,
+        serviceId,
+        priceOverride: priceOverride ?? null,
+      },
+    })
   }
   await auditService.logAudit({
     clinicId,
@@ -369,7 +353,7 @@ export const createProvider = async (
     oldValue: null,
     newValue: 'PROVIDER',
     performedById,
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -382,29 +366,30 @@ export const createProvider = async (
       locationIds,
     },
     performedById,
-  });
+  })
 
   return prisma.provider.findUnique({
-      where: { id: provider.id },
-      include: {
-        disciplines: { include: { discipline: { select: { id: true, name: true } } } },
-        user: { select: { id: true, name: true, email: true } },
-        locationAssignments: {
-          include: {
-            location: { select: { id: true, name: true, timezone: true } },
-          },
-        },
-        providerServices: {
-          include: {
-            service: { include: { discipline: { select: { id: true, name: true } } } },
-          },
+    where: { id: provider.id },
+    include: {
+      disciplines: { include: { discipline: { select: { id: true, name: true } } } },
+      user: { select: { id: true, name: true, email: true } },
+      locationAssignments: {
+        include: {
+          location: { select: { id: true, name: true, timezone: true } },
         },
       },
-    });
-};
+      providerServices: {
+        include: {
+          service: { include: { discipline: { select: { id: true, name: true } } } },
+        },
+      },
+    },
+  })
+}
 
 export const getProviders = async (where: ClinicWhere) => {
-  const whereClause = Object.keys(where).length === 0 ? { isActive: true } : { ...where, isActive: true };
+  const whereClause =
+    Object.keys(where).length === 0 ? { isActive: true } : { ...where, isActive: true }
   return prisma.provider.findMany({
     where: whereClause as { isActive: boolean; clinicId?: string },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -422,14 +407,11 @@ export const getProviders = async (where: ClinicWhere) => {
         },
       },
     },
-  });
-};
+  })
+}
 
-export const getProviderById = async (
-  id: string,
-  where: ClinicWhere = {}
-) => {
-  const whereClause = Object.keys(where).length === 0 ? { id } : { id, ...where };
+export const getProviderById = async (id: string, where: ClinicWhere = {}) => {
+  const whereClause = Object.keys(where).length === 0 ? { id } : { id, ...where }
   return prisma.provider.findFirst({
     where: whereClause as { id: string; clinicId?: string },
     include: {
@@ -442,8 +424,8 @@ export const getProviderById = async (
         },
       },
     },
-  });
-};
+  })
+}
 
 export const updateProvider = async (
   id: string,
@@ -451,30 +433,30 @@ export const updateProvider = async (
   where: ClinicWhere,
   performedById: string
 ) => {
-  const provider = await getProviderById(id, where);
+  const provider = await getProviderById(id, where)
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
-  const clinicId = 'clinicId' in where ? where.clinicId : undefined;
+  const clinicId = 'clinicId' in where ? where.clinicId : undefined
 
   if (data.disciplineIds && data.disciplineIds.length > 0 && clinicId) {
     for (const disciplineId of data.disciplineIds) {
-      await validateDisciplineBelongsToClinic(disciplineId, clinicId);
+      await validateDisciplineBelongsToClinic(disciplineId, clinicId)
     }
   }
 
   if (data.locationIds && clinicId) {
-    await resolveProviderLocationIds(clinicId, data.locationIds);
+    await resolveProviderLocationIds(clinicId, data.locationIds)
   }
 
   if (data.userId !== undefined) {
     if (data.userId && provider.clinicId) {
-      await validateUserBelongsToClinic(data.userId, provider.clinicId);
+      await validateUserBelongsToClinic(data.userId, provider.clinicId)
       if (data.userId !== provider.userId) {
-        await checkDuplicateProviderUserLink(data.userId);
+        await checkDuplicateProviderUserLink(data.userId)
       }
     }
   }
@@ -497,14 +479,14 @@ export const updateProvider = async (
         locationId: true,
       },
       orderBy: { startTime: 'asc' },
-    });
+    })
     if (affected.length > 0) {
       const err = new Error(
         'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
-      ) as ApiError;
-      err.statusCode = 400;
-      err.affectedAppointments = affected;
-      throw err;
+      ) as ApiError
+      err.statusCode = 400
+      err.affectedAppointments = affected
+      throw err
     }
   }
 
@@ -515,13 +497,13 @@ export const updateProvider = async (
     ...(data.phone !== undefined && { phone: data.phone }),
     ...(data.userId !== undefined && { userId: data.userId || null }),
     ...(data.isActive !== undefined && { isActive: data.isActive }),
-  };
+  }
 
   if (data.disciplineIds && data.disciplineIds.length > 0) {
-    await prisma.providerDiscipline.deleteMany({ where: { providerId: id } });
-    (baseData as { disciplines?: { create: { disciplineId: string }[] } }).disciplines = {
+    await prisma.providerDiscipline.deleteMany({ where: { providerId: id } })
+    ;(baseData as { disciplines?: { create: { disciplineId: string }[] } }).disciplines = {
       create: data.disciplineIds.map((disciplineId) => ({ disciplineId })),
-    };
+    }
   }
 
   const updatedProvider = await prisma.provider.update({
@@ -536,12 +518,12 @@ export const updateProvider = async (
         },
       },
     },
-  });
+  })
 
   if (data.locationIds && clinicId) {
     await prisma.providerLocationAssignment.deleteMany({
       where: { providerId: id },
-    });
+    })
 
     await prisma.providerLocationAssignment.createMany({
       data: data.locationIds.map((locationId, index) => ({
@@ -549,14 +531,14 @@ export const updateProvider = async (
         locationId,
         isPrimary: index === 0,
       })),
-    });
+    })
   }
 
   if (data.isActive !== undefined && provider.userId) {
     await prisma.user.update({
       where: { id: provider.userId },
       data: { isActive: data.isActive },
-    });
+    })
   }
 
   await auditService.logAudit({
@@ -572,10 +554,10 @@ export const updateProvider = async (
       locationIds: data.locationIds,
     },
     performedById,
-  });
+  })
 
   if (!data.locationIds) {
-    return updatedProvider;
+    return updatedProvider
   }
 
   return prisma.provider.findUnique({
@@ -589,19 +571,15 @@ export const updateProvider = async (
         },
       },
     },
-  });
-};
+  })
+}
 
-export const softDeleteProvider = async (
-  id: string,
-  where: ClinicWhere,
-  performedById: string
-) => {
-  const provider = await getProviderById(id, where);
+export const softDeleteProvider = async (id: string, where: ClinicWhere, performedById: string) => {
+  const provider = await getProviderById(id, where)
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   const affected = await prisma.appointment.findMany({
@@ -620,14 +598,14 @@ export const softDeleteProvider = async (
       locationId: true,
     },
     orderBy: { startTime: 'asc' },
-  });
+  })
   if (affected.length > 0) {
     const err = new Error(
       'Cannot deactivate provider with future appointments. Reassign or cancel them first.'
-    ) as ApiError;
-    err.statusCode = 400;
-    err.affectedAppointments = affected;
-    throw err;
+    ) as ApiError
+    err.statusCode = 400
+    err.affectedAppointments = affected
+    throw err
   }
 
   const updated = await prisma.provider.update({
@@ -637,13 +615,13 @@ export const softDeleteProvider = async (
       disciplines: { include: { discipline: { select: { id: true, name: true } } } },
       user: { select: { id: true, name: true, email: true } },
     },
-  });
+  })
 
   if (provider.userId) {
     await prisma.user.update({
       where: { id: provider.userId },
       data: { isActive: false },
-    });
+    })
   }
 
   await auditService.logAudit({
@@ -655,7 +633,7 @@ export const softDeleteProvider = async (
     oldValue: true,
     newValue: false,
     performedById,
-  });
+  })
 
   if (provider.userId) {
     await auditService.logAudit({
@@ -667,11 +645,11 @@ export const softDeleteProvider = async (
       oldValue: true,
       newValue: false,
       performedById,
-    });
+    })
   }
 
-  return updated;
-};
+  return updated
+}
 
 export const addProviderService = async (
   providerId: string,
@@ -680,21 +658,21 @@ export const addProviderService = async (
   clinicId: string,
   performedById: string
 ) => {
-  const provider = await getProviderById(providerId, { clinicId });
+  const provider = await getProviderById(providerId, { clinicId })
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  await validateServiceBelongsToClinic(serviceId, clinicId);
+  await validateServiceBelongsToClinic(serviceId, clinicId)
 
   const existing = await prisma.providerService.findFirst({
     where: { providerId, serviceId },
-  });
+  })
   if (existing) {
-    const err = new Error('Provider already has this service assigned') as ApiError;
-    err.statusCode = 409;
-    throw err;
+    const err = new Error('Provider already has this service assigned') as ApiError
+    err.statusCode = 409
+    throw err
   }
 
   const assignment = await prisma.providerService.create({
@@ -708,7 +686,7 @@ export const addProviderService = async (
         include: { discipline: { select: { id: true, name: true } } },
       },
     },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -720,10 +698,10 @@ export const addProviderService = async (
       priceOverride: assignment.priceOverride?.toString() ?? null,
     },
     performedById,
-  });
+  })
 
-  return assignment;
-};
+  return assignment
+}
 
 export const updateProviderService = async (
   providerId: string,
@@ -732,26 +710,26 @@ export const updateProviderService = async (
   clinicId: string,
   performedById: string
 ) => {
-  const provider = await getProviderById(providerId, { clinicId });
+  const provider = await getProviderById(providerId, { clinicId })
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
-  await validateServiceBelongsToClinic(serviceId, clinicId);
+  await validateServiceBelongsToClinic(serviceId, clinicId)
 
   const existing = await prisma.providerService.findFirst({
     where: { providerId, serviceId },
-  });
+  })
   if (!existing) {
-    const err = new Error('Provider service assignment not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider service assignment not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
-  const newPrice = priceOverride ?? null;
-  const oldStr = existing.priceOverride?.toString() ?? null;
-  const newStr = newPrice != null ? String(newPrice) : null;
+  const newPrice = priceOverride ?? null
+  const oldStr = existing.priceOverride?.toString() ?? null
+  const newStr = newPrice != null ? String(newPrice) : null
 
   const updated = await prisma.providerService.update({
     where: { id: existing.id },
@@ -761,7 +739,7 @@ export const updateProviderService = async (
         include: { discipline: { select: { id: true, name: true } } },
       },
     },
-  });
+  })
 
   if (oldStr !== newStr) {
     await auditService.logAudit({
@@ -773,11 +751,11 @@ export const updateProviderService = async (
       oldValue: oldStr,
       newValue: newStr,
       performedById,
-    });
+    })
   }
 
-  return updated;
-};
+  return updated
+}
 
 export const removeProviderService = async (
   providerId: string,
@@ -785,34 +763,34 @@ export const removeProviderService = async (
   clinicId: string,
   performedById: string
 ) => {
-  const provider = await getProviderById(providerId, { clinicId });
+  const provider = await getProviderById(providerId, { clinicId })
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   const count = await prisma.providerService.count({
     where: { providerId },
-  });
+  })
   if (count <= 1) {
-    const err = new Error('Provider must have at least one service') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Provider must have at least one service') as ApiError
+    err.statusCode = 400
+    throw err
   }
 
   const existing = await prisma.providerService.findFirst({
     where: { providerId, serviceId },
-  });
+  })
   if (!existing) {
-    const err = new Error('Provider service assignment not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider service assignment not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   const deleted = await prisma.providerService.delete({
     where: { id: existing.id },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -824,20 +802,17 @@ export const removeProviderService = async (
       priceOverride: existing.priceOverride?.toString() ?? null,
     },
     performedById,
-  });
+  })
 
-  return deleted;
-};
+  return deleted
+}
 
-export const getProviderServices = async (
-  providerId: string,
-  clinicId: string
-) => {
-  const provider = await getProviderById(providerId, { clinicId });
+export const getProviderServices = async (providerId: string, clinicId: string) => {
+  const provider = await getProviderById(providerId, { clinicId })
   if (!provider) {
-    const err = new Error('Provider not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Provider not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   return prisma.providerService.findMany({
@@ -847,5 +822,5 @@ export const getProviderServices = async (
         include: { discipline: { select: { id: true, name: true } } },
       },
     },
-  });
-};
+  })
+}
