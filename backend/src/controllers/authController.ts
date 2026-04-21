@@ -100,16 +100,43 @@ export const login = asyncHandler(
       permissions = user.customRole.permissions as string[]
     }
 
+    // Return the same extended shape as GET /auth/me so the client can immediately
+    // make routing decisions (onboarding gating, tour auto-start) without a round-trip.
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        clinicId: true,
+        customRoleId: true,
+        hasSeenTour: true,
+        tourCompletedAt: true,
+        preferences: true,
+        customRole: { select: { id: true, name: true, permissions: true } },
+        clinic: {
+          select: {
+            id: true,
+            name: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                onboardingCompletedAt: true,
+                onboardingStep: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
     successResponse(res, 200, 'Login successful', {
       accessToken,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        clinicId: user.clinicId,
-        customRoleId: user.customRoleId,
-        customRoleName: user.customRole?.name ?? null,
+        ...fullUser,
+        customRoleName: fullUser?.customRole?.name ?? null,
         permissions,
       },
     })
