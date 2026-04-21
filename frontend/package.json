@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
-    "dev:clean": "rm -rf .next && next dev -p 3002",
+    "dev": "next dev -p 3000",
+    "dev:clean": "rm -rf .next && next dev -p 3000",
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint --max-warnings=0",

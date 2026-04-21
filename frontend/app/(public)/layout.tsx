@@ -2,7 +2,8 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { AppButton } from '@/components/ui-system'
+import { usePathname, useRouter } from 'next/navigation'
+import { AppButton, LoadingSkeleton } from '@/components/ui-system'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   LayoutDashboard,
@@ -16,9 +17,19 @@ import { AppLogo } from '@/components/common/AppLogo'
 import { UserAvatar } from '@/components/common/UserAvatar'
 import { useCart } from '@/hooks/useCart'
 
-const commerceNavLinks = [{ href: '/store', label: 'Store' }]
+// Routes within (public) that require authentication.
+// Per PRD §8.2 logged-out users only see landing (/), clinic landing (/clinic/*),
+// and login/signup. Everything below requires a patient (or higher) to be signed in.
+const GATED_PREFIXES = ['/store', '/book', '/checkout', '/payment', '/intake', '/account']
+
+function isGatedPath(pathname: string | null): boolean {
+  if (!pathname) return false
+  return GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const { totalItems } = useCart()
   const [menuOpen, setMenuOpen] = React.useState(false)
@@ -36,7 +47,17 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     }
   }, [menuOpen])
 
+  // Auth gate for patient-only routes inside the public shell
+  React.useEffect(() => {
+    if (isLoading) return
+    if (!isAuthenticated && isGatedPath(pathname)) {
+      const target = `/login?returnUrl=${encodeURIComponent(pathname ?? '/')}`
+      router.replace(target)
+    }
+  }, [isLoading, isAuthenticated, pathname, router])
+
   const isPatient = user?.role === 'PATIENT'
+  const needsAuthRedirect = !isLoading && !isAuthenticated && isGatedPath(pathname)
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
@@ -47,27 +68,30 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <AppLogo size="lg" />
             </Link>
             <nav className="hidden lg:flex items-center gap-8">
-              {commerceNavLinks.map((item) => (
+              {isAuthenticated && isPatient && (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  href="/store"
                   className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
                 >
-                  {item.label}
+                  Store
                 </Link>
-              ))}
-              <Link
-                href="/#features"
-                className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
-              >
-                Features
-              </Link>
-              <Link
-                href="/#pricing"
-                className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
-              >
-                Pricing
-              </Link>
+              )}
+              {!isAuthenticated && (
+                <>
+                  <Link
+                    href="/#features"
+                    className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
+                  >
+                    Features
+                  </Link>
+                  <Link
+                    href="/#pricing"
+                    className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
+                  >
+                    Pricing
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-6">
@@ -170,50 +194,71 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 </div>
               )
             ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-2"
+                >
+                  Login
+                </Link>
+                <AppButton
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full px-5 font-medium h-9"
+                >
+                  <Link href="/signup">Sign up</Link>
+                </AppButton>
+              </div>
+            )}
+
+            {isAuthenticated && isPatient && (
               <Link
-                href="/login"
-                className="text-sm font-medium text-slate-500 hover:text-slate-900 flex items-center gap-2"
+                href="/checkout"
+                className="relative p-2 text-slate-600 hover:text-primary transition-colors"
               >
-                Login
+                <ShoppingCart className="h-6 w-6" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                    {totalItems}
+                  </span>
+                )}
               </Link>
             )}
 
-            <Link
-              href="/checkout"
-              className="relative p-2 text-slate-600 hover:text-primary transition-colors"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
-
-            <AppButton
-              asChild
-              size="sm"
-              className="rounded-full px-6 bg-primary text-white hover:bg-primary-900 shadow-none font-medium h-10"
-            >
-              <Link href="/#demo">Book a Demo</Link>
-            </AppButton>
+            {!isAuthenticated && (
+              <AppButton
+                asChild
+                size="sm"
+                className="rounded-full px-6 bg-primary text-white hover:bg-primary-900 shadow-none font-medium h-10"
+              >
+                <Link href="/#demo">Book a Demo</Link>
+              </AppButton>
+            )}
           </div>
         </div>
         <div className="border-t border-slate-200/70 px-4 py-2 lg:hidden">
           <nav className="flex items-center gap-2 overflow-x-auto pb-1">
-            {commerceNavLinks.map((item) => (
+            {isAuthenticated && isPatient && (
               <Link
-                key={`mobile-${item.href}`}
-                href={item.href}
+                href="/store"
                 className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
               >
-                {item.label}
+                Store
               </Link>
-            ))}
+            )}
           </nav>
         </div>
       </header>
-      <main className="min-h-[calc(100vh-5rem)]">{children}</main>
+      <main className="min-h-[calc(100vh-5rem)]">
+        {needsAuthRedirect ? (
+          <div className="mx-auto max-w-md px-4 py-20">
+            <LoadingSkeleton variant="card" />
+          </div>
+        ) : (
+          children
+        )}
+      </main>
       <footer className="border-t border-slate-100 bg-[#fafafa] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-12">
