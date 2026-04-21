@@ -22,7 +22,10 @@ const BENEFITS = [
 export default function WelcomePage() {
   const router = useRouter()
   const { user } = useAuth()
-  const firstName = user?.name?.split(' ')[0] ?? 'Doctor'
+  const nameParts = (user?.name ?? '').trim().split(/\s+/)
+  // Skip honorifics (Dr., Mr., Ms., Mrs., Prof.) if they come first
+  const firstMeaningful = nameParts.find((p) => !/^(dr|mr|ms|mrs|prof)\.?$/i.test(p)) ?? 'Doctor'
+  const firstName = firstMeaningful
 
   return (
     <OnboardingShell

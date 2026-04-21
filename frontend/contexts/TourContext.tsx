@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { usePathname } from 'next/navigation'
 import api from '@/lib/api'
 import { useAuth } from './AuthContext'
 import type { Role } from '@/lib/types'
@@ -49,29 +50,41 @@ function pickScript(role: Role | undefined): TourScript | null {
   }
 }
 
+function isTourSurface(pathname: string | null, role: Role | undefined): boolean {
+  if (!pathname) return false
+  // Patient tour runs on /account, everyone else on /dashboard
+  if (role === 'PATIENT') return pathname.startsWith('/account')
+  return pathname.startsWith('/dashboard')
+}
+
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const { user, patchUser } = useAuth()
+  const pathname = usePathname()
   const [active, setActive] = React.useState(false)
   const [stepIndex, setStepIndex] = React.useState(0)
   const [script, setScript] = React.useState<TourScript | null>(null)
   const autoStartedRef = React.useRef(false)
 
   // Auto-start on first sight of an unseen tour for roles that have a script.
+  // Gate on pathname: tour should only appear on the role's natural surface
+  // (dashboard / account), never on onboarding, login, or signup.
   React.useEffect(() => {
     if (autoStartedRef.current) return
     if (!user) return
     if (user.hasSeenTour) return
+    if (!isTourSurface(pathname, user.role)) return
+    // For SUPER_ADMIN, don't start the tour until onboarding is complete
+    if (user.role === 'SUPER_ADMIN' && !user.clinic?.tenant?.onboardingCompletedAt) return
     const s = pickScript(user.role)
     if (!s) return
     autoStartedRef.current = true
-    // Brief delay to let the dashboard render real content first
     const timer = setTimeout(() => {
       setScript(s)
       setStepIndex(0)
       setActive(true)
     }, 1200)
     return () => clearTimeout(timer)
-  }, [user])
+  }, [user, pathname])
 
   const start = React.useCallback(
     (opts?: StartOptions) => {

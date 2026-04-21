@@ -49,7 +49,8 @@ export default function DoneStepPage() {
       ]
     : []
 
-  const firstName = user?.name?.split(' ')[0] ?? 'Doctor'
+  const nameParts = (user?.name ?? '').trim().split(/\s+/)
+  const firstName = nameParts.find((p) => !/^(dr|mr|ms|mrs|prof)\.?$/i.test(p)) ?? 'Doctor'
 
   return (
     <OnboardingShell
