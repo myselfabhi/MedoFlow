@@ -18,5 +18,6 @@ router.post('/set-password', authRateLimit, authController.setPassword)
 router.post('/refresh-token', authRateLimit, authController.refreshToken)
 router.post('/logout', authController.logout)
 router.get('/me', protect, authController.me)
+router.patch('/me', protect, authController.updateMe)
 
 export default router

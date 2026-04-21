@@ -198,16 +198,18 @@ enum CommissionStatus {
 // One Tenant = one SaaS customer account (may own multiple Clinics/locations)
 // All clinic data is scoped through Clinic → Tenant
 model Tenant {
-  id           String       @id @default(cuid())
-  name         String
-  slug         String       @unique
-  status       TenantStatus @default(TRIAL)
-  plan         TenantPlan   @default(FREE)
-  region       String       @default("us-east-1")
-  dataResidency String?
-  trialEndsAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id                    String       @id @default(cuid())
+  name                  String
+  slug                  String       @unique
+  status                TenantStatus @default(TRIAL)
+  plan                  TenantPlan   @default(FREE)
+  region                String       @default("us-east-1")
+  dataResidency         String?
+  trialEndsAt           DateTime?
+  onboardingStep        Int          @default(0)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   clinics Clinic[]
   brand   Brand?
@@ -308,6 +310,9 @@ model User {
   role         Role
   customRoleId String?
   permissions  Json?
+  preferences  Json?
+  hasSeenTour  Boolean  @default(false)
+  tourCompletedAt DateTime?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

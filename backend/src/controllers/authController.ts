@@ -217,7 +217,114 @@ export const logout = asyncHandler(
 
 export const me = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    successResponse(res, 200, 'User retrieved', { user: req.user })
+    if (!req.user?.id) {
+      const err = new Error('Not authenticated') as ApiError
+      err.statusCode = 401
+      throw err
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        clinicId: true,
+        customRoleId: true,
+        customRole: { select: { id: true, name: true, permissions: true } },
+        permissions: true,
+        hasSeenTour: true,
+        tourCompletedAt: true,
+        preferences: true,
+        clinic: {
+          select: {
+            id: true,
+            name: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                onboardingCompletedAt: true,
+                onboardingStep: true,
+              },
+            },
+          },
+        },
+      },
+    })
+    successResponse(res, 200, 'User retrieved', { user })
+  }
+)
+
+const ALLOWED_UPDATE_KEYS = new Set(['name', 'hasSeenTour', 'preferences'])
+
+export const updateMe = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    if (!req.user?.id) {
+      const err = new Error('Not authenticated') as ApiError
+      err.statusCode = 401
+      throw err
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>
+    const updates: {
+      name?: string
+      hasSeenTour?: boolean
+      tourCompletedAt?: Date | null
+      preferences?: object
+    } = {}
+
+    for (const key of Object.keys(body)) {
+      if (!ALLOWED_UPDATE_KEYS.has(key)) {
+        const err = new Error(`Unknown field: ${key}`) as ApiError
+        err.statusCode = 400
+        throw err
+      }
+    }
+
+    if (typeof body['name'] === 'string') {
+      const trimmed = body['name'].trim()
+      if (trimmed.length < 2 || trimmed.length > 100) {
+        const err = new Error('Name must be 2–100 characters') as ApiError
+        err.statusCode = 400
+        throw err
+      }
+      updates.name = trimmed
+    }
+
+    if (typeof body['hasSeenTour'] === 'boolean') {
+      updates.hasSeenTour = body['hasSeenTour']
+      updates.tourCompletedAt = body['hasSeenTour'] ? new Date() : null
+    }
+
+    if (body['preferences'] !== undefined) {
+      if (typeof body['preferences'] !== 'object' || Array.isArray(body['preferences'])) {
+        const err = new Error('preferences must be an object') as ApiError
+        err.statusCode = 400
+        throw err
+      }
+      updates.preferences = body['preferences'] as object
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: updates as never,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        clinicId: true,
+        hasSeenTour: true,
+        tourCompletedAt: true,
+        preferences: true,
+        customRoleId: true,
+        customRole: { select: { id: true, name: true, permissions: true } },
+        permissions: true,
+      },
+    })
+
+    successResponse(res, 200, 'User updated', { user: updated })
   }
 )
 

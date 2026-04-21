@@ -33,6 +33,7 @@ import auditRoutes from './audit'
 import patientRoutes from './patients'
 import roleRoutes from './roles'
 import tenantRoutes from './tenants'
+import onboardingRoutes from './onboarding'
 
 const router = Router()
 
@@ -70,5 +71,6 @@ router.use('/packages', packageRoutes)
 router.use('/memberships', membershipRoutes)
 router.use('/carts', cartRoutes)
 router.use('/roles', roleRoutes)
+router.use('/onboarding', onboardingRoutes)
 
 export default router
