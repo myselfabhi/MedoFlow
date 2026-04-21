@@ -59,6 +59,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const isPatient = user?.role === 'PATIENT'
   const needsAuthRedirect = !isLoading && !isAuthenticated && isGatedPath(pathname)
 
+  // Strip honorifics (Dr., Mr., Ms., Mrs., Prof.) so "Dr. Priya Mehta" -> "Priya"
+  const firstName = React.useMemo(() => {
+    const parts = (user?.name ?? '').trim().split(/\s+/)
+    return parts.find((p) => !/^(dr|mr|ms|mrs|prof)\.?$/i.test(p)) ?? user?.name ?? ''
+  }, [user?.name])
+
   return (
     <div className="min-h-screen bg-[#fafafa]">
       <header className="sticky top-0 z-50 border-b border-transparent bg-[#fafafa]/80 backdrop-blur-md">
@@ -75,22 +81,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 >
                   Store
                 </Link>
-              )}
-              {!isAuthenticated && (
-                <>
-                  <Link
-                    href="/#features"
-                    className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
-                  >
-                    Features
-                  </Link>
-                  <Link
-                    href="/#pricing"
-                    className="text-sm font-medium text-slate-500 hover:text-primary transition-colors"
-                  >
-                    Pricing
-                  </Link>
-                </>
               )}
             </nav>
           </div>
@@ -179,7 +169,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               ) : (
                 <div className="flex items-center gap-4">
                   <span className="hidden sm:inline text-sm font-medium text-slate-500">
-                    Welcome, <span className="text-slate-900">{user?.name.split(' ')[0]}</span>
+                    Welcome, <span className="text-slate-900">{firstName}</span>
                   </span>
                   <AppButton
                     asChild
