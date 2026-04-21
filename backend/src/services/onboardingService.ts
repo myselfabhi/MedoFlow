@@ -14,6 +14,7 @@ export interface OnboardingStatus {
   brand: {
     logoUrl: string | null
     primaryColor: string
+    secondaryColor: string | null
     subdomain: string
   } | null
 }
@@ -42,7 +43,7 @@ export async function getStatus(clinicId: string): Promise<OnboardingStatus> {
       }),
       prisma.brand.findUnique({
         where: { tenantId },
-        select: { logoUrl: true, primaryColor: true, subdomain: true },
+        select: { logoUrl: true, primaryColor: true, secondaryColor: true, subdomain: true },
       }),
       prisma.location.count({ where: { clinicId, isActive: true } }),
       prisma.discipline.count({ where: { clinicId } }),
@@ -92,11 +93,15 @@ export async function complete(clinicId: string): Promise<void> {
 
 export async function updateBrand(
   clinicId: string,
-  data: { primaryColor?: string; logoUrl?: string | null }
+  data: { primaryColor?: string; secondaryColor?: string | null; logoUrl?: string | null }
 ): Promise<void> {
   const tenantId = await tenantIdFromClinic(clinicId)
 
-  const updates: { primaryColor?: string; logoUrl?: string | null } = {}
+  const updates: {
+    primaryColor?: string
+    secondaryColor?: string | null
+    logoUrl?: string | null
+  } = {}
   if (data.primaryColor !== undefined) {
     if (!/^#[0-9a-fA-F]{6}$/.test(data.primaryColor)) {
       const err = new Error('primaryColor must be a 6-digit hex like #6366f1') as ApiError
@@ -104,6 +109,14 @@ export async function updateBrand(
       throw err
     }
     updates.primaryColor = data.primaryColor.toLowerCase()
+  }
+  if (data.secondaryColor !== undefined) {
+    if (data.secondaryColor !== null && !/^#[0-9a-fA-F]{6}$/.test(data.secondaryColor)) {
+      const err = new Error('secondaryColor must be a 6-digit hex') as ApiError
+      err.statusCode = 400
+      throw err
+    }
+    updates.secondaryColor = data.secondaryColor?.toLowerCase() ?? null
   }
   if (data.logoUrl !== undefined) {
     updates.logoUrl = data.logoUrl

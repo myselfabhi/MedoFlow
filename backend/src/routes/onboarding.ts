@@ -21,6 +21,11 @@ const brandSchema = {
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/)
       .optional(),
+    secondaryColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .nullable()
+      .optional(),
     logoUrl: z.string().url().nullable().optional(),
   }),
 }

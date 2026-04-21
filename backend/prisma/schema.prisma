@@ -227,6 +227,7 @@ model Brand {
   logoUrl              String?
   faviconUrl           String?
   primaryColor         String   @default("#6366f1")
+  secondaryColor       String?
   typographyPair       String   @default("inter-inter")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -461,14 +462,21 @@ model ProviderUnavailability {
 }
 
 model Location {
-  id        String   @id @default(cuid())
-  clinicId  String
-  name      String
-  address   String?
-  timezone  String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  clinicId     String
+  name         String
+  address      String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+  phone        String?
+  timezone     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   clinic              Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
