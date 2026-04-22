@@ -1,6 +1,5 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { sanitizeVisitRecordForPatient } from '../utils/visitSanitize';
+import assert from 'node:assert/strict'
+import { sanitizeVisitRecordForPatient } from '../utils/visitSanitize'
 
 test('patient cannot access draft/internal note content - SOAP fields are masked', () => {
   const visitRecord = {
@@ -17,20 +16,20 @@ test('patient cannot access draft/internal note content - SOAP fields are masked
     status: 'FINAL',
     currentVersion: { id: 'v1' },
     versions: [{ id: 'v1' }],
-  };
+  }
 
-  const sanitized = sanitizeVisitRecordForPatient(visitRecord);
+  const sanitized = sanitizeVisitRecordForPatient(visitRecord)
 
-  assert.equal(sanitized.subjective, null);
-  assert.equal(sanitized.objective, null);
-  assert.equal(sanitized.assessment, null);
-  assert.equal(sanitized.plan, null);
-  assert.equal(sanitized.note, null);
-  assert.equal(sanitized.currentVersion, null);
-  assert.deepEqual(sanitized.versions, []);
-  assert.equal(sanitized.id, 'vr-1');
-  assert.equal(sanitized.status, 'FINAL');
-});
+  assert.equal(sanitized.subjective, null)
+  assert.equal(sanitized.objective, null)
+  assert.equal(sanitized.assessment, null)
+  assert.equal(sanitized.plan, null)
+  assert.equal(sanitized.note, null)
+  assert.equal(sanitized.currentVersion, null)
+  assert.deepEqual(sanitized.versions, [])
+  assert.equal(sanitized.id, 'vr-1')
+  assert.equal(sanitized.status, 'FINAL')
+})
 
 test('patient cannot access draft/internal note content - non-SOAP fields preserved', () => {
   const visitRecord = {
@@ -46,11 +45,11 @@ test('patient cannot access draft/internal note content - non-SOAP fields preser
     note: null,
     status: 'DRAFT',
     isFinalized: false,
-  };
+  }
 
-  const sanitized = sanitizeVisitRecordForPatient(visitRecord);
+  const sanitized = sanitizeVisitRecordForPatient(visitRecord)
 
-  assert.equal(sanitized.id, 'vr-2');
-  assert.equal(sanitized.status, 'DRAFT');
-  assert.equal(sanitized.isFinalized, false);
-});
+  assert.equal(sanitized.id, 'vr-2')
+  assert.equal(sanitized.status, 'DRAFT')
+  assert.equal(sanitized.isFinalized, false)
+})

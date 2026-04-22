@@ -1,22 +1,19 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
-const cuidSchema = z.string().min(1, 'ID is required');
+const cuidSchema = z.string().min(1, 'ID is required')
 
 const emailSchema = z
   .string()
   .trim()
   .email('Valid email is required')
-  .transform((value) => value.toLowerCase());
+  .transform((value) => value.toLowerCase())
 
-const optionalPriceOverride = z.preprocess(
-  (value) => {
-    if (value === '' || value === null || value === undefined) {
-      return undefined;
-    }
-    return value;
-  },
-  z.coerce.number().min(0, 'Price override must be 0 or greater').optional()
-);
+const optionalPriceOverride = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined
+  }
+  return value
+}, z.coerce.number().min(0, 'Price override must be 0 or greater').optional())
 
 export const patientRegistrationSchema = {
   body: z.object({
@@ -24,7 +21,7 @@ export const patientRegistrationSchema = {
     email: emailSchema,
     password: z.string().min(6, 'Password must be at least 6 characters'),
   }),
-};
+}
 
 export const clinicSetupSchema = {
   body: z.object({
@@ -37,7 +34,7 @@ export const clinicSetupSchema = {
       timezone: z.string().trim().min(1, 'Timezone is required'),
     }),
   }),
-};
+}
 
 export const clinicUpdateSchema = {
   body: z
@@ -48,23 +45,30 @@ export const clinicUpdateSchema = {
     .refine((value) => Object.keys(value).length > 0, {
       message: 'At least one field must be provided',
     }),
-};
+}
 
 export const locationUpsertSchema = {
   body: z.object({
     id: cuidSchema.optional(),
     name: z.string().trim().min(1, 'Location name is required'),
     address: z.string().trim().optional(),
+    addressLine1: z.string().trim().optional(),
+    addressLine2: z.string().trim().optional(),
+    city: z.string().trim().optional(),
+    state: z.string().trim().optional(),
+    postalCode: z.string().trim().optional(),
+    country: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
     timezone: z.string().trim().min(1, 'Timezone is required'),
   }),
-};
+}
 
 export const disciplineCreateSchema = {
   body: z.object({
     name: z.string().trim().min(1, 'Name is required'),
     description: z.string().trim().optional(),
   }),
-};
+}
 
 export const disciplineUpdateSchema = {
   params: z.object({
@@ -78,7 +82,7 @@ export const disciplineUpdateSchema = {
     .refine((value) => Object.keys(value).length > 0, {
       message: 'At least one field must be provided',
     }),
-};
+}
 
 export const serviceCreateSchema = {
   body: z.object({
@@ -88,7 +92,7 @@ export const serviceCreateSchema = {
     defaultPrice: z.coerce.number().min(0, 'Default price must be 0 or greater'),
     taxApplicable: z.boolean().optional(),
   }),
-};
+}
 
 export const serviceUpdateSchema = {
   params: z.object({
@@ -105,7 +109,7 @@ export const serviceUpdateSchema = {
     .refine((value) => Object.keys(value).length > 0, {
       message: 'At least one field must be provided',
     }),
-};
+}
 
 export const providerCreateSchema = {
   body: z.object({
@@ -124,7 +128,7 @@ export const providerCreateSchema = {
       )
       .min(1, 'At least one service is required'),
   }),
-};
+}
 
 export const providerUpdateSchema = {
   params: z.object({
@@ -143,7 +147,7 @@ export const providerUpdateSchema = {
     .refine((value) => Object.keys(value).length > 0, {
       message: 'At least one field must be provided',
     }),
-};
+}
 
 export const providerServiceCreateSchema = {
   params: z.object({
@@ -153,7 +157,7 @@ export const providerServiceCreateSchema = {
     serviceId: cuidSchema,
     priceOverride: optionalPriceOverride,
   }),
-};
+}
 
 export const providerServiceUpdateSchema = {
   params: z.object({
@@ -163,11 +167,11 @@ export const providerServiceUpdateSchema = {
   body: z.object({
     priceOverride: optionalPriceOverride,
   }),
-};
+}
 
 export const frontDeskProvisionSchema = {
   body: z.object({
     name: z.string().trim().min(1, 'Name is required'),
     email: emailSchema,
   }),
-};
+}

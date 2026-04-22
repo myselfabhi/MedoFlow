@@ -1,54 +1,55 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { AppointmentStatus, Prisma, Role } from '@prisma/client';
-import prisma from '../config/prisma';
-import * as analyticsService from '../services/analyticsService';
-import * as analyticsController from '../controllers/analyticsController';
+import assert from 'node:assert/strict'
+import { AppointmentStatus, Prisma, Role } from '@prisma/client'
+import prisma from '../config/prisma'
+import * as analyticsService from '../services/analyticsService'
+import * as analyticsController from '../controllers/analyticsController'
 
 const restore = <T extends object, K extends keyof T>(object: T, key: K, value: T[K]) => {
-  object[key] = value;
-};
+  object[key] = value
+}
 
 test('parseAnalyticsDateRange defaults to the last 30 days', () => {
-  const range = analyticsService.parseAnalyticsDateRange();
-  const diffDays = Math.round((range.dateTo.getTime() - range.dateFrom.getTime()) / (1000 * 60 * 60 * 24));
-  assert.equal(diffDays, 30);
-});
+  const range = analyticsService.parseAnalyticsDateRange()
+  const diffDays = Math.round(
+    (range.dateTo.getTime() - range.dateFrom.getTime()) / (1000 * 60 * 60 * 24)
+  )
+  assert.equal(diffDays, 30)
+})
 
 test('provider analytics scope always resolves to the authenticated provider', async () => {
-  const originalFindUnique = prisma.provider.findUnique;
+  const originalFindUnique = prisma.provider.findUnique
 
   try {
-    (prisma.provider.findUnique as any) = async ({ where }: any) => {
-      assert.equal(where.userId, 'user-1');
-      return { id: 'provider-1' };
-    };
+    ;(prisma.provider.findUnique as any) = async ({ where }: any) => {
+      assert.equal(where.userId, 'user-1')
+      return { id: 'provider-1' }
+    }
 
     const scope = await analyticsService.resolveAnalyticsScope({
       clinicId: 'clinic-1',
       role: Role.PROVIDER,
       userId: 'user-1',
       requestedProviderId: 'provider-999',
-    });
+    })
 
-    assert.equal(scope.providerId, 'provider-1');
+    assert.equal(scope.providerId, 'provider-1')
   } finally {
-    restore(prisma.provider, 'findUnique', originalFindUnique);
+    restore(prisma.provider, 'findUnique', originalFindUnique)
   }
-});
+})
 
 test('aggregate analytics computes finance, rates, patient value, and utilization from real ledger inputs', async () => {
-  const originalAppointmentFindMany = prisma.appointment.findMany;
-  const originalProviderFindMany = prisma.provider.findMany;
-  const originalInvoiceFindMany = prisma.invoice.findMany;
-  const originalCommissionFindMany = prisma.commissionRecord.findMany;
-  const originalSubscriptionFindMany = prisma.patientSubscription.findMany;
-  const originalPackageFindMany = prisma.patientPackage.findMany;
-  const originalWaitlistFindMany = prisma.waitlistEntry.findMany;
-  const originalAppointmentCount = prisma.appointment.count;
+  const originalAppointmentFindMany = prisma.appointment.findMany
+  const originalProviderFindMany = prisma.provider.findMany
+  const originalInvoiceFindMany = prisma.invoice.findMany
+  const originalCommissionFindMany = prisma.commissionRecord.findMany
+  const originalSubscriptionFindMany = prisma.patientSubscription.findMany
+  const originalPackageFindMany = prisma.patientPackage.findMany
+  const originalWaitlistFindMany = prisma.waitlistEntry.findMany
+  const originalAppointmentCount = prisma.appointment.count
 
   try {
-    (prisma.appointment.findMany as any) = async ({ where, select }: any) => {
+    ;(prisma.appointment.findMany as any) = async ({ where, select }: any) => {
       if (select?.patientId) {
         return [
           {
@@ -75,10 +76,10 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
             endTime: new Date('2025-10-01T10:30:00.000Z'),
             serviceId: 'service-1',
           },
-        ];
+        ]
       }
 
-      assert.equal(where.providerId, 'provider-1');
+      assert.equal(where.providerId, 'provider-1')
       return [
         {
           id: 'appt-1',
@@ -116,9 +117,9 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
           service: { id: 'service-1', name: 'Consult', disciplineId: 'discipline-1' },
           patient: { id: 'patient-3', name: 'Patient Three', email: 'three@example.com' },
         },
-      ];
-    };
-    (prisma.provider.findMany as any) = async () => [
+      ]
+    }
+    ;(prisma.provider.findMany as any) = async () => [
       {
         id: 'provider-1',
         firstName: 'Ada',
@@ -129,8 +130,8 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
           { weekday: 3, startTime: '09:00', endTime: '12:00' },
         ],
       },
-    ];
-    (prisma.invoice.findMany as any) = async ({ where, include }: any) => {
+    ]
+    ;(prisma.invoice.findMany as any) = async ({ where, include }: any) => {
       if (include?.patient && include?.payments && !include?.items) {
         return [
           {
@@ -155,10 +156,10 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
             payments: [{ amount: new Prisma.Decimal(50), status: 'PAID' }],
             items: [],
           },
-        ];
+        ]
       }
 
-      assert.equal(where.providerId, 'provider-1');
+      assert.equal(where.providerId, 'provider-1')
       return [
         {
           id: 'invoice-1',
@@ -170,7 +171,12 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
           totalAmount: new Prisma.Decimal(100),
           createdAt: new Date('2026-03-10T00:00:00.000Z'),
           payments: [
-            { amount: new Prisma.Decimal(100), status: 'PAID', paymentChannel: 'STRIPE', paymentMethod: 'CARD' },
+            {
+              amount: new Prisma.Decimal(100),
+              status: 'PAID',
+              paymentChannel: 'STRIPE',
+              paymentMethod: 'CARD',
+            },
           ],
           items: [
             {
@@ -212,7 +218,14 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
           status: 'FINALIZED',
           totalAmount: new Prisma.Decimal(50),
           createdAt: new Date('2026-03-11T00:00:00.000Z'),
-          payments: [{ amount: new Prisma.Decimal(20), status: 'PAID', paymentChannel: 'MANUAL', paymentMethod: 'CASH' }],
+          payments: [
+            {
+              amount: new Prisma.Decimal(20),
+              status: 'PAID',
+              paymentChannel: 'MANUAL',
+              paymentMethod: 'CASH',
+            },
+          ],
           items: [
             {
               totalPrice: new Prisma.Decimal(50),
@@ -231,13 +244,23 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
           patient: { id: 'patient-2', name: 'Patient Two', email: 'two@example.com' },
           provider: { id: 'provider-1', firstName: 'Ada', lastName: 'Lovelace' },
         },
-      ];
-    };
-    (prisma.commissionRecord.findMany as any) = async () => [
-      { amount: new Prisma.Decimal(10), status: 'PENDING', provider: { id: 'provider-1', firstName: 'Ada', lastName: 'Lovelace' }, invoiceItem: { service: { name: 'Consult' }, product: null, package: null } },
-      { amount: new Prisma.Decimal(5), status: 'PAID', provider: { id: 'provider-1', firstName: 'Ada', lastName: 'Lovelace' }, invoiceItem: { service: { name: 'Consult' }, product: null, package: null } },
-    ];
-    (prisma.patientSubscription.findMany as any) = async () => [
+      ]
+    }
+    ;(prisma.commissionRecord.findMany as any) = async () => [
+      {
+        amount: new Prisma.Decimal(10),
+        status: 'PENDING',
+        provider: { id: 'provider-1', firstName: 'Ada', lastName: 'Lovelace' },
+        invoiceItem: { service: { name: 'Consult' }, product: null, package: null },
+      },
+      {
+        amount: new Prisma.Decimal(5),
+        status: 'PAID',
+        provider: { id: 'provider-1', firstName: 'Ada', lastName: 'Lovelace' },
+        invoiceItem: { service: { name: 'Consult' }, product: null, package: null },
+      },
+    ]
+    ;(prisma.patientSubscription.findMany as any) = async () => [
       {
         status: 'ACTIVE',
         currentPeriodStart: new Date('2026-03-01T00:00:00.000Z'),
@@ -254,8 +277,8 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
         membership: { id: 'membership-2', name: 'Silver' },
         patient: { id: 'patient-2', name: 'Patient Two', email: 'two@example.com' },
       },
-    ];
-    (prisma.patientPackage.findMany as any) = async () => [
+    ]
+    ;(prisma.patientPackage.findMany as any) = async () => [
       {
         id: 'patient-package-1',
         status: 'ACTIVE',
@@ -265,12 +288,12 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
         package: { id: 'package-1', name: 'Series' },
         patient: { id: 'patient-1', name: 'Patient One', email: 'one@example.com' },
       },
-    ];
-    (prisma.waitlistEntry.findMany as any) = async () => [
+    ]
+    ;(prisma.waitlistEntry.findMany as any) = async () => [
       { status: 'WAITING' },
       { status: 'BOOKED' },
-    ];
-    (prisma.appointment.count as any) = async () => 1;
+    ]
+    ;(prisma.appointment.count as any) = async () => 1
 
     const result = await analyticsService.aggregateAnalytics(
       { clinicId: 'clinic-1', role: Role.PROVIDER, providerId: 'provider-1' },
@@ -278,31 +301,31 @@ test('aggregate analytics computes finance, rates, patient value, and utilizatio
         dateFrom: new Date('2026-03-01T00:00:00.000Z'),
         dateTo: new Date('2026-03-31T23:59:59.000Z'),
       }
-    );
+    )
 
-    assert.equal(result.summary.totalRevenue, 150);
-    assert.equal(result.summary.netCollectedRevenue, 120);
-    assert.equal(result.summary.outstandingReceivables, 30);
-    assert.equal(result.summary.cancellationRate.toFixed(1), '33.3');
-    assert.equal(result.summary.noShowRate.toFixed(1), '33.3');
-    assert.equal(result.summary.averageRevenuePerVisit, 120);
-    assert.equal(result.summary.productRevenue, 20);
-    assert.equal(result.summary.packageRevenue, 50);
-    assert.equal(result.summary.commissionSummary.owed, 10);
-    assert.equal(result.summary.membershipSummary.churnRate, 50);
-    assert.equal(result.summary.patientSummary.repeatVisitRate, 100);
-    assert.equal(result.summary.providerUtilization[0].availableMinutes, 2700);
+    assert.equal(result.summary.totalRevenue, 150)
+    assert.equal(result.summary.netCollectedRevenue, 120)
+    assert.equal(result.summary.outstandingReceivables, 30)
+    assert.equal(result.summary.cancellationRate.toFixed(1), '33.3')
+    assert.equal(result.summary.noShowRate.toFixed(1), '33.3')
+    assert.equal(result.summary.averageRevenuePerVisit, 120)
+    assert.equal(result.summary.productRevenue, 20)
+    assert.equal(result.summary.packageRevenue, 50)
+    assert.equal(result.summary.commissionSummary.owed, 10)
+    assert.equal(result.summary.membershipSummary.churnRate, 50)
+    assert.equal(result.summary.patientSummary.repeatVisitRate, 100)
+    assert.equal(result.summary.providerUtilization[0].availableMinutes, 2700)
   } finally {
-    restore(prisma.appointment, 'findMany', originalAppointmentFindMany);
-    restore(prisma.provider, 'findMany', originalProviderFindMany);
-    restore(prisma.invoice, 'findMany', originalInvoiceFindMany);
-    restore(prisma.commissionRecord, 'findMany', originalCommissionFindMany);
-    restore(prisma.patientSubscription, 'findMany', originalSubscriptionFindMany);
-    restore(prisma.patientPackage, 'findMany', originalPackageFindMany);
-    restore(prisma.waitlistEntry, 'findMany', originalWaitlistFindMany);
-    restore(prisma.appointment, 'count', originalAppointmentCount);
+    restore(prisma.appointment, 'findMany', originalAppointmentFindMany)
+    restore(prisma.provider, 'findMany', originalProviderFindMany)
+    restore(prisma.invoice, 'findMany', originalInvoiceFindMany)
+    restore(prisma.commissionRecord, 'findMany', originalCommissionFindMany)
+    restore(prisma.patientSubscription, 'findMany', originalSubscriptionFindMany)
+    restore(prisma.patientPackage, 'findMany', originalPackageFindMany)
+    restore(prisma.waitlistEntry, 'findMany', originalWaitlistFindMany)
+    restore(prisma.appointment, 'count', originalAppointmentCount)
   }
-});
+})
 
 test('business alerts trigger on revenue decline and low utilization', () => {
   const alerts = analyticsService.buildAlerts({
@@ -328,34 +351,46 @@ test('business alerts trigger on revenue decline and low utilization', () => {
       membershipChurnRate: 5,
     },
     packageSummary: { exhaustedCount: 1, expiringSoonCount: 1 },
-  });
+  })
 
-  assert.equal(alerts.some((alert) => alert.id === 'revenue_down'), true);
-  assert.equal(alerts.some((alert) => alert.id === 'receivables_up'), true);
-  assert.equal(alerts.some((alert) => alert.id === 'package_pressure'), true);
-  assert.equal(alerts.some((alert) => alert.id === 'utilization_provider-1'), true);
-});
+  assert.equal(
+    alerts.some((alert) => alert.id === 'revenue_down'),
+    true
+  )
+  assert.equal(
+    alerts.some((alert) => alert.id === 'receivables_up'),
+    true
+  )
+  assert.equal(
+    alerts.some((alert) => alert.id === 'package_pressure'),
+    true
+  )
+  assert.equal(
+    alerts.some((alert) => alert.id === 'utilization_provider-1'),
+    true
+  )
+})
 
 test('provider export controller rejects non-provider export types', async () => {
-  const originalFindUnique = prisma.provider.findUnique;
+  const originalFindUnique = prisma.provider.findUnique
   const req = {
     clinicId: 'clinic-1',
     query: { type: 'finance' },
     user: { id: 'user-1', role: Role.PROVIDER },
-  } as any;
-  const res = {} as any;
-  let capturedError: any = null;
+  } as any
+  const res = {} as any
+  let capturedError: any = null
   try {
-    (prisma.provider.findUnique as any) = async () => ({ id: 'provider-1' });
+    ;(prisma.provider.findUnique as any) = async () => ({ id: 'provider-1' })
     await new Promise<void>((resolve) => {
       analyticsController.exportReport(req, res, ((error: any) => {
-        capturedError = error;
-        resolve();
-      }) as any);
-    });
-    assert.equal(capturedError?.statusCode, 403);
-    assert.equal(capturedError?.code, 'forbidden');
+        capturedError = error
+        resolve()
+      }) as any)
+    })
+    assert.equal(capturedError?.statusCode, 403)
+    assert.equal(capturedError?.code, 'forbidden')
   } finally {
-    restore(prisma.provider, 'findUnique', originalFindUnique);
+    restore(prisma.provider, 'findUnique', originalFindUnique)
   }
-});
+})

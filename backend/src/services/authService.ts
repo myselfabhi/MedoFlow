@@ -1,36 +1,41 @@
-import bcrypt from 'bcryptjs';
-import prisma from '../config/prisma';
-import { ApiError } from '../types/errors';
+import * as argon2 from 'argon2'
+import prisma from '../config/prisma'
+import { ApiError } from '../types/errors'
 
 export interface RegisterBody {
-  name: string;
-  email: string;
-  password: string;
+  name: string
+  email: string
+  password: string
 }
 
 const validateRegistration = (body: RegisterBody): void => {
-  const { name, email, password } = body;
+  const { name, email, password } = body
 
   if (!name || !email || !password) {
-    const err = new Error('Name, email, and password are required') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Name, email, and password are required') as ApiError
+    err.statusCode = 400
+    throw err
   }
-};
+}
 
 export const registerUser = async (body: RegisterBody) => {
-  validateRegistration(body);
+  validateRegistration(body)
 
   const existingUser = await prisma.user.findUnique({
     where: { email: body.email.trim().toLowerCase() },
-  });
+  })
   if (existingUser) {
-    const err = new Error('Email already registered') as ApiError;
-    err.statusCode = 409;
-    throw err;
+    const err = new Error('Email already registered') as ApiError
+    err.statusCode = 409
+    throw err
   }
 
-  const hashedPassword = await bcrypt.hash(body.password, 12);
+  const hashedPassword = await argon2.hash(body.password, {
+    type: argon2.argon2id,
+    memoryCost: 19456, // 19 MB (OWASP recommended minimum)
+    timeCost: 2,
+    parallelism: 1,
+  })
 
   return prisma.user.create({
     data: {
@@ -49,5 +54,5 @@ export const registerUser = async (body: RegisterBody) => {
       isActive: true,
       createdAt: true,
     },
-  });
-};
+  })
+}

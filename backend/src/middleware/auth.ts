@@ -1,26 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../utils/tokenUtils';
-import prisma from '../config/prisma';
-import { Role } from '@prisma/client';
-import { ApiError } from '../types/errors';
-import { hasPermission } from '../config/permissions';
+import { Request, Response, NextFunction } from 'express'
+import { verifyAccessToken } from '../utils/tokenUtils'
+import prisma from '../config/prisma'
+import { Role } from '@prisma/client'
+import { ApiError } from '../types/errors'
+import { hasPermission } from '../config/permissions'
 
-export const protect = async (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const protect = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      const err = new Error('Access token required') as ApiError;
-      err.statusCode = 401;
-      throw err;
+      const err = new Error('Access token required') as ApiError
+      err.statusCode = 401
+      throw err
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyAccessToken(token);
+    const token = authHeader.split(' ')[1]
+    const decoded = verifyAccessToken(token)
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -41,26 +37,26 @@ export const protect = async (
           },
         },
       },
-    });
+    })
 
     if (!user) {
-      const err = new Error('User not found') as ApiError;
-      err.statusCode = 401;
-      throw err;
+      const err = new Error('User not found') as ApiError
+      err.statusCode = 401
+      throw err
     }
 
     if (!user.isActive) {
-      const err = new Error('Account is deactivated') as ApiError;
-      err.statusCode = 403;
-      throw err;
+      const err = new Error('Account is deactivated') as ApiError
+      err.statusCode = 403
+      throw err
     }
 
     // Resolve effective permissions
-    let effectivePermissions: string[] = [];
-    if (user.role === 'SUPER_ADMIN') {
-      effectivePermissions = ['*']; // full access
+    let effectivePermissions: string[] = []
+    if (user.role === 'PLATFORM_ADMIN' || user.role === 'SUPER_ADMIN') {
+      effectivePermissions = ['*'] // full access
     } else if (user.customRole?.permissions) {
-      effectivePermissions = user.customRole.permissions as string[];
+      effectivePermissions = user.customRole.permissions as string[]
     }
 
     req.user = {
@@ -73,23 +69,19 @@ export const protect = async (
       customRoleName: user.customRole?.name ?? null,
       permissions: effectivePermissions,
       hasSeenPatientTour: user.hasSeenPatientTour,
-    };
-    next();
-  } catch (err) {
-    const error = err as ApiError;
-    if (
-      error.name === 'JsonWebTokenError' ||
-      error.name === 'TokenExpiredError'
-    ) {
-      error.statusCode = 401;
-      error.message =
-        error.name === 'TokenExpiredError'
-          ? 'Access token expired'
-          : 'Invalid access token';
     }
-    next(err);
+    req.clinicId = user.clinicId
+    next()
+  } catch (err) {
+    const error = err as ApiError
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      error.statusCode = 401
+      error.message =
+        error.name === 'TokenExpiredError' ? 'Access token expired' : 'Invalid access token'
+    }
+    next(err)
   }
-};
+}
 
 /**
  * System-level role check (enum-based).
@@ -98,28 +90,28 @@ export const protect = async (
 export const authorize = (...roles: Role[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      const err = new Error('Authentication required') as ApiError;
-      err.statusCode = 401;
-      next(err);
-      return;
+      const err = new Error('Authentication required') as ApiError
+      err.statusCode = 401
+      next(err)
+      return
     }
 
-    // SUPER_ADMIN always passes any role check
-    if (req.user.role === 'SUPER_ADMIN') {
-      next();
-      return;
+    // PLATFORM_ADMIN and SUPER_ADMIN always pass any role check
+    if (req.user.role === 'PLATFORM_ADMIN' || req.user.role === 'SUPER_ADMIN') {
+      next()
+      return
     }
 
     if (!roles.includes(req.user.role)) {
-      const err = new Error('Insufficient permissions') as ApiError;
-      err.statusCode = 403;
-      next(err);
-      return;
+      const err = new Error('Insufficient permissions') as ApiError
+      err.statusCode = 403
+      next(err)
+      return
     }
 
-    next();
-  };
-};
+    next()
+  }
+}
 
 /**
  * Granular permission check — works with custom roles.
@@ -129,31 +121,31 @@ export const authorize = (...roles: Role[]) => {
 export const requirePermission = (...requiredKeys: string[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      const err = new Error('Authentication required') as ApiError;
-      err.statusCode = 401;
-      next(err);
-      return;
+      const err = new Error('Authentication required') as ApiError
+      err.statusCode = 401
+      next(err)
+      return
     }
 
-    // SUPER_ADMIN always has full access
-    if (req.user.role === 'SUPER_ADMIN') {
-      next();
-      return;
+    // PLATFORM_ADMIN and SUPER_ADMIN always have full access
+    if (req.user.role === 'PLATFORM_ADMIN' || req.user.role === 'SUPER_ADMIN') {
+      next()
+      return
     }
 
-    const userPerms = req.user.permissions ?? [];
-    const hasAll = requiredKeys.every((key) => hasPermission(userPerms, key));
+    const userPerms = req.user.permissions ?? []
+    const hasAll = requiredKeys.every((key) => hasPermission(userPerms, key))
 
     if (!hasAll) {
-      const err = new Error('You do not have permission to perform this action') as ApiError;
-      err.statusCode = 403;
-      next(err);
-      return;
+      const err = new Error('You do not have permission to perform this action') as ApiError
+      err.statusCode = 403
+      next(err)
+      return
     }
 
-    next();
-  };
-};
+    next()
+  }
+}
 
 export const optionalProtect = async (
   req: Request,
@@ -161,14 +153,14 @@ export const optionalProtect = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      next();
-      return;
+      next()
+      return
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyAccessToken(token);
+    const token = authHeader.split(' ')[1]
+    const decoded = verifyAccessToken(token)
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -189,14 +181,14 @@ export const optionalProtect = async (
           },
         },
       },
-    });
+    })
 
     if (user && user.isActive) {
-      let effectivePermissions: string[] = [];
-      if (user.role === 'SUPER_ADMIN') {
-        effectivePermissions = ['*'];
+      let effectivePermissions: string[] = []
+      if (user.role === 'PLATFORM_ADMIN' || user.role === 'SUPER_ADMIN') {
+        effectivePermissions = ['*']
       } else if (user.customRole?.permissions) {
-        effectivePermissions = user.customRole.permissions as string[];
+        effectivePermissions = user.customRole.permissions as string[]
       }
 
       req.user = {
@@ -209,10 +201,11 @@ export const optionalProtect = async (
         customRoleName: user.customRole?.name ?? null,
         permissions: effectivePermissions,
         hasSeenPatientTour: user.hasSeenPatientTour,
-      };
+      }
+      req.clinicId = user.clinicId
     }
-    next();
+    next()
   } catch {
-    next();
+    next()
   }
-};
+}

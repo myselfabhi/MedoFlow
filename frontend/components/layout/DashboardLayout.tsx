@@ -1,18 +1,24 @@
-'use client';
+'use client'
 
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { AppSidebar } from './AppSidebar';
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { AppSidebar } from './AppSidebar'
+import { AppSidebarMobile } from './AppSidebarMobile'
+import { TopBar } from './TopBar'
+import { DashboardErrorBoundary, LoadingSkeleton } from '@/components/ui-system'
+import { useTour } from '@/contexts/TourContext'
 
 export interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter()
+  const pathname = usePathname()
+  const { isAuthenticated, isLoading, user } = useAuth()
+  const { start: startTour } = useTour()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const superAdminOnlyPrefixes = [
     '/dashboard/admin',
@@ -22,82 +28,108 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     '/dashboard/staff',
     '/dashboard/locations',
     '/dashboard/clinic',
-    '/dashboard/clinics/new',
-  ];
+  ]
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(
-        `/login?returnUrl=${encodeURIComponent(pathname || '/dashboard')}`
-      );
-      return;
+      router.push(`/login?returnUrl=${encodeURIComponent(pathname || '/dashboard')}`)
+      return
     }
 
-    if (isLoading || !user) return;
+    if (isLoading || !user) return
 
+    // PATIENT role is no longer allowed in /dashboard (Phase 2: kill /dashboard/patient/*)
+    if (user.role === 'PATIENT') {
+      router.replace('/account')
+      return
+    }
+
+    // First-time SUPER_ADMIN setup — route to onboarding wizard
+    const onboardingCompletedAt = user.clinic?.tenant?.onboardingCompletedAt
+    if (
+      user.role === 'SUPER_ADMIN' &&
+      user.clinicId &&
+      !onboardingCompletedAt &&
+      pathname !== '/welcome' &&
+      !pathname?.startsWith('/welcome')
+    ) {
+      router.replace('/welcome')
+      return
+    }
+
+    // SUPER_ADMIN without a clinic shouldn't exist post-signup anymore, but if
+    // we land in that state, route to signup instead of the removed /clinics/new page.
     if (user.role === 'SUPER_ADMIN' && !user.clinicId) {
-      if (pathname !== '/dashboard/clinics/new') {
-        router.replace('/dashboard/clinics/new');
-      }
-      return;
+      router.replace('/signup')
+      return
     }
 
     const isSuperAdminOnlyRoute = superAdminOnlyPrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-    );
+    )
 
-    const isFrontDeskRoute = pathname === '/dashboard/front-desk' || pathname?.startsWith('/dashboard/front-desk/');
+    const isFrontDeskRoute =
+      pathname === '/dashboard/front-desk' || pathname?.startsWith('/dashboard/front-desk/')
 
     // SUPER_ADMIN and STAFF (custom roles) can access admin routes
     if (isSuperAdminOnlyRoute && user.role !== 'SUPER_ADMIN' && user.role !== 'STAFF') {
-      router.replace('/dashboard');
-      return;
+      router.replace('/dashboard')
+      return
     }
 
-    if (isFrontDeskRoute && user.role !== 'FRONT_DESK' && user.role !== 'SUPER_ADMIN' && user.role !== 'STAFF') {
-      router.replace('/dashboard');
-      return;
+    if (
+      isFrontDeskRoute &&
+      user.role !== 'FRONT_DESK' &&
+      user.role !== 'SUPER_ADMIN' &&
+      user.role !== 'STAFF'
+    ) {
+      router.replace('/dashboard')
+      return
     }
-  }, [isLoading, isAuthenticated, router, pathname, user]);
+  }, [isLoading, isAuthenticated, router, pathname, user])
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
+        <LoadingSkeleton variant="avatar" count={1} />
       </div>
-    );
+    )
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null
   }
 
-  if (user?.role === 'SUPER_ADMIN' && !user.clinicId && pathname !== '/dashboard/clinics/new') {
-    return null;
+  // Block rendering during the SUPER_ADMIN onboarding redirect
+  if (
+    user?.role === 'SUPER_ADMIN' &&
+    user.clinicId &&
+    !user.clinic?.tenant?.onboardingCompletedAt &&
+    pathname !== '/welcome' &&
+    !pathname?.startsWith('/welcome')
+  ) {
+    return null
   }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      <AppSidebar />
-      <div className="relative ml-[280px]">
-        <div className="border-b border-[#E5E7EB] bg-[#FAFAFA]/95 px-8 py-5 backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0D9488]">
-                Dashboard
-              </p>
-              <p className="mt-1 text-sm text-[#64748B]">
-                {user?.role === 'PATIENT' 
-                  ? 'Access your health records and appointments.' 
-                  : user?.role === 'PROVIDER'
-                  ? 'Manage your clinical day and patient records.'
-                  : 'Manage your clinic operations from one place.'}
-              </p>
-            </div>
-          </div>
-        </div>
-        <main className="min-h-[calc(100vh-5rem)]">{children}</main>
+      {/* Desktop fixed sidebar */}
+      <div className="hidden md:block">
+        <AppSidebar />
+      </div>
+
+      {/* Mobile drawer */}
+      <AppSidebarMobile open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+
+      <div className="relative md:ml-[280px]">
+        <TopBar
+          onOpenMobileNav={() => setMobileNavOpen(true)}
+          onRestartTour={() => startTour({ force: true })}
+        />
+        <main className="min-h-[calc(100vh-3.5rem)]">
+          <DashboardErrorBoundary>{children}</DashboardErrorBoundary>
+        </main>
       </div>
     </div>
-  );
+  )
 }

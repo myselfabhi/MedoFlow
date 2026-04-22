@@ -1,23 +1,30 @@
-import { Role } from '@prisma/client';
+import { Role, TenantStatus, TenantPlan } from '@prisma/client'
 
 declare global {
   namespace Express {
     interface Request {
       user?: {
-        id: string;
-        name: string;
-        email: string;
-        role: Role;
-        clinicId: string | null;
-        customRoleId: string | null;
-        customRoleName: string | null;
-        permissions: string[];
-        hasSeenPatientTour?: boolean;
-      };
-      clinicId?: string | null;
-      bypassClinicScope?: boolean;
+        id: string
+        name: string
+        email: string
+        role: Role
+        clinicId: string | null
+        customRoleId: string | null
+        customRoleName: string | null
+        permissions: string[]
+        hasSeenPatientTour?: boolean
+      }
+      clinicId?: string | null
+      /** Resolved from clinic → tenant; null for PLATFORM_ADMIN */
+      tenantId?: string | null
+      /** Tenant status/plan; used for feature-gating */
+      tenantContext?: {
+        status: TenantStatus
+        plan: TenantPlan
+      } | null
+      bypassClinicScope?: boolean
     }
   }
 }
 
-export {};
+export {}

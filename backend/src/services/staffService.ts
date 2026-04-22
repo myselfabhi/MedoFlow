@@ -1,11 +1,11 @@
-import bcrypt from 'bcryptjs';
-import prisma from '../config/prisma';
-import { ApiError } from '../types/errors';
-import * as passwordSetupService from './passwordSetupService';
-import * as emailService from './emailService';
-import * as auditService from './auditService';
+import * as argon2 from 'argon2'
+import prisma from '../config/prisma'
+import { ApiError } from '../types/errors'
+import * as passwordSetupService from './passwordSetupService'
+import * as emailService from './emailService'
+import * as auditService from './auditService'
 
-const PLACEHOLDER_PASSWORD = 'pending-setup';
+const PLACEHOLDER_PASSWORD = 'pending-setup'
 
 export const listFrontDeskStaff = async (clinicId: string) => {
   return prisma.user.findMany({
@@ -25,8 +25,8 @@ export const listFrontDeskStaff = async (clinicId: string) => {
       isActive: true,
       createdAt: true,
     },
-  });
-};
+  })
+}
 
 export const listStaff = async (clinicId: string) => {
   return prisma.user.findMany({
@@ -46,21 +46,21 @@ export const listStaff = async (clinicId: string) => {
       permissions: true,
       isActive: true,
       createdAt: true,
-      provider: { 
-        select: { 
+      provider: {
+        select: {
           id: true,
           disciplines: {
-            select: { discipline: { select: { name: true } } }
+            select: { discipline: { select: { name: true } } },
           },
           providerServices: {
             take: 3,
-            select: { service: { select: { name: true } } }
-          }
-        } 
+            select: { service: { select: { name: true } } },
+          },
+        },
       },
     },
-  });
-};
+  })
+}
 
 export const deactivateStaffUser = async (
   userId: string,
@@ -70,12 +70,12 @@ export const deactivateStaffUser = async (
   const userToDeactivate = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, clinicId: true, role: true },
-  });
+  })
 
   if (!userToDeactivate || userToDeactivate.clinicId !== clinicId) {
-    const err = new Error('User not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('User not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   // PRD: Protection against removing the last Super Admin
@@ -86,14 +86,14 @@ export const deactivateStaffUser = async (
         role: 'SUPER_ADMIN',
         isActive: true,
       },
-    });
+    })
 
     if (adminCount <= 1) {
       const err = new Error(
         'Cannot deactivate the last remaining Super Admin. Assign another Super Admin first.'
-      ) as ApiError;
-      err.statusCode = 400;
-      throw err;
+      ) as ApiError
+      err.statusCode = 400
+      throw err
     }
   }
 
@@ -107,7 +107,7 @@ export const deactivateStaffUser = async (
       role: true,
       isActive: true,
     },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -118,10 +118,10 @@ export const deactivateStaffUser = async (
     oldValue: true,
     newValue: false,
     performedById,
-  });
+  })
 
-  return updatedUser;
-};
+  return updatedUser
+}
 
 export const updateStaffUser = async (
   userId: string,
@@ -132,25 +132,23 @@ export const updateStaffUser = async (
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, clinicId: true, role: true, name: true },
-  });
+  })
 
   if (!user || user.clinicId !== clinicId) {
-    const err = new Error('User not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('User not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   // Prevent removing the last Super Admin
   if (user.role === 'SUPER_ADMIN' && data.role && data.role !== 'SUPER_ADMIN') {
     const adminCount = await prisma.user.count({
       where: { clinicId, role: 'SUPER_ADMIN', isActive: true },
-    });
+    })
     if (adminCount <= 1) {
-      const err = new Error(
-        'Cannot change role of the last remaining Super Admin.'
-      ) as ApiError;
-      err.statusCode = 400;
-      throw err;
+      const err = new Error('Cannot change role of the last remaining Super Admin.') as ApiError
+      err.statusCode = 400
+      throw err
     }
   }
 
@@ -158,16 +156,16 @@ export const updateStaffUser = async (
   if (data.customRoleId) {
     const customRole = await prisma.customRole.findUnique({
       where: { id: data.customRoleId },
-    });
+    })
     if (!customRole || customRole.clinicId !== clinicId) {
-      const err = new Error('Invalid custom role') as ApiError;
-      err.statusCode = 400;
-      throw err;
+      const err = new Error('Invalid custom role') as ApiError
+      err.statusCode = 400
+      throw err
     }
   }
 
   // Determine the system role to use
-  const systemRole = data.customRoleId ? 'STAFF' : (data.role as any) ?? user.role;
+  const systemRole = data.customRoleId ? 'STAFF' : ((data.role as any) ?? user.role)
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -177,12 +175,17 @@ export const updateStaffUser = async (
       ...(data.permissions !== undefined ? { permissions: data.permissions as any } : {}),
     },
     select: {
-      id: true, name: true, email: true, role: true,
+      id: true,
+      name: true,
+      email: true,
+      role: true,
       customRoleId: true,
       customRole: { select: { id: true, name: true, permissions: true } },
-      permissions: true, isActive: true, createdAt: true,
+      permissions: true,
+      isActive: true,
+      createdAt: true,
     },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -193,10 +196,10 @@ export const updateStaffUser = async (
     oldValue: user.role,
     newValue: data.customRoleId ?? data.role ?? user.role,
     performedById,
-  });
+  })
 
-  return updated;
-};
+  return updated
+}
 
 export const linkAdminAsProvider = async (
   userId: string,
@@ -205,24 +208,30 @@ export const linkAdminAsProvider = async (
 ) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, clinicId: true, role: true, name: true, provider: { select: { id: true } } },
-  });
+    select: {
+      id: true,
+      clinicId: true,
+      role: true,
+      name: true,
+      provider: { select: { id: true } },
+    },
+  })
 
   if (!user || user.clinicId !== clinicId) {
-    const err = new Error('User not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('User not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   if (user.provider) {
     // Already has a provider profile — just return it
-    return user.provider;
+    return user.provider
   }
 
   // Split name into first/last
-  const nameParts = (user.name ?? '').trim().split(' ');
-  const firstName = nameParts[0] ?? user.name;
-  const lastName = nameParts.slice(1).join(' ') || firstName;
+  const nameParts = (user.name ?? '').trim().split(' ')
+  const firstName = nameParts[0] ?? user.name
+  const lastName = nameParts.slice(1).join(' ') || firstName
 
   const provider = await prisma.provider.create({
     data: {
@@ -232,7 +241,7 @@ export const linkAdminAsProvider = async (
       userId,
     },
     select: { id: true, firstName: true, lastName: true, userId: true },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -243,10 +252,10 @@ export const linkAdminAsProvider = async (
     oldValue: null,
     newValue: userId,
     performedById,
-  });
+  })
 
-  return provider;
-};
+  return provider
+}
 
 export const provisionFrontDeskUser = async (
   data: { name: string; email: string; role?: string; permissions?: object; customRoleId?: string },
@@ -254,57 +263,59 @@ export const provisionFrontDeskUser = async (
   performedById: string
 ) => {
   if (!process.env.SMTP_HOST && process.env.NODE_ENV === 'production') {
-    const err = new Error(
-      'SMTP is required to invite staff in production'
-    ) as ApiError;
-    err.statusCode = 500;
-    throw err;
+    const err = new Error('SMTP is required to invite staff in production') as ApiError
+    err.statusCode = 500
+    throw err
   }
 
-  const email = data.email.trim().toLowerCase();
+  const email = data.email.trim().toLowerCase()
   const existingUser = await prisma.user.findUnique({
     where: { email },
     select: { id: true },
-  });
+  })
 
   if (existingUser) {
-    const err = new Error('An account with this email already exists') as ApiError;
-    err.statusCode = 409;
-    throw err;
+    const err = new Error('An account with this email already exists') as ApiError
+    err.statusCode = 409
+    throw err
   }
 
   // Determine role — if customRoleId is provided, use STAFF; otherwise fallback to legacy roles
-  let assignedRole: any;
-  let customRoleId: string | null = null;
-  let roleLabelForEmail = 'Staff';
+  let assignedRole: any
+  let customRoleId: string | null = null
+  let roleLabelForEmail = 'Staff'
 
   if (data.customRoleId) {
     const customRole = await prisma.customRole.findUnique({
       where: { id: data.customRoleId },
-    });
+    })
     if (!customRole || customRole.clinicId !== clinicId) {
-      const err = new Error('Invalid custom role') as ApiError;
-      err.statusCode = 400;
-      throw err;
+      const err = new Error('Invalid custom role') as ApiError
+      err.statusCode = 400
+      throw err
     }
-    assignedRole = 'STAFF';
-    customRoleId = data.customRoleId;
-    roleLabelForEmail = customRole.name;
+    assignedRole = 'STAFF'
+    customRoleId = data.customRoleId
+    roleLabelForEmail = customRole.name
   } else {
-    const allowedNonProviderRoles = ['FRONT_DESK', 'ACCOUNTING', 'MARKETING'];
-    assignedRole = data.role && allowedNonProviderRoles.includes(data.role)
-      ? data.role
-      : 'FRONT_DESK';
+    const allowedNonProviderRoles = ['FRONT_DESK', 'ACCOUNTING', 'MARKETING']
+    assignedRole =
+      data.role && allowedNonProviderRoles.includes(data.role) ? data.role : 'FRONT_DESK'
 
     const roleLabels: Record<string, string> = {
       FRONT_DESK: 'Front Desk',
       ACCOUNTING: 'Accounting',
       MARKETING: 'Marketing',
-    };
-    roleLabelForEmail = roleLabels[assignedRole] ?? 'Staff';
+    }
+    roleLabelForEmail = roleLabels[assignedRole] ?? 'Staff'
   }
 
-  const password = await bcrypt.hash(PLACEHOLDER_PASSWORD, 12);
+  const password = await argon2.hash(PLACEHOLDER_PASSWORD, {
+    type: argon2.argon2id,
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  })
   const user = await prisma.user.create({
     data: {
       name: data.name.trim(),
@@ -326,22 +337,22 @@ export const provisionFrontDeskUser = async (
       isActive: true,
       createdAt: true,
     },
-  });
+  })
 
-  const token = await passwordSetupService.createPasswordSetupToken(user.id);
+  const token = await passwordSetupService.createPasswordSetupToken(user.id)
   const frontendUrl = (
     process.env.FRONTEND_URL ||
     process.env.APP_URL ||
     'http://localhost:3000'
-  ).replace(/\/$/, '');
-  const setupLink = `${frontendUrl}/set-password?token=${token}`;
+  ).replace(/\/$/, '')
+  const setupLink = `${frontendUrl}/set-password?token=${token}`
 
   await emailService.sendStaffInviteEmail({
     to: email,
     name: user.name,
     setupLink,
     roleLabel: roleLabelForEmail,
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -352,7 +363,7 @@ export const provisionFrontDeskUser = async (
     oldValue: null,
     newValue: customRoleId ?? user.role,
     performedById,
-  });
+  })
 
-  return user;
-};
+  return user
+}

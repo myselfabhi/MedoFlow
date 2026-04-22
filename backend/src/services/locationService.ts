@@ -1,13 +1,20 @@
-import prisma from '../config/prisma';
-import * as auditService from './auditService';
+import prisma from '../config/prisma'
+import * as auditService from './auditService'
 
 export interface CreateLocationData {
-  name: string;
-  address?: string;
-  timezone: string;
+  name: string
+  address?: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+  phone?: string
+  timezone: string
 }
 
-type ClinicWhere = { clinicId?: string } | Record<string, never>;
+type ClinicWhere = { clinicId?: string } | Record<string, never>
 
 export const createLocation = async (
   data: CreateLocationData,
@@ -19,9 +26,16 @@ export const createLocation = async (
       clinicId,
       name: data.name,
       address: data.address,
+      addressLine1: data.addressLine1,
+      addressLine2: data.addressLine2,
+      city: data.city,
+      state: data.state,
+      postalCode: data.postalCode,
+      country: data.country,
+      phone: data.phone,
       timezone: data.timezone,
     },
-  });
+  })
 
   await auditService.logAudit({
     clinicId,
@@ -33,15 +47,16 @@ export const createLocation = async (
       timezone: location.timezone,
     },
     performedById,
-  });
+  })
 
-  return location;
-};
+  return location
+}
 
 export const getLocations = async (where: ClinicWhere) => {
-  const whereClause = Object.keys(where).length === 0 ? { isActive: true } : { ...where, isActive: true };
+  const whereClause =
+    Object.keys(where).length === 0 ? { isActive: true } : { ...where, isActive: true }
   return prisma.location.findMany({
     where: whereClause as { isActive: boolean; clinicId?: string },
     orderBy: { name: 'asc' },
-  });
-};
+  })
+}
