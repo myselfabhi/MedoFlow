@@ -468,7 +468,7 @@ export default function ConsultationRoomPage() {
                                     <div className="mt-4 p-3 bg-white rounded-lg border border-amber-200">
                                         <p className="text-xs text-slate-500 mb-1">Patient Join Link:</p>
                                         <code className="text-xs text-slate-700 break-all select-all">
-                                            {typeof window !== 'undefined' ? `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}` : ''}
+                                            {typeof window !== 'undefined' ? `${window.location.origin}/consultation/${session.joinToken}` : ''}
                                         </code>
                                     </div>
                                 )}
@@ -748,7 +748,7 @@ export default function ConsultationRoomPage() {
                                 <p className="text-xs text-slate-500 mb-2">Share this link with the patient to join the consultation:</p>
                                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                                     <code className="text-xs text-slate-700 break-all select-all">
-                                        {typeof window !== 'undefined' ? `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}` : ''}
+                                        {typeof window !== 'undefined' ? `${window.location.origin}/consultation/${session.joinToken}` : ''}
                                     </code>
                                 </div>
                                 <AppButton
@@ -756,7 +756,7 @@ export default function ConsultationRoomPage() {
                                     size="sm"
                                     className="mt-3 w-full"
                                     onClick={() => {
-                                        const link = `${window.location.origin}/dashboard/patient/consultation/${session.joinToken}`;
+                                        const link = `${window.location.origin}/consultation/${session.joinToken}`;
                                         navigator.clipboard.writeText(link);
                                         toast.success('Link copied to clipboard');
                                     }}

@@ -12,5 +12,6 @@ router.post('/set-password', authController.setPassword);
 router.post('/refresh-token', authController.refreshToken);
 router.post('/logout', authController.logout);
 router.get('/me', protect, authController.me);
+router.post('/patient-tour-seen', protect, authController.markPatientTourSeen);
 
 export default router;

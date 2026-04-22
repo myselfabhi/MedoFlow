@@ -9,6 +9,7 @@ export interface User {
   customRoleId?: string | null;
   customRoleName?: string | null;
   permissions?: string[];
+  hasSeenPatientTour?: boolean;
 }
 
 export interface ApiResponse<T> {

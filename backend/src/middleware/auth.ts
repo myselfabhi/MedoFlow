@@ -32,6 +32,7 @@ export const protect = async (
         clinicId: true,
         isActive: true,
         customRoleId: true,
+        hasSeenPatientTour: true,
         customRole: {
           select: {
             id: true,
@@ -71,6 +72,7 @@ export const protect = async (
       customRoleId: user.customRoleId,
       customRoleName: user.customRole?.name ?? null,
       permissions: effectivePermissions,
+      hasSeenPatientTour: user.hasSeenPatientTour,
     };
     next();
   } catch (err) {
@@ -178,6 +180,7 @@ export const optionalProtect = async (
         clinicId: true,
         isActive: true,
         customRoleId: true,
+        hasSeenPatientTour: true,
         customRole: {
           select: {
             id: true,
@@ -205,6 +208,7 @@ export const optionalProtect = async (
         customRoleId: user.customRoleId,
         customRoleName: user.customRole?.name ?? null,
         permissions: effectivePermissions,
+        hasSeenPatientTour: user.hasSeenPatientTour,
       };
     }
     next();

@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, landingForRole } from '@/contexts/AuthContext';
 import {
   AppCard,
   AppCardContent,
@@ -26,14 +26,14 @@ type LoginFormData = z.infer<typeof loginSchema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get('returnUrl') || '/dashboard';
-  const { login, isAuthenticated } = useAuth();
+  const returnUrlParam = searchParams.get('returnUrl');
+  const { login, isAuthenticated, user } = useAuth();
 
   React.useEffect(() => {
-    if (isAuthenticated) {
-      router.replace(returnUrl);
+    if (isAuthenticated && user) {
+      router.replace(returnUrlParam || landingForRole(user));
     }
-  }, [isAuthenticated, returnUrl, router]);
+  }, [isAuthenticated, user, returnUrlParam, router]);
   
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -50,7 +50,8 @@ function LoginForm() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await login(data.email, data.password);
+      const signedInUser = await login(data.email, data.password);
+      router.replace(returnUrlParam || landingForRole(signedInUser));
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message

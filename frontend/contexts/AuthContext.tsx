@@ -9,9 +9,10 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   getCurrentUser: () => Promise<User | null>;
+  markPatientTourSeen: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +22,10 @@ const PROTECTED_ROUTES = ['/dashboard'];
 function isProtectedRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+export function landingForRole(user: Pick<User, 'role'>): string {
+  return user.role === 'PATIENT' ? '/' : '/dashboard';
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -55,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setAccessToken(payload.accessToken);
     setUser(payload.user);
+    return payload.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -67,9 +73,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  const markPatientTourSeen = useCallback(async () => {
+    try {
+      await api.post('/auth/patient-tour-seen');
+      setUser((prev) => (prev ? { ...prev, hasSeenPatientTour: true } : prev));
+    } catch (err) {
+      console.error('Failed to mark tour as seen', err);
+    }
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
-      // If we already have a user in state, just finish loading
       if (user) {
         setIsLoading(false);
         return;
@@ -77,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const restoredUser = await getCurrentUser();
-        // If on a protected route and no user found, redirect
         if (!restoredUser && isProtectedRoute(pathname)) {
           router.push('/login');
         }
@@ -92,8 +105,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initAuth();
-    // We want to run this when the app mounts and when pathname changes 
-    // to enforce protection, but getCurrentUser is memoized.
   }, [pathname, getCurrentUser, router]);
 
   const value: AuthContextType = {
@@ -103,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     getCurrentUser,
+    markPatientTourSeen,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

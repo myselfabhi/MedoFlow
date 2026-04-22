@@ -43,7 +43,7 @@ export default function CheckoutPage() {
       setIsDemoSubmitting(true);
       await api.post('/carts/checkout-demo');
       toast.success('Demo Payment successful!');
-      router.push('/dashboard/patient/billing');
+      router.push('/?view=billing');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Demo Payment failed');
     } finally {
@@ -170,7 +170,7 @@ export default function CheckoutPage() {
                         <StripePaymentForm 
                           clientSecret={clientSecret} 
                           buttonLabel={`Pay $${subtotal.toFixed(2)}`}
-                          onSuccess={() => router.push('/dashboard/patient/appointments')}
+                          onSuccess={() => router.push('/?view=appointments')}
                         />
                       </Elements>
                     </div>

@@ -271,7 +271,7 @@ export const handleCartCheckoutPaymentIntentSucceeded = async (
     to: invoice.patient.email,
     patientName: invoice.patient.name,
     totalAmount: `$${Number(invoice.totalAmount).toFixed(2)}`,
-    invoiceUrl: `${process.env.FRONTEND_URL}/dashboard/patient/invoices/${invoice.id}`,
+    invoiceUrl: `${process.env.FRONTEND_URL}/?view=billing&invoice=${invoice.id}`,
   });
 };
 

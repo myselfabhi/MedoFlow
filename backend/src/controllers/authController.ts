@@ -111,8 +111,24 @@ export const login = asyncHandler(
         customRoleId: user.customRoleId,
         customRoleName: user.customRole?.name ?? null,
         permissions,
+        hasSeenPatientTour: user.hasSeenPatientTour,
       },
     });
+  }
+);
+
+export const markPatientTourSeen = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      const err = new Error('Authentication required') as ApiError;
+      err.statusCode = 401;
+      throw err;
+    }
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { hasSeenPatientTour: true },
+    });
+    successResponse(res, 200, 'Tour marked as seen');
   }
 );
 

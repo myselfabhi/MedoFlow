@@ -37,32 +37,6 @@ interface SidebarSection {
   items: SidebarItem[];
 }
 
-const patientSections: SidebarSection[] = [
-  {
-    title: 'My Care',
-    items: [
-      { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-      { href: '/dashboard/patient/appointments', label: 'Visits', icon: Calendar },
-      { href: '/dashboard/patient/billing', label: 'Billing & History', icon: Receipt },
-    ]
-  },
-  {
-    title: 'Actions',
-    items: [
-      { href: '/store', label: 'Book Appointment', icon: CalendarPlus },
-    ]
-  },
-  {
-    title: 'Wellness',
-    items: [
-      { href: '/dashboard/memberships', label: 'Memberships', icon: Tags },
-      { href: '/store', label: 'Clinic Store', icon: ShoppingCart },
-      { href: '/store?tab=products', label: 'Products', icon: ShoppingCart },
-      { href: '/store?tab=packages', label: 'Packages', icon: Package },
-    ]
-  }
-];
-
 const providerSections: SidebarSection[] = [
   {
     title: 'Clinical',
@@ -171,8 +145,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   
-  const sections = user?.role === 'PATIENT' ? patientSections
-    : user?.role === 'PROVIDER' ? providerSections
+  const sections = user?.role === 'PROVIDER' ? providerSections
     : (user?.role === 'SUPER_ADMIN' || user?.role === 'STAFF') ? superAdminSections
     : user?.role === 'FRONT_DESK' ? frontDeskSections
     : [];

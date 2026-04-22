@@ -157,7 +157,7 @@ export default function AppointmentsPage() {
                   render: (apt) => (
                     <div className="flex justify-end pr-4">
                       <AppButton variant="ghost" size="sm" className="rounded-full font-bold text-primary-600" asChild>
-                        <Link href={isPatient ? `/dashboard/patient/appointments/${apt.id}` : `/dashboard/provider/appointments/${apt.id}`}>
+                        <Link href={`/dashboard/provider/appointments/${apt.id}`}>
                           View Details <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </AppButton>

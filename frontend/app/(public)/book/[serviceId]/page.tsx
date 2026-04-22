@@ -240,7 +240,7 @@ function BookingPageContent() {
         router.push(`/payment/${appointment.id}?clientSecret=${clientSecret}`);
       } else {
         toast.success('Appointment booked successfully!');
-        router.push('/dashboard/patient/appointments');
+        router.push('/?view=appointments');
       }
     } catch (err) {
       toast.error('Booking failed. Please try again.');

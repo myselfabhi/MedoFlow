@@ -12,6 +12,7 @@ declare global {
         customRoleId: string | null;
         customRoleName: string | null;
         permissions: string[];
+        hasSeenPatientTour?: boolean;
       };
       clinicId?: string | null;
       bypassClinicScope?: boolean;
