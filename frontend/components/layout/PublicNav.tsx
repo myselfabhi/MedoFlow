@@ -33,12 +33,6 @@ import { useCartModal } from '@/components/store/CartModal'
 import { useBookingModal } from '@/components/booking/BookingModal'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 
-const SECTION_LINKS = [
-  { href: '/#features', label: 'Product' },
-  { href: '/#how-it-works', label: 'How it works' },
-  { href: '/#pricing', label: 'Pricing' },
-]
-
 export function PublicNav() {
   const pathname = usePathname()
   const isLanding = pathname === '/'
@@ -101,14 +95,8 @@ export function PublicNav() {
             <BrandLogo size="md" tone={translucent ? 'light' : 'dark'} />
           </Link>
           <nav className="hidden items-center gap-7 lg:flex">
-            {/* Marketing links only surface for signed-out visitors on the
-                landing page — patients don't need them in their day-to-day. */}
-            {!isAuthenticated &&
-              SECTION_LINKS.map((l) => (
-                <Link key={l.href} href={l.href} className={linkCls}>
-                  {l.label}
-                </Link>
-              ))}
+            {/* Guests see no section links — only the Log in CTA on the right.
+                Logged-in patients get Store. */}
             {isAuthenticated && isPatient && (
               <Link href="/store" className={linkCls}>
                 Store
