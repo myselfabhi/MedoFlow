@@ -38,10 +38,11 @@ function SetPasswordForm() {
     handleSubmit,
     formState: { errors },
   } = useForm<SetPasswordFormData>({
-    // Cast to any: zod's .refine() returns ZodEffects which fights the
-    // resolver's generic signature depending on the @hookform/resolvers
-    // patch version. Runtime behavior is unaffected.
-    resolver: zodResolver(setPasswordSchema) as any,
+    // Cast the schema through any: zod's .refine() returns ZodEffects which
+    // zodResolver's generic rejects in this patch version. Runtime is
+    // unaffected — resolver handles ZodEffects correctly at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(setPasswordSchema as any),
   })
 
   const onSubmit = async (data: SetPasswordFormData) => {
