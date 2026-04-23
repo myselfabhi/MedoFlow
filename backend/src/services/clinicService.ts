@@ -1,61 +1,60 @@
-import prisma from '../config/prisma';
-import { Clinic } from '@prisma/client';
-import { ApiError } from '../types/errors';
-import * as auditService from './auditService';
+import prisma from '../config/prisma'
+import { Clinic } from '@prisma/client'
+import { ApiError } from '../types/errors'
+import * as auditService from './auditService'
 
 export interface CreateClinicData {
-  name: string;
-  email: string;
-  subscriptionPlan?: string;
+  name: string
+  email: string
+  subscriptionPlan?: string
 }
 
 export interface UpdateClinicData {
-  name?: string;
-  email?: string;
-  subscriptionPlan?: string;
+  name?: string
+  email?: string
+  subscriptionPlan?: string
 }
 
 export interface UpsertLaunchLocationData {
-  id?: string;
-  name: string;
-  address?: string;
-  timezone: string;
+  id?: string
+  name: string
+  address?: string
+  timezone: string
 }
 
-export const createClinic = async (
-  data: CreateClinicData
-): Promise<Clinic> => {
+export const createClinic = async (data: CreateClinicData): Promise<Clinic> => {
   return prisma.clinic.create({
     data: {
       name: data.name,
       email: data.email,
       subscriptionPlan: data.subscriptionPlan || 'free',
+      tenantId: 'tenant_default',
     },
-  });
-};
+  })
+}
 
 export const getClinicById = async (id: string) => {
   return prisma.clinic.findUnique({
     where: { id },
-  });
-};
+  })
+}
 
 export const clinicExists = async (id: string): Promise<boolean> => {
   const clinic = await prisma.clinic.findUnique({
     where: { id },
     select: { id: true },
-  });
-  return !!clinic;
-};
+  })
+  return !!clinic
+}
 
 export const getClinicForUser = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { clinicId: true, role: true },
-  });
+  })
 
   if (!user?.clinicId) {
-    return null;
+    return null
   }
 
   const clinic = await prisma.clinic.findUnique({
@@ -66,10 +65,10 @@ export const getClinicForUser = async (userId: string) => {
         orderBy: { createdAt: 'asc' },
       },
     },
-  });
+  })
 
   if (!clinic) {
-    return null;
+    return null
   }
 
   const [providerCount, staffCount] = await Promise.all([
@@ -83,7 +82,7 @@ export const getClinicForUser = async (userId: string) => {
         role: { in: ['SUPER_ADMIN', 'FRONT_DESK'] },
       },
     }),
-  ]);
+  ])
 
   return {
     ...clinic,
@@ -93,8 +92,8 @@ export const getClinicForUser = async (userId: string) => {
       staffCount,
       locationCount: clinic.locations.length,
     },
-  };
-};
+  }
+}
 
 export const setupClinicForSuperAdmin = async (
   userId: string,
@@ -103,18 +102,18 @@ export const setupClinicForSuperAdmin = async (
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, clinicId: true, role: true },
-  });
+  })
 
   if (!user || user.role !== 'SUPER_ADMIN') {
-    const err = new Error('Only super admins can set up a clinic') as ApiError;
-    err.statusCode = 403;
-    throw err;
+    const err = new Error('Only super admins can set up a clinic') as ApiError
+    err.statusCode = 403
+    throw err
   }
 
   if (user.clinicId) {
-    const err = new Error('Clinic setup has already been completed') as ApiError;
-    err.statusCode = 400;
-    throw err;
+    const err = new Error('Clinic setup has already been completed') as ApiError
+    err.statusCode = 400
+    throw err
   }
 
   const clinic = await prisma.$transaction(async (tx) => {
@@ -123,13 +122,14 @@ export const setupClinicForSuperAdmin = async (
         name: data.name.trim(),
         email: data.email.trim().toLowerCase(),
         subscriptionPlan: data.subscriptionPlan || 'free',
+        tenantId: 'tenant_default',
       },
-    });
+    })
 
     await tx.user.update({
       where: { id: userId },
       data: { clinicId: createdClinic.id },
-    });
+    })
 
     await tx.location.create({
       data: {
@@ -138,10 +138,10 @@ export const setupClinicForSuperAdmin = async (
         address: data.location.address?.trim() || null,
         timezone: data.location.timezone,
       },
-    });
+    })
 
-    return createdClinic;
-  });
+    return createdClinic
+  })
 
   await auditService.logAudit({
     clinicId: clinic.id,
@@ -153,10 +153,10 @@ export const setupClinicForSuperAdmin = async (
       email: clinic.email,
     },
     performedById: userId,
-  });
+  })
 
-  return getClinicForUser(userId);
-};
+  return getClinicForUser(userId)
+}
 
 export const updateClinic = async (
   clinicId: string,
@@ -165,12 +165,12 @@ export const updateClinic = async (
 ) => {
   const clinic = await prisma.clinic.findUnique({
     where: { id: clinicId },
-  });
+  })
 
   if (!clinic) {
-    const err = new Error('Clinic not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Clinic not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   const updated = await prisma.clinic.update({
@@ -182,9 +182,9 @@ export const updateClinic = async (
         subscriptionPlan: data.subscriptionPlan,
       }),
     },
-  });
+  })
 
-  const auditFields: Array<keyof UpdateClinicData> = ['name', 'email', 'subscriptionPlan'];
+  const auditFields: Array<keyof UpdateClinicData> = ['name', 'email', 'subscriptionPlan']
   for (const field of auditFields) {
     if (data[field] !== undefined && clinic[field] !== updated[field]) {
       await auditService.logAudit({
@@ -196,12 +196,12 @@ export const updateClinic = async (
         oldValue: clinic[field] as string | null,
         newValue: updated[field] as string | null,
         performedById,
-      });
+      })
     }
   }
 
-  return updated;
-};
+  return updated
+}
 
 export const upsertLaunchLocation = async (
   clinicId: string,
@@ -216,18 +216,18 @@ export const upsertLaunchLocation = async (
         orderBy: { createdAt: 'asc' },
       },
     },
-  });
+  })
 
   if (!clinic) {
-    const err = new Error('Clinic not found') as ApiError;
-    err.statusCode = 404;
-    throw err;
+    const err = new Error('Clinic not found') as ApiError
+    err.statusCode = 404
+    throw err
   }
 
   const existingLocation =
     (data.id
       ? clinic.locations.find((location) => location.id === data.id)
-      : clinic.locations[0]) ?? null;
+      : clinic.locations[0]) ?? null
 
   if (!existingLocation) {
     const created = await prisma.location.create({
@@ -237,7 +237,7 @@ export const upsertLaunchLocation = async (
         address: data.address?.trim() || null,
         timezone: data.timezone,
       },
-    });
+    })
 
     await auditService.logAudit({
       clinicId,
@@ -249,9 +249,9 @@ export const upsertLaunchLocation = async (
         timezone: created.timezone,
       },
       performedById,
-    });
+    })
 
-    return created;
+    return created
   }
 
   const updated = await prisma.location.update({
@@ -261,9 +261,9 @@ export const upsertLaunchLocation = async (
       address: data.address?.trim() || null,
       timezone: data.timezone,
     },
-  });
+  })
 
-  const auditFields: Array<keyof UpsertLaunchLocationData> = ['name', 'address', 'timezone'];
+  const auditFields: Array<keyof UpsertLaunchLocationData> = ['name', 'address', 'timezone']
   for (const field of auditFields) {
     if (data[field] !== undefined && existingLocation[field] !== updated[field]) {
       await auditService.logAudit({
@@ -275,9 +275,9 @@ export const upsertLaunchLocation = async (
         oldValue: (existingLocation as Record<string, unknown>)[field] as string | null,
         newValue: (updated as Record<string, unknown>)[field] as string | null,
         performedById,
-      });
+      })
     }
   }
 
-  return updated;
-};
+  return updated
+}

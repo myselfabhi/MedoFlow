@@ -1,14 +1,14 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import React, { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Plus, Trash2, GripVertical } from 'lucide-react'
 
-let _idCounter = 0;
-const genId = () => `field_${Date.now()}_${++_idCounter}`;
+let _idCounter = 0
+const genId = () => `field_${Date.now()}_${++_idCounter}`
 import {
   listTemplates,
   createTemplate,
@@ -18,11 +18,11 @@ import {
   type FormFieldDefinition,
   type FormScope,
   type CreateTemplatePayload,
-} from '@/lib/formsApi';
-import { getDisciplines } from '@/lib/disciplineApi';
-import { getDashboardServices } from '@/lib/serviceApi';
-import { useAppToast } from '@/hooks/useAppToast';
-import { useSystemModal } from '@/hooks/useSystemModal';
+} from '@/lib/formsApi'
+import { getDisciplines } from '@/lib/disciplineApi'
+import { getDashboardServices } from '@/lib/serviceApi'
+import { useAppToast } from '@/hooks/useAppToast'
+import { useSystemModal } from '@/hooks/useSystemModal'
 import {
   AppCard,
   AppCardHeader,
@@ -33,23 +33,18 @@ import {
   AppEmptyState,
   AppBadge,
   AppTable,
-} from '@/components/ui-system';
-import { PageContainer } from '@/components/layout';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui-system'
+import { PageContainer } from '@/components/layout'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // ── Field type options ─────────────────────────────────────────────────────────
 
@@ -59,9 +54,9 @@ const FIELD_TYPES = [
   { value: 'number', label: 'Number' },
   { value: 'checkbox', label: 'Checkbox' },
   { value: 'select', label: 'Dropdown' },
-] as const;
+] as const
 
-type FieldType = FormFieldDefinition['type'];
+type FieldType = FormFieldDefinition['type']
 
 // ── Field editor row ───────────────────────────────────────────────────────────
 
@@ -71,23 +66,23 @@ function FieldRow({
   onChange,
   onRemove,
 }: {
-  field: FormFieldDefinition;
-  index: number;
-  onChange: (updated: FormFieldDefinition) => void;
-  onRemove: () => void;
+  field: FormFieldDefinition
+  index: number
+  onChange: (updated: FormFieldDefinition) => void
+  onRemove: () => void
 }) {
   const [optionsText, setOptionsText] = useState(
     field.options?.map((o) => o.label).join('\n') ?? ''
-  );
+  )
 
   const handleOptionsBlur = () => {
     const options = optionsText
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
-      .map((line) => ({ value: line.toLowerCase().replace(/\s+/g, '_'), label: line }));
-    onChange({ ...field, options });
-  };
+      .map((line) => ({ value: line.toLowerCase().replace(/\s+/g, '_'), label: line }))
+    onChange({ ...field, options })
+  }
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -96,9 +91,7 @@ function FieldRow({
         <div className="flex-1 space-y-3">
           <div className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[180px]">
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Field label
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Field label</label>
               <AppInput
                 value={field.label}
                 onChange={(e) => onChange({ ...field, label: e.target.value })}
@@ -106,13 +99,15 @@ function FieldRow({
               />
             </div>
             <div className="w-40">
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Type
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
               <Select
                 value={field.type}
                 onValueChange={(val) =>
-                  onChange({ ...field, type: val as FieldType, options: val === 'select' ? [] : undefined })
+                  onChange({
+                    ...field,
+                    type: val as FieldType,
+                    options: val === 'select' ? [] : undefined,
+                  })
                 }
               >
                 <SelectTrigger className="h-9">
@@ -131,9 +126,7 @@ function FieldRow({
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
                 <Checkbox
                   checked={field.required ?? false}
-                  onCheckedChange={(checked) =>
-                    onChange({ ...field, required: checked === true })
-                  }
+                  onCheckedChange={(checked) => onChange({ ...field, required: checked === true })}
                 />
                 Required
               </label>
@@ -141,9 +134,7 @@ function FieldRow({
           </div>
           {field.type !== 'checkbox' && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Placeholder
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Placeholder</label>
               <AppInput
                 value={field.placeholder ?? ''}
                 onChange={(e) => onChange({ ...field, placeholder: e.target.value })}
@@ -176,7 +167,7 @@ function FieldRow({
         </button>
       </div>
     </div>
-  );
+  )
 }
 
 // ── Template form schema ───────────────────────────────────────────────────────
@@ -187,9 +178,9 @@ const templateSchema = z.object({
   scope: z.enum(['CLINIC', 'DISCIPLINE', 'SERVICE']),
   disciplineId: z.string().optional(),
   serviceId: z.string().optional(),
-});
+})
 
-type TemplateFormData = z.infer<typeof templateSchema>;
+type TemplateFormData = z.infer<typeof templateSchema>
 
 // ── Template dialog ────────────────────────────────────────────────────────────
 
@@ -198,26 +189,26 @@ function TemplateDialog({
   onOpenChange,
   editing,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editing: FormTemplate | null;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  editing: FormTemplate | null
 }) {
-  const queryClient = useQueryClient();
-  const toast = useAppToast();
+  const queryClient = useQueryClient()
+  const toast = useAppToast()
 
-  const [fields, setFields] = useState<FormFieldDefinition[]>(editing?.fields ?? []);
+  const [fields, setFields] = useState<FormFieldDefinition[]>(editing?.fields ?? [])
 
   const { data: disciplines = [] } = useQuery({
     queryKey: ['disciplines'],
     queryFn: getDisciplines,
     enabled: open,
-  });
+  })
 
   const { data: services = [] } = useQuery({
     queryKey: ['services'],
     queryFn: getDashboardServices,
     enabled: open,
-  });
+  })
 
   const {
     register,
@@ -235,9 +226,9 @@ function TemplateDialog({
       disciplineId: editing?.discipline?.id ?? '',
       serviceId: editing?.service?.id ?? '',
     },
-  });
+  })
 
-  const scope = watch('scope');
+  const scope = watch('scope')
 
   // Reset form + fields when dialog opens/closes or editing target changes
   React.useEffect(() => {
@@ -248,26 +239,26 @@ function TemplateDialog({
         scope: (editing?.scope as FormScope) ?? 'CLINIC',
         disciplineId: editing?.discipline?.id ?? '',
         serviceId: editing?.service?.id ?? '',
-      });
-      setFields(editing?.fields ?? []);
+      })
+      setFields(editing?.fields ?? [])
     }
-  }, [open, editing, reset]);
+  }, [open, editing, reset])
 
   const saveMutation = useMutation({
     mutationFn: (payload: CreateTemplatePayload) =>
       editing ? updateTemplate(editing.id, payload) : createTemplate(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formTemplates'] });
-      onOpenChange(false);
-      toast.success(editing ? 'Template updated' : 'Template created');
+      queryClient.invalidateQueries({ queryKey: ['formTemplates'] })
+      onOpenChange(false)
+      toast.success(editing ? 'Template updated' : 'Template created')
     },
     onError: () => toast.error('Failed to save template'),
-  });
+  })
 
   const onSubmit = (data: TemplateFormData) => {
     if (fields.length === 0) {
-      toast.error('Add at least one field');
-      return;
+      toast.error('Add at least one field')
+      return
     }
     const payload: CreateTemplatePayload = {
       name: data.name,
@@ -277,27 +268,22 @@ function TemplateDialog({
       ...(data.scope === 'DISCIPLINE' && data.disciplineId
         ? { disciplineId: data.disciplineId }
         : {}),
-      ...(data.scope === 'SERVICE' && data.serviceId
-        ? { serviceId: data.serviceId }
-        : {}),
-    };
-    saveMutation.mutate(payload);
-  };
+      ...(data.scope === 'SERVICE' && data.serviceId ? { serviceId: data.serviceId } : {}),
+    }
+    saveMutation.mutate(payload)
+  }
 
   const addField = () => {
-    setFields((prev) => [
-      ...prev,
-      { id: genId(), type: 'text', label: '', required: false },
-    ]);
-  };
+    setFields((prev) => [...prev, { id: genId(), type: 'text', label: '', required: false }])
+  }
 
   const updateField = (index: number, updated: FormFieldDefinition) => {
-    setFields((prev) => prev.map((f, i) => (i === index ? updated : f)));
-  };
+    setFields((prev) => prev.map((f, i) => (i === index ? updated : f)))
+  }
 
   const removeField = (index: number) => {
-    setFields((prev) => prev.filter((_, i) => i !== index));
-  };
+    setFields((prev) => prev.filter((_, i) => i !== index))
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -311,9 +297,7 @@ function TemplateDialog({
           <div>
             <label className="block text-sm font-medium text-slate-700">Name</label>
             <AppInput className="mt-1" {...register('name')} />
-            {errors.name && (
-              <p className="mt-1 text-sm text-danger">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="mt-1 text-sm text-danger">{errors.name.message}</p>}
           </div>
 
           {/* Description */}
@@ -406,8 +390,7 @@ function TemplateDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-slate-700">
-                Fields{' '}
-                <span className="font-normal text-slate-400">({fields.length})</span>
+                Fields <span className="font-normal text-slate-400">({fields.length})</span>
               </label>
               <AppButton type="button" size="sm" variant="outline" onClick={addField}>
                 <Plus className="h-3.5 w-3.5" />
@@ -435,11 +418,7 @@ function TemplateDialog({
 
           {/* Actions */}
           <div className="flex justify-end gap-2 border-t pt-4">
-            <AppButton
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
+            <AppButton type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </AppButton>
             <AppButton type="submit" disabled={isSubmitting || saveMutation.isPending}>
@@ -449,7 +428,7 @@ function TemplateDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
@@ -458,33 +437,37 @@ const SCOPE_LABELS: Record<string, string> = {
   CLINIC: 'Clinic-wide',
   DISCIPLINE: 'Discipline',
   SERVICE: 'Service',
-};
+}
 
 export default function FormsPage() {
-  const queryClient = useQueryClient();
-  const toast = useAppToast();
-  const { showModal } = useSystemModal();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null);
+  const queryClient = useQueryClient()
+  const toast = useAppToast()
+  const { showModal } = useSystemModal()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null)
 
-  const { data: templates, isLoading, error } = useQuery({
+  const {
+    data: templates,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['formTemplates'],
     queryFn: listTemplates,
-  });
+  })
 
   const disableMutation = useMutation({
     mutationFn: disableTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['formTemplates'] });
-      toast.success('Template disabled');
+      queryClient.invalidateQueries({ queryKey: ['formTemplates'] })
+      toast.success('Template disabled')
     },
     onError: () => toast.error('Failed to disable template'),
-  });
+  })
 
   const handleEdit = (template: FormTemplate) => {
-    setEditingTemplate(template);
-    setDialogOpen(true);
-  };
+    setEditingTemplate(template)
+    setDialogOpen(true)
+  }
 
   const handleDisable = (id: string, name: string) => {
     showModal({
@@ -492,15 +475,15 @@ export default function FormsPage() {
       description: `Disable "${name}"? It will no longer be shown to patients but historical responses are preserved.`,
       actionLabel: 'Disable',
       onAction: () => disableMutation.mutate(id),
-    });
-  };
+    })
+  }
 
   const formatDate = (str: string) =>
     new Date(str).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    });
+    })
 
   return (
     <PageContainer className="space-y-8">
@@ -510,8 +493,8 @@ export default function FormsPage() {
         actions={
           <AppButton
             onClick={() => {
-              setEditingTemplate(null);
-              setDialogOpen(true);
+              setEditingTemplate(null)
+              setDialogOpen(true)
             }}
             className="rounded-full shadow-md px-6"
           >
@@ -547,8 +530,8 @@ export default function FormsPage() {
                 description="Create a template to collect patient information before or after appointments."
                 actionLabel="New Template"
                 onAction={() => {
-                  setEditingTemplate(null);
-                  setDialogOpen(true);
+                  setEditingTemplate(null)
+                  setDialogOpen(true)
                 }}
               />
             </div>
@@ -556,13 +539,13 @@ export default function FormsPage() {
 
           {!isLoading && !error && templates && templates.length > 0 && (
             <AppTable<FormTemplate>
+              mobileCardMode
               columns={[
                 {
                   key: 'name',
                   header: 'Name',
-                  render: (t) => (
-                    <span className="font-bold text-slate-900">{t.name}</span>
-                  ),
+                  mobilePrimary: true,
+                  render: (t) => <span className="font-bold text-slate-900">{t.name}</span>,
                 },
                 {
                   key: 'scope',
@@ -573,10 +556,14 @@ export default function FormsPage() {
                         {SCOPE_LABELS[t.scope] ?? t.scope}
                       </AppBadge>
                       {t.discipline && (
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t.discipline.name}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                          {t.discipline.name}
+                        </span>
                       )}
                       {t.service && (
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t.service.name}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                          {t.service.name}
+                        </span>
                       )}
                     </div>
                   ),
@@ -585,14 +572,18 @@ export default function FormsPage() {
                   key: 'fields',
                   header: 'Fields',
                   render: (t) => (
-                    <span className="text-slate-600 font-medium">{t.fields.length} field{t.fields.length !== 1 ? 's' : ''}</span>
+                    <span className="text-slate-600 font-medium">
+                      {t.fields.length} field{t.fields.length !== 1 ? 's' : ''}
+                    </span>
                   ),
                 },
                 {
                   key: 'created',
                   header: 'Created',
                   render: (t) => (
-                    <span className="text-slate-500 text-xs font-medium">{formatDate(t.createdAt)}</span>
+                    <span className="text-slate-500 text-xs font-medium">
+                      {formatDate(t.createdAt)}
+                    </span>
                   ),
                 },
                 {
@@ -632,11 +623,11 @@ export default function FormsPage() {
       <TemplateDialog
         open={dialogOpen}
         onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) setEditingTemplate(null);
+          setDialogOpen(open)
+          if (!open) setEditingTemplate(null)
         }}
         editing={editingTemplate}
       />
     </PageContainer>
-  );
+  )
 }

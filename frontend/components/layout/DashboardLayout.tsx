@@ -32,7 +32,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(`/login?returnUrl=${encodeURIComponent(pathname || '/dashboard')}`)
+      router.push(`/?auth=login&returnUrl=${encodeURIComponent(pathname || '/dashboard')}`)
       return
     }
 
@@ -121,7 +121,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Mobile drawer */}
       <AppSidebarMobile open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
 
-      <div className="relative md:ml-[280px]">
+      <div className="relative md:ml-[264px]">
         <TopBar
           onOpenMobileNav={() => setMobileNavOpen(true)}
           onRestartTour={() => startTour({ force: true })}

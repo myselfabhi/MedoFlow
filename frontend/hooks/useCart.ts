@@ -1,63 +1,82 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import api from '@/lib/api';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import api from '@/lib/api'
+import { toast } from 'sonner'
 
 export interface CartItem {
-  id: string;
-  itemId: string;
-  itemType: 'PRODUCT' | 'PACKAGE' | 'MEMBERSHIP' | 'SERVICE';
-  name: string;
-  unitPrice: number;
-  quantity: number;
-  product?: any;
-  package?: any;
-  membership?: any;
-  service?: any;
+  id: string
+  itemId: string
+  itemType: 'PRODUCT' | 'PACKAGE' | 'MEMBERSHIP' | 'SERVICE'
+  name: string
+  unitPrice: number
+  quantity: number
+  product?: any
+  package?: any
+  membership?: any
+  service?: any
 }
 
-const LOCAL_CART_KEY = 'medoflow_guest_cart';
+const LOCAL_CART_KEY = 'medoflow_guest_cart'
 
 export function useCart() {
-  const { isAuthenticated, user } = useAuth();
-  const [cart, setCart] = useState<{ items: CartItem[] }>({ items: [] });
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated } = useAuth()
+  const [cart, setCart] = useState<{ items: CartItem[] }>({ items: [] })
+  const [isLoading, setIsLoading] = useState(true)
+
+  const persistGuestCart = useCallback((next: { items: CartItem[] }) => {
+    setCart(next)
+    localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(next))
+  }, [])
 
   const fetchCartItems = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     if (isAuthenticated) {
       try {
-        const res = await api.get('/carts');
-        setCart(res.data.data.cart);
+        const res = await api.get('/carts')
+        const raw = res.data.data.cart
+        // Server items nest the product/package/membership — flatten `name`
+        // and `unitPrice` to the top level so UI code works for guest + auth
+        // carts uniformly.
+        const items = (raw.items ?? []).map((item: any) => ({
+          ...item,
+          name:
+            item.product?.name ??
+            item.package?.name ??
+            item.membership?.name ??
+            item.service?.name ??
+            'Item',
+          unitPrice: Number(item.unitPrice ?? 0),
+        }))
+        setCart({ ...raw, items })
       } catch (err) {
-        console.error('Failed to fetch server cart', err);
+        console.error('Failed to fetch server cart', err)
       }
     } else {
-      const savedCart = localStorage.getItem(LOCAL_CART_KEY);
+      const savedCart = localStorage.getItem(LOCAL_CART_KEY)
       if (savedCart) {
         try {
-          setCart(JSON.parse(savedCart));
+          setCart(JSON.parse(savedCart))
         } catch (e) {
-          console.error('Failed to parse local cart', e);
+          console.error('Failed to parse local cart', e)
         }
       }
     }
-    setIsLoading(false);
-  }, [isAuthenticated]);
+    setIsLoading(false)
+  }, [isAuthenticated])
 
   useEffect(() => {
-    fetchCartItems();
-  }, [fetchCartItems]);
+    fetchCartItems()
+  }, [fetchCartItems])
 
-  // Sync guest cart to server when user logs in
+  // Sync guest cart to server when user logs in.
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      const savedCart = localStorage.getItem(LOCAL_CART_KEY);
+      const savedCart = localStorage.getItem(LOCAL_CART_KEY)
       if (savedCart) {
         try {
-          const { items } = JSON.parse(savedCart);
+          const { items } = JSON.parse(savedCart)
           if (items && items.length > 0) {
             const syncCart = async () => {
               for (const item of items) {
@@ -66,84 +85,116 @@ export function useCart() {
                     itemType: item.itemType,
                     itemId: item.itemId,
                     quantity: item.quantity,
-                  });
+                  })
                 } catch (e) {
-                  console.error('Failed to sync item', item.name, e);
+                  console.error('Failed to sync item', item.name, e)
                 }
               }
-              localStorage.removeItem(LOCAL_CART_KEY);
-              fetchCartItems();
-              toast.success('Your guest cart has been synced to your account!');
-            };
-            syncCart();
+              localStorage.removeItem(LOCAL_CART_KEY)
+              fetchCartItems()
+              toast.success('Your guest cart has been synced to your account!')
+            }
+            syncCart()
           }
         } catch (e) {
-          console.error('Failed to parse and sync guest cart', e);
+          console.error('Failed to parse and sync guest cart', e)
         }
       }
     }
-  }, [isAuthenticated, isLoading, fetchCartItems]);
+  }, [isAuthenticated, isLoading, fetchCartItems])
 
-  const addToCart = async (item: any, type: CartItem['itemType']) => {
+  const addToCart = async (item: any, type: CartItem['itemType'], quantity = 1) => {
     if (isAuthenticated) {
       try {
         await api.post('/carts/items', {
           itemType: type,
           itemId: item.id,
-          quantity: 1,
-        });
-        toast.success(`Added ${item.name} to cart`);
-        fetchCartItems();
+          quantity,
+        })
+        toast.success(`Added ${item.name} to cart`)
+        await fetchCartItems()
       } catch (error) {
-        console.error('Failed to add to server cart', error);
-        toast.error('Could not add item to cart.');
+        console.error('Failed to add to server cart', error)
+        toast.error('Could not add item to cart.')
       }
     } else {
-      // Guest cart logic
-      const currentCart = { ...cart };
-      const existingItemIndex = currentCart.items.findIndex(
-        (i) => i.itemId === item.id && i.itemType === type
-      );
-
-      if (existingItemIndex > -1) {
-        currentCart.items[existingItemIndex].quantity += 1;
+      const next = { items: [...cart.items] }
+      const existingIndex = next.items.findIndex((i) => i.itemId === item.id && i.itemType === type)
+      if (existingIndex > -1) {
+        next.items[existingIndex]!.quantity += quantity
       } else {
-        const newItem: CartItem = {
-          id: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        next.items.push({
+          id: `guest_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
           itemId: item.id,
           itemType: type,
           name: item.name,
           unitPrice: Number(item.price || item.monthlyPrice || 0),
-          quantity: 1,
+          quantity,
           product: type === 'PRODUCT' ? item : undefined,
           package: type === 'PACKAGE' ? item : undefined,
           membership: type === 'MEMBERSHIP' ? item : undefined,
-        };
-        currentCart.items.push(newItem);
+        })
       }
-
-      setCart(currentCart);
-      localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(currentCart));
-      toast.success(`Added ${item.name} to guest cart`);
+      persistGuestCart(next)
+      toast.success(`Added ${item.name} to cart`)
     }
-  };
+  }
+
+  const updateQuantity = async (cartItemId: string, quantity: number) => {
+    if (quantity < 1) {
+      return removeItem(cartItemId)
+    }
+    if (isAuthenticated) {
+      try {
+        await api.put(`/carts/items/${cartItemId}`, { quantity })
+        await fetchCartItems()
+      } catch (err) {
+        console.error('Failed to update cart item', err)
+        toast.error('Could not update quantity.')
+      }
+    } else {
+      const next = {
+        items: cart.items.map((i) => (i.id === cartItemId ? { ...i, quantity } : i)),
+      }
+      persistGuestCart(next)
+    }
+  }
+
+  const removeItem = async (cartItemId: string) => {
+    if (isAuthenticated) {
+      try {
+        await api.delete(`/carts/items/${cartItemId}`)
+        await fetchCartItems()
+      } catch (err) {
+        console.error('Failed to remove cart item', err)
+        toast.error('Could not remove item.')
+      }
+    } else {
+      const next = { items: cart.items.filter((i) => i.id !== cartItemId) }
+      persistGuestCart(next)
+    }
+  }
 
   const clearGuestCart = () => {
-    localStorage.removeItem(LOCAL_CART_KEY);
+    localStorage.removeItem(LOCAL_CART_KEY)
     if (!isAuthenticated) {
-      setCart({ items: [] });
+      setCart({ items: [] })
     }
-  };
+  }
 
-  const totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0)
+  const subtotal = cart.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0)
 
   return {
     cart,
     totalItems,
+    subtotal,
     isLoading,
     addToCart,
+    updateQuantity,
+    removeItem,
     fetchCartItems,
     clearGuestCart,
-    isAuthenticated
-  };
+    isAuthenticated,
+  }
 }

@@ -15,7 +15,7 @@ export const protect = async (req: Request, _res: Response, next: NextFunction):
       throw err
     }
 
-    const token = authHeader.split(' ')[1]
+    const token = authHeader.split(' ')[1]!
     const decoded = verifyAccessToken(token)
 
     const user = await prisma.user.findUnique({
@@ -159,7 +159,7 @@ export const optionalProtect = async (
       return
     }
 
-    const token = authHeader.split(' ')[1]
+    const token = authHeader.split(' ')[1]!
     const decoded = verifyAccessToken(token)
 
     const user = await prisma.user.findUnique({

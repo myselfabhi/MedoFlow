@@ -1,63 +1,71 @@
-'use client';
+'use client'
 
-import React, { useEffect, useState, Suspense } from 'react';
-import { useIsFetching, useIsMutating } from '@tanstack/react-query';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { AppLogo } from './AppLogo';
+/**
+ * GlobalApiLoader — full-screen overlay shown while React Query is fetching
+ * or mutating, or while the router is mid-navigation.
+ *
+ * Design: uses MedoflowLoader so all transient loading states in the app
+ * share the same mark and animation. Debounced by 400ms so fast queries
+ * never flash the overlay.
+ */
+
+import React, { Suspense, useEffect, useState } from 'react'
+import { useIsFetching, useIsMutating } from '@tanstack/react-query'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { MedoflowLoader } from './MedoflowLoader'
 
 function GlobalApiLoaderContent() {
-  const isFetching = useIsFetching();
-  const isMutating = useIsMutating();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  const [isVisible, setIsVisible] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
+  const isFetching = useIsFetching()
+  const isMutating = useIsMutating()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  // Trigger loader on route changes
-  useEffect(() => {
-    setIsNavigating(true);
-    const timeout = setTimeout(() => setIsNavigating(false), 600);
-    return () => clearTimeout(timeout);
-  }, [pathname, searchParams]);
+  const [showApi, setShowApi] = useState(false)
+  const [showNav, setShowNav] = useState(false)
 
-  // Debounce the API loader
+  // Route-change pulse
   useEffect(() => {
-    const isApiActive = isFetching > 0 || isMutating > 0;
-    
-    let timeout: NodeJS.Timeout;
-    if (isApiActive) {
-      timeout = setTimeout(() => setIsVisible(true), 400);
+    setShowNav(true)
+    const t = setTimeout(() => setShowNav(false), 600)
+    return () => clearTimeout(t)
+  }, [pathname, searchParams])
+
+  // Debounced API loader — hide instantly, reveal after 400ms of real work
+  useEffect(() => {
+    const active = isFetching > 0 || isMutating > 0
+    let t: ReturnType<typeof setTimeout> | undefined
+    if (active) {
+      t = setTimeout(() => setShowApi(true), 400)
     } else {
-      setIsVisible(false);
+      setShowApi(false)
     }
+    return () => {
+      if (t) clearTimeout(t)
+    }
+  }, [isFetching, isMutating])
 
-    return () => clearTimeout(timeout);
-  }, [isFetching, isMutating]);
-
-  const showLoader = isVisible || isNavigating;
-
-  if (!showLoader) return null;
+  const visible = showApi || showNav
+  if (!visible) return null
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-[9999] flex flex-col items-center justify-center",
-      "bg-white animate-in fade-in duration-500"
-    )}>
-      <div className="flex flex-col items-center space-y-4 text-center">
-        <AppLogo showText={false} size="xl" animated={false} className="justify-center scale-125" />
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-slate-600 tracking-wide">
-            Medoflow
-          </p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-            {isNavigating ? 'Updating Module' : 'Synchronizing Data'}
-          </p>
-        </div>
+    <div
+      className={cn(
+        'fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5',
+        'bg-white/85 backdrop-blur-md animate-in fade-in duration-300'
+      )}
+      role="status"
+      aria-live="polite"
+    >
+      <MedoflowLoader size="xl" tone="brand" label="Loading" />
+      <div className="text-center">
+        <p className="mf-display text-[16px] text-navy">Medoflow</p>
+        <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-ink-muted">
+          {showNav ? 'Updating module' : 'Syncing'}
+        </p>
       </div>
     </div>
-  );
+  )
 }
 
 export function GlobalApiLoader() {
@@ -65,5 +73,5 @@ export function GlobalApiLoader() {
     <Suspense fallback={null}>
       <GlobalApiLoaderContent />
     </Suspense>
-  );
+  )
 }

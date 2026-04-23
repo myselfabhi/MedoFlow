@@ -28,7 +28,7 @@ function isProtectedRoute(pathname: string | null): boolean {
 }
 
 export function landingForRole(user: Pick<User, 'role'>): string {
-  return user.role === 'PATIENT' ? '/' : '/dashboard';
+  return user.role === 'PATIENT' ? '/' : '/dashboard'
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -94,14 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const restoredUser = await getCurrentUser()
-        // If on a protected route and no user found, redirect
+        // If on a protected route and no user found, redirect to landing
+        // with the auth modal open (set by ?auth=login).
         if (!restoredUser && isProtectedRoute(pathname)) {
-          router.push('/login')
+          router.push(`/?auth=login&returnUrl=${encodeURIComponent(pathname || '/')}`)
         }
       } catch (err) {
         console.error('Auth initialization error:', err)
         if (isProtectedRoute(pathname)) {
-          router.push('/login')
+          router.push(`/?auth=login&returnUrl=${encodeURIComponent(pathname || '/')}`)
         }
       } finally {
         setIsLoading(false)

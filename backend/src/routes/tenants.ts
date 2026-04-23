@@ -25,7 +25,7 @@ const subdomainCheckSchema = z.object({
 router.post(
   '/signup',
   authRateLimit,
-  validateRequest(signupSchema),
+  validateRequest({ body: signupSchema }),
   asyncHandler(async (req, res) => {
     const result = await tenantService.provisionTenant(req.body)
     successResponse(res, 201, 'Clinic created successfully. Welcome to MedoFlow!', {

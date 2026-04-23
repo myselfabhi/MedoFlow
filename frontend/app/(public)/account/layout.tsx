@@ -34,7 +34,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
-      router.replace(`/login?returnUrl=${encodeURIComponent(pathname)}`)
+      router.replace(`/?auth=login&returnUrl=${encodeURIComponent(pathname)}`)
       return
     }
     if (user && user.role !== 'PATIENT') {

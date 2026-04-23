@@ -69,46 +69,81 @@ export default function AppointmentsPage() {
     ? 'View and manage your upcoming visits and care history.'
     : 'Clinical schedule and appointment management console.'
 
+  const totalCount = appointments.length
+  const completedCount = appointments.filter((a) => a.status === 'COMPLETED').length
+  const pendingCount = appointments.filter((a) => a.status.includes('PENDING')).length
+
   return (
     <PageContainer className="space-y-8">
-      <AppPageHeader
-        title="Clinical Schedule"
-        description={subtitle}
-        actions={
-          <DateRangeFilter
-            value={dateRangeOption}
-            onChange={(opt, range) => {
-              setDateRangeOption(opt)
-              setDateRangeValues(range)
-            }}
-          />
-        }
-      />
+      {/* Hero */}
+      <div className="relative overflow-clip rounded-3xl border border-[#E5E7EB] bg-gradient-to-br from-[#1E3A5F] via-[#23436B] to-[#0F766E] text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-16 -bottom-10 h-56 w-56 rounded-full bg-[#14B8A6]/25 blur-3xl"
+        />
+        <div className="relative flex flex-col gap-6 p-8 lg:flex-row lg:items-end lg:justify-between lg:p-10">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#14B8A6]" />
+              Clinical Queue
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Clinical Schedule</h1>
+            <p className="max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
+              {subtitle}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangeFilter
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt)
+                setDateRangeValues(range)
+              }}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <KPIStatCard
           label="Total Bookings"
-          value={appointments.length}
+          value={totalCount}
           icon={Calendar}
-          iconClassName="text-blue-600 bg-blue-50"
+          iconClassName="text-[#6366F1] bg-[#EEF2FF]"
         />
         <KPIStatCard
           label="Completed Visits"
-          value={appointments.filter((a) => a.status === 'COMPLETED').length}
+          value={completedCount}
           icon={CheckCircle2}
-          iconClassName="text-emerald-600 bg-emerald-50"
+          iconClassName="text-[#0D9488] bg-[#F0FDFA]"
         />
         <KPIStatCard
           label="Pending Items"
-          value={appointments.filter((a) => a.status.includes('PENDING')).length}
+          value={pendingCount}
           icon={AlertCircle}
-          iconClassName="text-amber-600 bg-amber-50"
+          iconClassName="text-[#F59E0B] bg-[#FFFBEB]"
         />
       </div>
 
-      <AppCard className="border-none shadow-sm overflow-hidden bg-white">
-        <AppCardHeader className="bg-white border-b-0 py-6 px-8 flex items-center justify-between">
-          <AppCardTitle className="text-lg font-bold">Appointment Registry</AppCardTitle>
+      <AppCard className="overflow-hidden border border-[#E5E7EB] bg-white shadow-none">
+        <AppCardHeader className="flex flex-row items-center justify-between border-b border-[#E5E7EB] bg-gradient-to-r from-white via-[#F8FAFC] to-[#F0FDFA] py-5">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#0F766E] text-white shadow-sm">
+              <Calendar className="h-4 w-4" />
+            </span>
+            <div>
+              <AppCardTitle className="text-base font-bold">Appointment Registry</AppCardTitle>
+              <p className="text-xs font-medium text-slate-500">
+                {totalCount === 0
+                  ? 'No visits in range'
+                  : `${totalCount} visit${totalCount > 1 ? 's' : ''} · ${completedCount} completed`}
+              </p>
+            </div>
+          </div>
         </AppCardHeader>
         <AppCardContent className="p-0">
           {isLoading ? (
@@ -130,10 +165,12 @@ export default function AppointmentsPage() {
             </div>
           ) : (
             <AppTable
+              mobileCardMode
               columns={[
                 {
                   key: 'service',
                   header: 'Visit Details',
+                  mobilePrimary: true,
                   render: (apt) => (
                     <div>
                       <p className="font-bold text-slate-900">{apt.service.name}</p>
@@ -185,7 +222,6 @@ export default function AppointmentsPage() {
                               : `/dashboard/provider/appointments/${apt.id}`
                           }
                         >
-
                           View Details <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </AppButton>

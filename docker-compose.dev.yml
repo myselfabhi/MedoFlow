@@ -1,0 +1,28 @@
+# Local dev infrastructure for MedoFlow.
+#
+# Brings up a dedicated Postgres on port 5433 so it never collides with
+# another project on 5432 (e.g. ethos-postgres-dev). Volume is named so data
+# survives container restarts; nuke it with `docker compose -f docker-compose.dev.yml down -v`.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medoflow-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medoflow
+      POSTGRES_PASSWORD: medoflow
+      POSTGRES_DB: medoflow
+    ports:
+      - '5433:5432'
+    volumes:
+      - medoflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U medoflow -d medoflow']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  medoflow_postgres_data:
+    name: medoflow_postgres_data

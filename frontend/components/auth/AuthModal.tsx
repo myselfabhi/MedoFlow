@@ -1,0 +1,633 @@
+'use client'
+
+/**
+ * AuthModal — unified login / sign-up dialog used across the marketing shell.
+ *
+ * Shape:
+ *   • Left panel  — navy "edge" with the brand story + proof chips.
+ *   • Right panel — white "workspace" holding the actual form.
+ *   • Tabs switch between "Sign in" and "Create account" without re-mounting
+ *     the dialog (smoother UX than navigating to a separate page).
+ *
+ * The full-page /login and /register routes are intentionally kept alive as
+ * fallbacks (deep-linked from emails, returnUrl flows, future OAuth
+ * callbacks). This modal simply provides a friendlier first path.
+ *
+ * Wire-up:
+ *   1. Wrap the public tree with <AuthModalProvider>.
+ *   2. Trigger from anywhere with useAuthModal().openLogin() / openSignup().
+ */
+
+import React from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { ArrowRight, Lock, Mail, ShieldCheck, User as UserIcon } from 'lucide-react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { cn } from '@/lib/utils'
+import api from '@/lib/api'
+import { useAuth, landingForRole } from '@/contexts/AuthContext'
+import { BrandLogo } from '@/components/common/BrandLogo'
+import { MedoflowLoader } from '@/components/common/MedoflowLoader'
+
+// ─────────────────────────── Context ─────────────────────────────────
+
+type AuthMode = 'login' | 'signup'
+
+type AuthModalContextValue = {
+  open: boolean
+  mode: AuthMode
+  openLogin: () => void
+  openSignup: () => void
+  close: () => void
+  switchMode: (m: AuthMode) => void
+}
+
+const AuthModalContext = React.createContext<AuthModalContextValue | null>(null)
+
+export function useAuthModal(): AuthModalContextValue {
+  const ctx = React.useContext(AuthModalContext)
+  if (!ctx) throw new Error('useAuthModal must be used inside <AuthModalProvider>')
+  return ctx
+}
+
+export function AuthModalProvider({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false)
+  const [mode, setMode] = React.useState<AuthMode>('login')
+
+  const value = React.useMemo<AuthModalContextValue>(
+    () => ({
+      open,
+      mode,
+      openLogin: () => {
+        setMode('login')
+        setOpen(true)
+      },
+      openSignup: () => {
+        setMode('signup')
+        setOpen(true)
+      },
+      close: () => setOpen(false),
+      switchMode: setMode,
+    }),
+    [open, mode]
+  )
+
+  return (
+    <AuthModalContext.Provider value={value}>
+      {children}
+      <AuthModal />
+      <AuthQueryParamListener />
+    </AuthModalContext.Provider>
+  )
+}
+
+/**
+ * Listens for `?auth=login` or `?auth=signup` in the URL and opens the
+ * matching modal. This is how legacy routes (/login, /signup) hand off to
+ * the modal flow after redirecting to the landing page.
+ */
+function AuthQueryParamListener() {
+  const search = useSearchParams()
+  const router = useRouter()
+  const { openLogin, openSignup } = useAuthModal()
+  const pathname = usePathname()
+  const handled = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    const mode = search.get('auth')
+    if (!mode) {
+      handled.current = null
+      return
+    }
+    const key = `${pathname}?${search.toString()}`
+    if (handled.current === key) return
+    handled.current = key
+    if (mode === 'signup') openSignup()
+    else openLogin()
+    // Strip the auth param so a refresh doesn't reopen the modal, but keep
+    // returnUrl so the LoginForm can route back after success.
+    const remaining = new URLSearchParams(search.toString())
+    remaining.delete('auth')
+    const suffix = remaining.toString()
+    router.replace(pathname + (suffix ? `?${suffix}` : ''))
+  }, [search, pathname, router, openLogin, openSignup])
+
+  return null
+}
+
+// ─────────────────────────── Modal shell ─────────────────────────────
+
+function AuthModal() {
+  const { open, mode, close, switchMode } = useAuthModal()
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={(v) => (v ? undefined : close())}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          className={cn(
+            'fixed inset-0 z-[60] bg-navy/60 backdrop-blur-sm',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0'
+          )}
+        />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed left-1/2 top-1/2 z-[61] grid w-[94vw] max-w-[920px]',
+            // Mobile: card sits in the center, scrolls internally if needed.
+            'max-h-[92vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[20px]',
+            'bg-white md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
+            'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95'
+          )}
+          style={{ boxShadow: '0 40px 80px -20px rgba(15, 23, 42, 0.35)' }}
+        >
+          {/* Desktop split panel */}
+          <BrandPanel mode={mode} />
+
+          {/* Mobile-only brand strip — keeps the modal feeling branded at 375px */}
+          <MobileBrandStrip mode={mode} />
+
+          <div className="relative flex max-h-[92vh] flex-col overflow-y-auto bg-white p-6 sm:p-8 md:p-10">
+            <DialogPrimitive.Close
+              aria-label="Close"
+              className={cn(
+                'absolute right-5 top-5 inline-flex h-8 w-8 items-center justify-center',
+                'rounded-full border border-hairline text-ink-muted transition-colors',
+                'hover:bg-canvas hover:text-ink'
+              )}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path
+                  d="M1 1l12 12M13 1L1 13"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </DialogPrimitive.Close>
+
+            <DialogPrimitive.Title className="mf-display text-[26px] text-ink">
+              {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description className="mt-1.5 text-[13.5px] text-ink-muted">
+              {mode === 'login'
+                ? 'Sign in to pick up right where you left off.'
+                : 'Start your 14-day trial. No credit card required.'}
+            </DialogPrimitive.Description>
+
+            <ModeSwitch mode={mode} onChange={switchMode} />
+
+            <div className="mt-6">
+              {mode === 'login' ? (
+                <LoginForm onSuccess={close} />
+              ) : (
+                <SignupForm onSuccess={() => switchMode('login')} />
+              )}
+            </div>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  )
+}
+
+// ─────────────────────────── Brand panel (left) ──────────────────────
+
+function BrandPanel({ mode }: { mode: AuthMode }) {
+  return (
+    <aside className="relative hidden overflow-hidden bg-navy p-10 text-white md:flex md:flex-col md:justify-between">
+      {/* atmospheric bg */}
+      <div className="absolute inset-0 mf-grid-pattern opacity-40" aria-hidden />
+      <div
+        className="pointer-events-none absolute -top-24 -left-16 h-72 w-72 rounded-full blur-[120px]"
+        style={{ backgroundColor: 'rgba(13, 148, 136, 0.35)' }}
+        aria-hidden
+      />
+
+      <div className="relative">
+        <BrandLogo size="lg" tone="light" />
+        <h3 className="mf-display mt-8 text-[26px] leading-tight text-white">
+          {mode === 'login' ? (
+            <>
+              One timeline. <br />
+              <span className="text-teal-bright">Every patient.</span>
+            </>
+          ) : (
+            <>
+              Start running on <br />
+              <span className="text-teal-bright">one surface.</span>
+            </>
+          )}
+        </h3>
+        <p className="mt-4 max-w-xs text-[13.5px] leading-relaxed text-white/65">
+          {mode === 'login'
+            ? 'Pick up the day where you left off — schedule, charts, and billing are already waiting.'
+            : 'Replace the 7+ tools stitched across your day with a single, calmer surface.'}
+        </p>
+      </div>
+
+      <ul className="relative mt-10 space-y-3 text-[13px] text-white/75">
+        <Proof>HIPAA &amp; SOC2 aligned</Proof>
+        <Proof>Free 14-day trial &middot; no credit card</Proof>
+        <Proof>2,400+ clinics across 14 specialties</Proof>
+      </ul>
+    </aside>
+  )
+}
+
+function Proof({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-center gap-2.5">
+      <span className="mf-dot mf-dot--ok" />
+      {children}
+    </li>
+  )
+}
+
+// ─────────────────────────── Mobile brand strip ──────────────────────
+
+/**
+ * Compressed brand presence for <md viewports where the full BrandPanel is
+ * hidden. Single navy strip, one-liner, one proof chip. Keeps the dialog
+ * feeling on-brand without pushing the form out of the fold on a phone.
+ */
+function MobileBrandStrip({ mode }: { mode: AuthMode }) {
+  return (
+    <div className="flex items-center gap-3 bg-navy px-5 py-4 text-white md:hidden">
+      <BrandLogo size="sm" tone="light" />
+      <p className="mf-display min-w-0 truncate text-[13px] leading-tight text-white/80">
+        {mode === 'login' ? 'One timeline. Every patient.' : 'Start on one surface.'}
+      </p>
+    </div>
+  )
+}
+
+// ─────────────────────────── Tab switch ──────────────────────────────
+
+function ModeSwitch({ mode, onChange }: { mode: AuthMode; onChange: (m: AuthMode) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Authentication mode"
+      className="mt-6 inline-grid w-fit grid-cols-2 rounded-full border border-hairline bg-canvas p-1 text-[12.5px]"
+    >
+      {(['login', 'signup'] as const).map((m) => (
+        <button
+          key={m}
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => onChange(m)}
+          className={cn(
+            'h-8 rounded-full px-4 font-medium transition-colors',
+            mode === m ? 'bg-white text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+          )}
+        >
+          {m === 'login' ? 'Sign in' : 'Create account'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────── Login form ──────────────────────────────
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
+})
+type LoginData = z.infer<typeof loginSchema>
+
+function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const router = useRouter()
+  const search = useSearchParams()
+  const returnUrl = search.get('returnUrl')
+  const { login } = useAuth()
+
+  const [error, setError] = React.useState<string | null>(null)
+  const [submitting, setSubmitting] = React.useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginData>({ resolver: zodResolver(loginSchema) })
+
+  const onSubmit = async (data: LoginData) => {
+    setError(null)
+    setSubmitting(true)
+    try {
+      const user = await login(data.email, data.password)
+      onSuccess()
+      router.replace(returnUrl || landingForRole(user))
+      router.refresh()
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Sign in failed'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {error && <FormError message={error} />}
+
+      <Field
+        id="login-email"
+        label="Work email"
+        icon={Mail}
+        type="email"
+        autoComplete="email"
+        placeholder="name@clinic.com"
+        error={errors.email?.message}
+        {...register('email')}
+      />
+
+      <Field
+        id="login-password"
+        label="Password"
+        icon={Lock}
+        type="password"
+        autoComplete="current-password"
+        placeholder="••••••••"
+        error={errors.password?.message}
+        trailing={
+          <Link
+            href="/forgot-password"
+            className="text-[11.5px] font-medium text-teal hover:text-teal-hover"
+          >
+            Forgot?
+          </Link>
+        }
+        {...register('password')}
+      />
+
+      <SubmitButton submitting={submitting} label="Sign in" />
+    </form>
+  )
+}
+
+// ─────────────────────────── Signup form ─────────────────────────────
+
+const signupSchema = z.object({
+  name: z.string().min(1, 'Please enter your name'),
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(6, 'Use at least 6 characters'),
+})
+type SignupData = z.infer<typeof signupSchema>
+
+function SignupForm({ onSuccess }: { onSuccess: () => void }) {
+  const [error, setError] = React.useState<string | null>(null)
+  const [success, setSuccess] = React.useState(false)
+  const [submitting, setSubmitting] = React.useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SignupData>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { name: '', email: '', password: '' },
+  })
+
+  const onSubmit = async (data: SignupData) => {
+    setError(null)
+    setSubmitting(true)
+    try {
+      await api.post('/auth/register', data)
+      setSuccess(true)
+      // Give the user a moment to read the success note, then flip to login.
+      setTimeout(onSuccess, 1500)
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Registration failed'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="rounded-[12px] border border-teal bg-teal-wash px-5 py-6 text-center">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-teal text-white">
+          <ShieldCheck className="h-5 w-5" strokeWidth={2} />
+        </div>
+        <p className="mf-display mt-3 text-[18px] text-navy">Account created</p>
+        <p className="mt-1 text-[12.5px] text-ink-muted">
+          Sign in with your new credentials to continue.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {error && <FormError message={error} />}
+
+      <Field
+        id="signup-name"
+        label="Full name"
+        icon={UserIcon}
+        type="text"
+        autoComplete="name"
+        placeholder="Jane Doe"
+        error={errors.name?.message}
+        {...register('name')}
+      />
+
+      <Field
+        id="signup-email"
+        label="Email"
+        icon={Mail}
+        type="email"
+        autoComplete="email"
+        placeholder="jane@clinic.com"
+        error={errors.email?.message}
+        {...register('email')}
+      />
+
+      <Field
+        id="signup-password"
+        label="Password"
+        icon={Lock}
+        type="password"
+        autoComplete="new-password"
+        placeholder="Min. 6 characters"
+        error={errors.password?.message}
+        {...register('password')}
+      />
+
+      <p className="text-[11.5px] leading-relaxed text-ink-muted">
+        By creating an account you agree to our{' '}
+        <Link href="#" className="font-medium text-teal hover:text-teal-hover">
+          Terms
+        </Link>{' '}
+        and{' '}
+        <Link href="#" className="font-medium text-teal hover:text-teal-hover">
+          Privacy Policy
+        </Link>
+        .
+      </p>
+
+      <SubmitButton submitting={submitting} label="Create account" />
+    </form>
+  )
+}
+
+// ─────────────────────────── Pieces ──────────────────────────────────
+
+type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  id: string
+  label: string
+  icon: React.ElementType
+  error?: string
+  trailing?: React.ReactNode
+}
+
+const Field = React.forwardRef<HTMLInputElement, FieldProps>(function Field(
+  { id, label, icon: Icon, error, trailing, className, ...input },
+  ref
+) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <label htmlFor={id} className="mf-eyebrow text-ink-muted">
+          {label}
+        </label>
+        {trailing}
+      </div>
+      <div className="relative mt-2">
+        <Icon
+          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint"
+          strokeWidth={1.75}
+        />
+        <input
+          id={id}
+          ref={ref}
+          {...input}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={cn(
+            'block h-11 w-full rounded-[10px] border bg-white pl-10 pr-3 text-[14px] text-ink',
+            'placeholder:text-ink-faint',
+            'focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal',
+            error ? 'border-destructive' : 'border-hairline hover:border-ink-faint',
+            className
+          )}
+        />
+      </div>
+      {error && (
+        <p id={`${id}-error`} className="mt-1.5 text-[11.5px] text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+})
+
+function FormError({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2.5 rounded-[10px] border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-[12.5px] leading-snug text-destructive"
+    >
+      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+      <span className="break-words">{message}</span>
+    </div>
+  )
+}
+
+function SubmitButton({ submitting, label }: { submitting: boolean; label: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={submitting}
+      className={cn(
+        'mf-btn mf-btn-primary mt-2 w-full',
+        submitting && 'cursor-not-allowed opacity-80'
+      )}
+    >
+      {submitting ? (
+        <Spinner />
+      ) : (
+        <>
+          {label}
+          <ArrowRight className="h-4 w-4" />
+        </>
+      )}
+    </button>
+  )
+}
+
+function Spinner() {
+  // Inline MedoflowLoader so the button pulse matches the rest of the app's
+  // loading vocabulary. `light` tone on the teal primary button.
+  return <MedoflowLoader size="sm" tone="light" className="-my-0.5" />
+}
+
+// ─────────────────────────── Helpers ─────────────────────────────────
+
+/**
+ * Pull a safe, human-readable error message out of an axios-style error.
+ *
+ * Backends occasionally return raw stack traces or internal paths; we never
+ * want those leaking into the UI. If anything looks like a stack trace or
+ * is absurdly long, we fall back to a friendly generic.
+ */
+function extractErrorMessage(err: unknown, fallback: string): string {
+  const status = getStatus(err)
+  const raw = readMessage(err)
+
+  // Status-first friendly messages
+  if (status === 401) return 'Incorrect email or password.'
+  if (status === 403) return 'You don\u2019t have access to this account.'
+  if (status === 404) return 'Account not found.'
+  if (status === 409) return 'An account with that email already exists.'
+  if (status === 429) return 'Too many attempts. Try again in a minute.'
+  if (status === 0 || status === undefined) {
+    // Likely network / CORS / server down
+    if (!raw) return 'We couldn\u2019t reach the server. Please try again.'
+  }
+  if (status && status >= 500) return 'Our servers hit a snag. Please try again.'
+
+  if (!raw) return fallback
+
+  // Never show stack traces / internal paths.
+  if (isLikelyStackTrace(raw)) return fallback
+
+  // Strip surrounding whitespace and hard-cap length.
+  const cleaned = raw.trim().replace(/\s+/g, ' ')
+  return cleaned.length > 160 ? cleaned.slice(0, 160).trimEnd() + '\u2026' : cleaned
+}
+
+function readMessage(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  const data = (err as { response?: { data?: unknown } }).response?.data
+  if (typeof data === 'string') return data
+  if (data && typeof data === 'object' && 'message' in data) {
+    const m = (data as { message?: unknown }).message
+    if (typeof m === 'string') return m
+  }
+  const top = (err as { message?: unknown }).message
+  return typeof top === 'string' ? top : undefined
+}
+
+function getStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  const s = (err as { response?: { status?: number } }).response?.status
+  return typeof s === 'number' ? s : undefined
+}
+
+function isLikelyStackTrace(s: string): boolean {
+  // Heuristics: multi-line, contains "at ", "Require stack", or filesystem paths.
+  return (
+    s.length > 220 ||
+    /\bRequire stack\b/i.test(s) ||
+    /\n\s+at /.test(s) ||
+    /node_modules/.test(s) ||
+    /\/Users\//.test(s) ||
+    /\.ts:\d+|\.js:\d+/.test(s)
+  )
+}

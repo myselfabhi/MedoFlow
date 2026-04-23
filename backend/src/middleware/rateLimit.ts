@@ -1,7 +1,10 @@
 import rateLimit from 'express-rate-limit'
 
 /**
- * Auth endpoint rate limiter: 5 attempts per 15 minutes per IP.
+ * Login rate limiter: 5 failed attempts per 15 minutes per IP.
+ * Brute-force defense — counts only failures so legit users who mistype once
+ * or twice don't burn the budget.
+ *
  * In production this should use a Redis store so limits survive restarts
  * and work across multiple API instances.
  */
@@ -15,6 +18,26 @@ export const authRateLimit = rateLimit({
     error: 'Too many attempts. Please try again in 15 minutes.',
   },
   skipSuccessfulRequests: true, // Only count failed requests toward the limit
+})
+
+/**
+ * Refresh-token rate limiter: separate, more permissive bucket.
+ *
+ * Why: /refresh-token legitimately 401s when called with no/expired cookie
+ * (e.g. right after logout, or in dev with HMR re-rendering auth providers).
+ * Those 401s aren't brute-force attempts on a password, so they should NOT
+ * share the /login 5-per-15-min budget. We still rate-limit to prevent abuse,
+ * just at a sensible ceiling.
+ */
+export const refreshRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many refresh attempts. Please slow down.',
+  },
 })
 
 /**

@@ -680,6 +680,13 @@ model Appointment {
   rescheduledFromId      String?                @unique
   rescheduledToId        String?
   meetLink               String?
+  /**
+   * Booking-time AI-Scribe consent. When set, the patient opted in to
+   * automated note-taking while booking. The ConsultationSession created for
+   * this appointment will start with consentStatus=GRANTED so the provider
+   * doesn't need to re-prompt mid-visit.
+   */
+  aiScribeConsentGrantedAt DateTime?
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
 

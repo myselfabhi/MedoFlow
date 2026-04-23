@@ -7,11 +7,17 @@ dist/
 .next/
 coverage/
 .turbo/
+*.tsbuildinfo
 
 # Env files
 .env
 .env.local
 .env.*.local
+*.env.bak
+*.env.*.bak
+
+# Claude Code worktrees (transient working copies, never commit)
+.claude/worktrees/
 
 # OS / Editor
 .DS_Store

@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  AppPageHeader, 
+import React, { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  AppPageHeader,
   AppEmptyState,
   AppCard,
   AppCardHeader,
@@ -12,59 +12,73 @@ import {
   AppButton,
   KPIStatCard,
   AppTable,
-  DateRangeFilter
-} from '@/components/ui-system';
-import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
-import { PageContainer } from '@/components/layout';
-import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/contexts/AuthContext';
-import { listStaff, deactivateStaff } from '@/lib/staffApi';
-import { useAppToast } from '@/hooks/useAppToast';
-import { Trash2, UserPlus, ShieldCheck, Users, Clock, Pencil, Shield, Stethoscope, Calendar } from 'lucide-react';
-import Link from 'next/link';
-import { AddStaffModal } from './AddStaffModal';
-import { EditStaffModal } from './EditStaffModal';
-import { cn } from '@/lib/utils';
-import type { StaffMember } from '@/lib/staffApi';
+  DateRangeFilter,
+} from '@/components/ui-system'
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter'
+import { PageContainer } from '@/components/layout'
+import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/contexts/AuthContext'
+import { listStaff, deactivateStaff } from '@/lib/staffApi'
+import { useAppToast } from '@/hooks/useAppToast'
+import {
+  Trash2,
+  UserPlus,
+  ShieldCheck,
+  Users,
+  Clock,
+  Pencil,
+  Shield,
+  Stethoscope,
+  Calendar,
+} from 'lucide-react'
+import Link from 'next/link'
+import { AddStaffModal } from './AddStaffModal'
+import { EditStaffModal } from './EditStaffModal'
+import { cn } from '@/lib/utils'
+import type { StaffMember } from '@/lib/staffApi'
 
 export default function StaffPage() {
-  const { user } = useAuth();
-  const toast = useAppToast();
-  const queryClient = useQueryClient();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
+  const { user } = useAuth()
+  const toast = useAppToast()
+  const queryClient = useQueryClient()
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<StaffMember | null>(null)
 
-  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
-  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME')
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({})
 
-  const { data: staff = [], isLoading, refetch } = useQuery({
+  const {
+    data: staff = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['staff'],
     queryFn: () => listStaff(),
     enabled: !!user?.clinicId,
-  });
+  })
 
   const deactivateMutation = useMutation({
     mutationFn: deactivateStaff,
     onSuccess: () => {
-      toast.success('Team member deactivated');
-      refetch();
+      toast.success('Team member deactivated')
+      refetch()
     },
     onError: () => toast.error('Failed to deactivate member'),
-  });
+  })
 
   const filteredKPIStaff = staff.filter((s) => {
-    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true;
-    const createdAt = new Date(s.createdAt);
-    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate;
-  });
+    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true
+    const createdAt = new Date(s.createdAt)
+    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate
+  })
 
   const handleDeactivate = (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to deactivate ${name}?`)) {
-      deactivateMutation.mutate(id);
+      deactivateMutation.mutate(id)
     }
-  };
+  }
 
-  const isAuthorized = user?.role === 'SUPER_ADMIN' || user?.role === 'FRONT_DESK';
+  const isAuthorized = user?.role === 'SUPER_ADMIN' || user?.role === 'FRONT_DESK'
 
   if (!isAuthorized) {
     return (
@@ -74,7 +88,7 @@ export default function StaffPage() {
           description="Only administrators can manage clinic staff."
         />
       </div>
-    );
+    )
   }
 
   if (isLoading) {
@@ -82,7 +96,7 @@ export default function StaffPage() {
       <div className="p-8 flex justify-center py-20">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
       </div>
-    );
+    )
   }
 
   return (
@@ -92,11 +106,11 @@ export default function StaffPage() {
         description="Manage your clinic's administrators and operational support staff."
         actions={
           <div className="flex gap-4 items-center">
-            <DateRangeFilter 
+            <DateRangeFilter
               value={dateRangeOption}
               onChange={(opt, range) => {
-                setDateRangeOption(opt);
-                setDateRangeValues(range);
+                setDateRangeOption(opt)
+                setDateRangeValues(range)
               }}
             />
             <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
@@ -107,7 +121,10 @@ export default function StaffPage() {
                   Manage Roles
                 </AppButton>
               </Link>
-              <AppButton onClick={() => setIsModalOpen(true)} className="rounded-full px-6 shadow-md">
+              <AppButton
+                onClick={() => setIsModalOpen(true)}
+                className="rounded-full px-6 shadow-md"
+              >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Invite Member
               </AppButton>
@@ -117,21 +134,21 @@ export default function StaffPage() {
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <KPIStatCard 
+        <KPIStatCard
           label="Team Size"
           value={filteredKPIStaff.length}
           icon={Users}
           iconClassName="text-blue-600 bg-blue-50"
         />
-        <KPIStatCard 
+        <KPIStatCard
           label="Admins"
-          value={filteredKPIStaff.filter(s => s.role === 'SUPER_ADMIN').length}
+          value={filteredKPIStaff.filter((s) => s.role === 'SUPER_ADMIN').length}
           icon={ShieldCheck}
           iconClassName="text-purple-600 bg-purple-50"
         />
-        <KPIStatCard 
+        <KPIStatCard
           label="Providers"
-          value={filteredKPIStaff.filter(s => !!s.provider).length}
+          value={filteredKPIStaff.filter((s) => !!s.provider).length}
           icon={Stethoscope}
           iconClassName="text-emerald-600 bg-emerald-50"
         />
@@ -143,10 +160,12 @@ export default function StaffPage() {
         </AppCardHeader>
         <AppCardContent className="p-0">
           <AppTable
+            mobileCardMode
             columns={[
               {
                 key: 'member',
                 header: 'Member',
+                mobilePrimary: true,
                 render: (m) => (
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-500">
@@ -165,12 +184,20 @@ export default function StaffPage() {
                 render: (m) => (
                   <div className="flex flex-col gap-1">
                     {m.customRole ? (
-                      <span className="text-sm font-semibold text-slate-700">{m.customRole.name}</span>
+                      <span className="text-sm font-semibold text-slate-700">
+                        {m.customRole.name}
+                      </span>
                     ) : (
-                      <Badge className="rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-widest w-fit" variant={
-                        m.role === 'SUPER_ADMIN' ? 'default' : 
-                        m.role === 'PROVIDER' ? 'outline' : 'secondary'
-                      }>
+                      <Badge
+                        className="rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-widest w-fit"
+                        variant={
+                          m.role === 'SUPER_ADMIN'
+                            ? 'default'
+                            : m.role === 'PROVIDER'
+                              ? 'outline'
+                              : 'secondary'
+                        }
+                      >
                         {m.role.replace('_', ' ')}
                       </Badge>
                     )}
@@ -182,20 +209,25 @@ export default function StaffPage() {
                 header: 'Clinical Profile',
                 render: (m) => {
                   if (!m.provider) {
-                    return <span className="text-[11px] font-medium text-slate-400">—</span>;
+                    return <span className="text-[11px] font-medium text-slate-400">—</span>
                   }
-                  
-                  const disciplines = m.provider.disciplines?.map(d => d.discipline.name) || [];
-                  const servicesCount = m.provider.providerServices?.length || 0;
-                  
+
+                  const disciplines = m.provider.disciplines?.map((d) => d.discipline.name) || []
+                  const servicesCount = m.provider.providerServices?.length || 0
+
                   return (
                     <div className="flex flex-col gap-1.5">
                       <div className="flex flex-wrap gap-1">
-                        {disciplines.length > 0 ? disciplines.map(d => (
-                          <span key={d} className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 border border-teal-100/50">
-                            {d}
-                          </span>
-                        )) : (
+                        {disciplines.length > 0 ? (
+                          disciplines.map((d) => (
+                            <span
+                              key={d}
+                              className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 border border-teal-100/50"
+                            >
+                              {d}
+                            </span>
+                          ))
+                        ) : (
                           <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
                             <Stethoscope className="h-3 w-3 text-slate-400" />
                             Provider
@@ -208,8 +240,8 @@ export default function StaffPage() {
                         </span>
                       )}
                     </div>
-                  );
-                }
+                  )
+                },
               },
               {
                 key: 'joined',
@@ -261,7 +293,7 @@ export default function StaffPage() {
                     )}
                   </div>
                 ),
-              }
+              },
             ]}
             data={staff}
             keyExtractor={(m) => m.id}
@@ -269,18 +301,17 @@ export default function StaffPage() {
         </AppCardContent>
       </AppCard>
 
-      <AddStaffModal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-      />
+      <AddStaffModal open={isModalOpen} onOpenChange={setIsModalOpen} />
 
       {editingMember && (
         <EditStaffModal
           open={!!editingMember}
-          onOpenChange={(open) => { if (!open) setEditingMember(null); }}
+          onOpenChange={(open) => {
+            if (!open) setEditingMember(null)
+          }}
           member={editingMember}
         />
       )}
     </PageContainer>
-  );
+  )
 }

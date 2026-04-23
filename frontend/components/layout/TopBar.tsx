@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Bell,
+  ChevronDown,
   ChevronRight,
   HelpCircle,
   LogOut,
@@ -19,6 +20,18 @@ import { cn } from '@/lib/utils'
 interface TopBarProps {
   onOpenMobileNav?: () => void
   onRestartTour?: () => void
+}
+
+/**
+ * Prisma-style CUIDs (our default id format) always start with a lowercase `c`
+ * and are ~24 chars of lowercase alphanumerics. UUIDs are the dashed 36-char
+ * variant. We drop both from breadcrumbs — they're visual noise.
+ */
+function isOpaqueId(seg: string): boolean {
+  return (
+    /^c[a-z0-9]{20,30}$/.test(seg) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(seg)
+  )
 }
 
 function formatCrumb(seg: string): string {
@@ -51,10 +64,13 @@ export function TopBar({ onOpenMobileNav, onRestartTour }: TopBarProps) {
 
   const crumbs = React.useMemo(() => {
     const parts = pathname.split('/').filter(Boolean)
-    return parts.map((seg, idx) => ({
-      label: formatCrumb(seg),
-      href: '/' + parts.slice(0, idx + 1).join('/'),
-    }))
+    return parts
+      .map((seg, idx) => ({
+        raw: seg,
+        label: formatCrumb(seg),
+        href: '/' + parts.slice(0, idx + 1).join('/'),
+      }))
+      .filter((c) => !isOpaqueId(c.raw))
   }, [pathname])
 
   const roleLabel = user?.role?.replace('_', ' ') ?? ''
@@ -102,26 +118,40 @@ export function TopBar({ onOpenMobileNav, onRestartTour }: TopBarProps) {
           <Bell className="h-5 w-5" />
         </button>
 
-        <div className="relative" ref={menuRef}>
+        <div className="relative ml-1" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
             className={cn(
-              'flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-left hover:bg-slate-100',
-              menuOpen && 'bg-slate-100'
+              'flex items-center gap-2.5 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-2 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 sm:pr-3',
+              menuOpen && 'border-slate-300 bg-slate-50'
             )}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
+            aria-label={user?.name ? `Open ${user.name}'s menu` : 'Open user menu'}
           >
             <UserAvatar
               seed={`${user?.id ?? ''}-${user?.name ?? ''}`}
               alt={user?.name ?? 'User'}
-              className="h-7 w-7 rounded-full"
-              sizes="28px"
+              className="h-8 w-8 shrink-0 rounded-full"
+              sizes="32px"
             />
-            <span className="hidden text-sm font-medium text-slate-800 md:inline">
-              {user?.name?.split(' ')[0] ?? 'User'}
+            <span className="hidden min-w-0 flex-col text-left leading-tight sm:flex">
+              <span className="truncate text-sm font-semibold text-slate-900">
+                {user?.name ?? 'User'}
+              </span>
+              {roleLabel && (
+                <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {roleLabel}
+                </span>
+              )}
             </span>
+            <ChevronDown
+              className={cn(
+                'hidden h-4 w-4 shrink-0 text-slate-400 transition-transform sm:block',
+                menuOpen && 'rotate-180'
+              )}
+            />
           </button>
 
           {menuOpen && (

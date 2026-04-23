@@ -175,8 +175,11 @@ export default function PatientsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left panel: Patient list */}
-        <div className="lg:col-span-1 space-y-4">
+        {/* Left panel: Patient list.
+            On mobile, hide once a patient is picked so the detail view gets full width. */}
+        <div
+          className={cn('space-y-4 lg:col-span-1 lg:block', selectedPatientId ? 'hidden' : 'block')}
+        >
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
@@ -226,8 +229,19 @@ export default function PatientsPage() {
           </AppCard>
         </div>
 
-        {/* Right panel: Patient record */}
-        <div className="lg:col-span-2">
+        {/* Right panel: Patient record.
+            On mobile we hide the empty state since the user arrives at the list first;
+            once a patient is picked, the record slides in and we reveal a "Back" control. */}
+        <div className={cn('lg:col-span-2 lg:block', selectedPatientId ? 'block' : 'hidden')}>
+          {selectedPatient && (
+            <button
+              type="button"
+              onClick={() => setSelectedPatientId(null)}
+              className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary-600 hover:text-primary-700 lg:hidden"
+            >
+              <span aria-hidden>←</span> Back to list
+            </button>
+          )}
           {!selectedPatient ? (
             <AppCard className="h-full flex items-center justify-center border-none shadow-sm bg-white min-h-[400px]">
               <div className="text-center space-y-4">
@@ -280,60 +294,62 @@ export default function PatientsPage() {
                           No appointments recorded for this patient.
                         </p>
                       ) : (
-                        <div className="overflow-x-auto -mx-8 px-8">
-                          <AppTable
-                            columns={[
-                              {
-                                key: 'date',
-                                header: 'Visit Date',
-                                render: (apt) => (
-                                  <div className="font-bold text-slate-900">
-                                    {formatDateTime(apt.startTime).split(',')[0]}
-                                  </div>
-                                ),
-                              },
-                              {
-                                key: 'service',
-                                header: 'Service',
-                                render: (apt) => (
-                                  <div className="text-sm font-medium text-slate-600">
-                                    {apt.service?.name ?? '—'}
-                                  </div>
-                                ),
-                              },
-                              {
-                                key: 'status',
-                                header: 'Status',
-                                render: (apt) => (
-                                  <StatusBadge status={apt.status} variant="appointment" />
-                                ),
-                              },
-                              {
-                                key: 'actions',
-                                header: '',
-                                render: (apt) => (
-                                  <AppButton
-                                    variant="ghost"
-                                    size="sm"
-                                    className="rounded-full text-primary-600 font-bold"
-                                    asChild
-                                  >
-                                    <Link href={`/dashboard/provider/appointments/${apt.id}`}>
-                                      View Charts
-                                    </Link>
-                                  </AppButton>
-                                ),
-                              },
-                            ]}
-                            data={selectedAppointments
-                              .sort(
-                                (a, b) =>
-                                  new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-                              )
-                              .slice(0, 5)}
-                            keyExtractor={(apt) => apt.id}
-                          />
-                        </div>
+                        <AppTable
+                          mobileCardMode
+                          columns={[
+                            {
+                              key: 'date',
+                              header: 'Visit Date',
+                              mobileLabel: 'Date',
+                              mobilePrimary: true,
+                              render: (apt) => (
+                                <div className="font-bold text-slate-900">
+                                  {formatDateTime(apt.startTime).split(',')[0]}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'service',
+                              header: 'Service',
+                              render: (apt) => (
+                                <div className="text-sm font-medium text-slate-600">
+                                  {apt.service?.name ?? '—'}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'status',
+                              header: 'Status',
+                              render: (apt) => (
+                                <StatusBadge status={apt.status} variant="appointment" />
+                              ),
+                            },
+                            {
+                              key: 'actions',
+                              header: '',
+                              mobileLabel: 'Details',
+                              render: (apt) => (
+                                <AppButton
+                                  variant="ghost"
+                                  size="sm"
+                                  className="rounded-full text-primary-600 font-bold"
+                                  asChild
+                                >
+                                  <Link href={`/dashboard/provider/appointments/${apt.id}`}>
+                                    View Charts
+                                  </Link>
+                                </AppButton>
+                              ),
+                            },
+                          ]}
+                          data={selectedAppointments
+                            .sort(
+                              (a, b) =>
+                                new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+                            )
+                            .slice(0, 5)}
+                          keyExtractor={(apt) => apt.id}
+                        />
                       )}
                     </div>
                   </div>

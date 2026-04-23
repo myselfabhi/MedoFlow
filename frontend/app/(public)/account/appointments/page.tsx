@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { getMyAppointments, type PatientAppointment } from '@/lib/patientApi'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { useBookingModal } from '@/components/booking/BookingModal'
 import {
   AppPageHeader,
   AppTable,
@@ -23,6 +24,7 @@ function formatDateTime(iso: string) {
 export default function AccountAppointmentsPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const bookingModal = useBookingModal()
   const {
     data: appointments,
     isLoading,
@@ -55,16 +57,14 @@ export default function AccountAppointmentsPage() {
     )
   }
 
-  const bookHref = user?.clinicId ? `/clinic/${user.clinicId}` : '/store'
-
   return (
     <div className="space-y-6">
       <AppPageHeader
         title="Appointments"
         description="Upcoming and past visits"
         actions={
-          <AppButton size="sm" asChild>
-            <Link href={bookHref}>Book appointment</Link>
+          <AppButton size="sm" onClick={bookingModal.open}>
+            Book appointment
           </AppButton>
         }
       />
@@ -118,7 +118,7 @@ export default function AccountAppointmentsPage() {
           emptyTitle="No appointments yet"
           emptyDescription="Book your first appointment to get started."
           emptyActionLabel="Book appointment"
-          onEmptyAction={() => router.push(bookHref)}
+          onEmptyAction={bookingModal.open}
         />
       </div>
     </div>

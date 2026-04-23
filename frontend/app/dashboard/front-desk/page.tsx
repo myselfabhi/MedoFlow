@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useQuery } from '@tanstack/react-query';
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { getInvoices } from '@/lib/invoiceApi';
-import { getClinicAppointments } from '@/lib/patientApi';
+import { useQuery } from '@tanstack/react-query'
+import React, { useState } from 'react'
+import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { getInvoices } from '@/lib/invoiceApi'
+import { getClinicAppointments } from '@/lib/patientApi'
 import {
   AppCard,
   AppCardHeader,
@@ -15,66 +15,66 @@ import {
   AppButton,
   KPIStatCard,
   DateRangeFilter,
-} from '@/components/ui-system';
-import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter';
-import { PageContainer } from '@/components/layout';
-import { AppTable } from '@/components/ui-system/AppTable';
-import { StatusBadge } from '@/components/common/StatusBadge';
-import { 
-  CreditCard, 
-  CalendarDays, 
-  DollarSign, 
+} from '@/components/ui-system'
+import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter'
+import { PageContainer } from '@/components/layout'
+import { AppTable } from '@/components/ui-system/AppTable'
+import { StatusBadge } from '@/components/common/StatusBadge'
+import {
+  CreditCard,
+  CalendarDays,
+  DollarSign,
   ArrowRight,
   ShoppingCart,
   Users,
-  Clock
-} from 'lucide-react';
+  Clock,
+} from 'lucide-react'
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-  });
+  })
 }
 
 export default function FrontDeskDashboardPage() {
-  const { user } = useAuth();
-  const clinicId = user?.clinicId ?? '';
+  const { user } = useAuth()
+  const clinicId = user?.clinicId ?? ''
 
-  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME');
-  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({});
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME')
+  const [dateRangeValues, setDateRangeValues] = useState<DateRange>({})
 
   if (user && user.role !== 'FRONT_DESK') {
-    return null;
+    return null
   }
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => getInvoices(),
     enabled: !!clinicId,
-  });
+  })
 
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ['clinic-appointments', dateRangeOption],
     queryFn: () => getClinicAppointments(dateRangeValues.startDate, dateRangeValues.endDate),
     enabled: !!clinicId,
-  });
+  })
 
   const filteredInvoices = invoices.filter((i) => {
-    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true;
-    const createdAt = new Date(i.createdAt);
-    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate;
-  });
+    if (!dateRangeValues.startDate || !dateRangeValues.endDate) return true
+    const createdAt = new Date(i.createdAt)
+    return createdAt >= dateRangeValues.startDate && createdAt <= dateRangeValues.endDate
+  })
 
   const unpaidInvoices = filteredInvoices.filter(
     (i) => i.status === 'DRAFT' || i.status === 'FINALIZED' || i.status === 'PENDING_PAYMENT'
-  );
-  
+  )
+
   const upcomingToday = appointments
     .filter((a) => a.status !== 'CANCELLED' && a.status !== 'NO_SHOW')
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
 
-  const isLoading = invoicesLoading || appointmentsLoading;
+  const isLoading = invoicesLoading || appointmentsLoading
 
   return (
     <PageContainer className="space-y-8">
@@ -83,11 +83,11 @@ export default function FrontDeskDashboardPage() {
         description="Daily clinical management and rapid checkout console."
         actions={
           <div className="flex gap-4 items-center">
-            <DateRangeFilter 
+            <DateRangeFilter
               value={dateRangeOption}
               onChange={(opt, range) => {
-                setDateRangeOption(opt);
-                setDateRangeValues(range);
+                setDateRangeOption(opt)
+                setDateRangeValues(range)
               }}
             />
             <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
@@ -102,21 +102,21 @@ export default function FrontDeskDashboardPage() {
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <KPIStatCard 
-          label={dateRangeOption === 'ALL_TIME' ? "All Bookings" : "Period Schedule"}
+        <KPIStatCard
+          label={dateRangeOption === 'ALL_TIME' ? 'All Bookings' : 'Period Schedule'}
           value={isLoading ? '...' : upcomingToday.length}
           icon={CalendarDays}
           description="Total active appointments"
           iconClassName="text-blue-600 bg-blue-50"
         />
-        <KPIStatCard 
+        <KPIStatCard
           label="Unpaid Items"
           value={isLoading ? '...' : unpaidInvoices.length}
           icon={DollarSign}
           description="Awaiting collection"
           iconClassName="text-amber-600 bg-amber-50"
         />
-        <KPIStatCard 
+        <KPIStatCard
           label="Waiting List"
           value="0"
           icon={Users}
@@ -132,7 +132,9 @@ export default function FrontDeskDashboardPage() {
             <AppCardHeader className="flex flex-row items-center justify-between bg-slate-50/50 border-b-0 py-6">
               <AppCardTitle className="text-lg font-bold">Today's Appointment Queue</AppCardTitle>
               <AppButton variant="ghost" size="sm" className="text-primary-600" asChild>
-                <Link href="/dashboard/appointments">Full View <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                <Link href="/dashboard/appointments">
+                  Full View <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
               </AppButton>
             </AppCardHeader>
             <AppCardContent className="p-0">
@@ -148,42 +150,52 @@ export default function FrontDeskDashboardPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <AppTable
+                    mobileCardMode
                     columns={[
-                      { 
-                        key: 'time', 
-                        header: 'Time', 
+                      {
+                        key: 'time',
+                        header: 'Time',
                         render: (apt) => (
-                          <div className="font-bold text-slate-900">{formatTime(apt.startTime)}</div>
-                        )
+                          <div className="font-bold text-slate-900">
+                            {formatTime(apt.startTime)}
+                          </div>
+                        ),
                       },
-                      { 
-                        key: 'patient', 
-                        header: 'Patient', 
+                      {
+                        key: 'patient',
+                        header: 'Patient',
+                        mobilePrimary: true,
                         render: (apt) => (
                           <div>
-                            <div className="font-bold text-slate-900">{apt.patient?.name ?? '—'}</div>
+                            <div className="font-bold text-slate-900">
+                              {apt.patient?.name ?? '—'}
+                            </div>
                             <div className="text-xs text-slate-500">{apt.patient?.email}</div>
                           </div>
-                        ) 
+                        ),
                       },
-                      { 
-                        key: 'service', 
-                        header: 'Service', 
+                      {
+                        key: 'service',
+                        header: 'Service',
                         render: (apt) => (
-                          <div className="text-sm font-medium text-slate-600">{apt.service?.name ?? '—'}</div>
-                        ) 
+                          <div className="text-sm font-medium text-slate-600">
+                            {apt.service?.name ?? '—'}
+                          </div>
+                        ),
                       },
-                      { 
-                        key: 'provider', 
-                        header: 'Provider', 
+                      {
+                        key: 'provider',
+                        header: 'Provider',
                         render: (apt) => (
-                          <div className="text-sm text-slate-600 italic">Dr. {apt.provider ? `${apt.provider.lastName}` : '—'}</div>
-                        ) 
+                          <div className="text-sm text-slate-600 italic">
+                            Dr. {apt.provider ? `${apt.provider.lastName}` : '—'}
+                          </div>
+                        ),
                       },
-                      { 
-                        key: 'status', 
-                        header: 'Status', 
-                        render: (apt) => <StatusBadge status={apt.status} variant="appointment" /> 
+                      {
+                        key: 'status',
+                        header: 'Status',
+                        render: (apt) => <StatusBadge status={apt.status} variant="appointment" />,
                       },
                       {
                         key: 'actions',
@@ -192,8 +204,8 @@ export default function FrontDeskDashboardPage() {
                           <AppButton variant="ghost" size="sm" className="rounded-full" asChild>
                             <Link href={`/dashboard/appointments`}>Manage</Link>
                           </AppButton>
-                        )
-                      }
+                        ),
+                      },
                     ]}
                     data={upcomingToday}
                     keyExtractor={(apt) => apt.id}
@@ -212,7 +224,10 @@ export default function FrontDeskDashboardPage() {
               <p className="text-slate-400 text-sm leading-relaxed">
                 Processing a walk-in or product sale? Use the POS console for immediate billing.
               </p>
-              <AppButton className="w-full bg-primary-600 hover:bg-primary-700 border-none rounded-full font-bold shadow-lg" asChild>
+              <AppButton
+                className="w-full bg-primary-600 hover:bg-primary-700 border-none rounded-full font-bold shadow-lg"
+                asChild
+              >
                 <Link href="/dashboard/front-desk/pos">New Transaction</Link>
               </AppButton>
             </AppCardContent>
@@ -220,11 +235,16 @@ export default function FrontDeskDashboardPage() {
 
           <AppCard className="border-none shadow-sm overflow-hidden">
             <AppCardHeader className="bg-slate-50/50 border-b-0 py-4 px-6">
-              <AppCardTitle className="text-sm font-black uppercase tracking-widest text-slate-400">Quick Patient Lookup</AppCardTitle>
+              <AppCardTitle className="text-sm font-black uppercase tracking-widest text-slate-400">
+                Quick Patient Lookup
+              </AppCardTitle>
             </AppCardHeader>
             <AppCardContent className="p-6">
               <div className="relative">
-                <Link href="/dashboard/patients" className="block w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-medium text-slate-500 hover:bg-slate-100 transition-colors">
+                <Link
+                  href="/dashboard/patients"
+                  className="block w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-medium text-slate-500 hover:bg-slate-100 transition-colors"
+                >
                   Search directory...
                 </Link>
               </div>
@@ -233,5 +253,5 @@ export default function FrontDeskDashboardPage() {
         </div>
       </div>
     </PageContainer>
-  );
+  )
 }

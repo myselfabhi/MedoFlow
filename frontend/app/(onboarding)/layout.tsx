@@ -18,7 +18,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
-      router.replace('/login')
+      router.replace('/?auth=login&returnUrl=/onboarding')
       return
     }
     if (!user) return

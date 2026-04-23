@@ -90,10 +90,12 @@ export default function AccountBillingPage() {
         </AppCardHeader>
         <AppCardContent className="p-0">
           <AppTable
+            mobileCardMode
             columns={[
               {
                 key: 'date',
                 header: 'Date',
+                mobilePrimary: true,
                 render: (i) => (
                   <div>
                     <p className="font-semibold text-slate-900">{formatDate(i.createdAt)}</p>
@@ -106,8 +108,9 @@ export default function AccountBillingPage() {
               {
                 key: 'status',
                 header: 'Status',
+                mobileLabel: 'Status',
                 render: (i) => (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={i.status} variant="invoice" />
                     <StatusBadge
                       status={i.financialStatus}
@@ -133,6 +136,7 @@ export default function AccountBillingPage() {
               {
                 key: 'total',
                 header: 'Total',
+                mobileLabel: 'Total',
                 className: 'text-right',
                 render: (i) => (
                   <p className="text-sm font-semibold text-slate-900">

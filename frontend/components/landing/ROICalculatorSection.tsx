@@ -1,172 +1,206 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { motion, useSpring, useTransform, animate } from 'framer-motion';
-import { Users, Clock, TrendingUp } from 'lucide-react';
+/**
+ * ROICalculatorSection — chapter 7 of the narrative.
+ *
+ * Role: make it personal. Big animated number front-and-center; the inputs
+ * are intentionally secondary so the page reads as an answer, not a form.
+ */
+
+import React, { useEffect, useState } from 'react'
+import { motion, animate } from 'framer-motion'
+import { Users, Clock, Info, TrendingUp } from 'lucide-react'
+import { SectionHeader, fadeUpInView } from './primitives'
+
+// Heuristic: staff × hours/week × $26/hr × 60% automation × 52 weeks.
+const calcAnnualValue = (staff: number, hours: number) => Math.round(staff * hours * 26 * 0.6 * 52)
 
 export function ROICalculatorSection() {
-  const [staff, setStaff] = useState(4);
-  const [hours, setHours] = useState(15);
-  const [displayValue, setDisplayValue] = useState(46800);
+  const [staff, setStaff] = useState(4)
+  const [hours, setHours] = useState(15)
+  const [displayValue, setDisplayValue] = useState(() => calcAnnualValue(4, 15))
 
-  // Logic: (Staff * Hours * Hourly Wage * Automation Rate * Weeks)
-  // Heuristic: $46,800 is the anchor for (4 staff, 15 hours).
-  // Formula: staff * hours * 26 (avg wage) * 0.6 (automation) * 52 (weeks)
-  const calculateROI = (s: number, h: number) => {
-    return Math.round(s * h * 26 * 0.6 * 52);
-  };
-
+  // Spring the headline number to the new target.
   useEffect(() => {
-    const newValue = calculateROI(staff, hours);
-    const controls = animate(displayValue, newValue, {
-      duration: 0.8,
+    const controls = animate(displayValue, calcAnnualValue(staff, hours), {
+      duration: 0.7,
       ease: [0.4, 0, 0.2, 1],
-      onUpdate: (latest) => setDisplayValue(Math.round(latest))
-    });
-    return () => controls.stop();
-  }, [staff, hours]);
+      onUpdate: (latest) => setDisplayValue(Math.round(latest)),
+    })
+    return () => controls.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, hours])
 
-  const daysFreed = ((staff * hours * 0.6) / 8).toFixed(1);
-  const hoursYear = (staff * hours * 0.6 * 52).toLocaleString();
-  const fte = (staff * hours * 0.6 / 40).toFixed(2);
+  const productiveHours = staff * hours * 0.6
+  const daysFreed = (productiveHours / 8).toFixed(1)
+  const hoursYear = (productiveHours * 52).toLocaleString()
+  const fte = (productiveHours / 40).toFixed(2)
 
   return (
-    <section className="py-24 bg-[#fafafa]">
-      <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold font-display text-primary mb-3">
-            Calculate your savings
-          </h2>
-          <p className="text-base text-slate-500">
-            See how much time Medoflow can give back to your practice
-          </p>
-        </div>
+    <section className="mf-zone-white py-28 md:py-36 border-t border-hairline">
+      <div className="container mx-auto px-6">
+        <SectionHeader
+          eyebrow="Your numbers"
+          title={
+            <>
+              How much time <br className="hidden md:block" />
+              would you get back?
+            </>
+          }
+          description="Move the sliders. We'll estimate the admin capacity Medoflow could return to your practice every year."
+        />
 
-        {/* Calculator Card */}
-        <div className="max-w-4xl mx-auto bg-white rounded-[2rem] p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,04)] border border-slate-100">
-          <div className="grid md:grid-cols-2 gap-10">
-            
-            {/* Left: Inputs */}
-            <div className="space-y-8">
-              {/* Staff Slider */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-2 text-slate-700 text-sm font-bold uppercase tracking-widest">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    Admin Staff
-                  </div>
-                  <span className="text-2xl font-bold font-display text-slate-900">{staff}</span>
+        <div className="mx-auto mt-20 max-w-5xl">
+          <motion.div {...fadeUpInView(0.05)} className="mf-card overflow-hidden">
+            <div className="grid gap-0 md:grid-cols-[1fr_1.15fr]">
+              {/* ─── Left: the big answer ─────────────────── */}
+              <div className="flex flex-col justify-between bg-navy p-8 text-white md:p-10">
+                <div>
+                  <p className="mf-eyebrow text-white/60">Admin capacity freed / year</p>
+                  <motion.p
+                    key={displayValue}
+                    initial={{ opacity: 0.6 }}
+                    animate={{ opacity: 1 }}
+                    className="mf-display mt-3 text-[56px] leading-none md:text-[76px]"
+                  >
+                    ${displayValue.toLocaleString()}
+                  </motion.p>
+                  <p className="mt-3 max-w-xs text-[13px] text-white/60">
+                    worth of staff time reallocated to patient care, not headcount cuts.
+                  </p>
                 </div>
-                <input 
-                  type="range" 
-                  min="1" 
-                  max="20" 
+
+                <div className="mt-10 grid grid-cols-3 gap-3 border-t border-white/10 pt-6">
+                  <AnswerStat value={daysFreed} unit="days/wk" label="Freed" />
+                  <AnswerStat value={hoursYear} unit="hrs" label="Per year" />
+                  <AnswerStat value={fte} unit="FTE" label="Equivalent" />
+                </div>
+              </div>
+
+              {/* ─── Right: controls ──────────────────────── */}
+              <div className="p-8 md:p-10">
+                <SliderRow
+                  icon={<Users className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                  label="Admin staff"
                   value={staff}
-                  onChange={(e) => setStaff(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-700 transition-all"
+                  min={1}
+                  max={20}
+                  onChange={setStaff}
+                  minLabel="1 person"
+                  maxLabel="20 people"
                 />
-                <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <span>1 person</span>
-                  <span>20 people</span>
-                </div>
-              </div>
 
-              {/* Hours Slider */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-2 text-slate-700 text-sm font-bold uppercase tracking-widest">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    Admin Hours/Week
+                <div className="mt-9">
+                  <SliderRow
+                    icon={<Clock className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                    label="Admin hours / week"
+                    value={hours}
+                    unit="h"
+                    min={5}
+                    max={40}
+                    onChange={setHours}
+                    minLabel="5 hours"
+                    maxLabel="40 hours"
+                  />
+                </div>
+
+                <div className="mt-9 flex gap-3 rounded-[12px] bg-canvas p-4 border border-hairline">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />
+                  <div className="text-[12.5px] leading-relaxed text-ink-muted">
+                    <p className="mf-eyebrow mb-1 text-ink-muted">How we calculate</p>
+                    Healthcare admin wages ($22&ndash;$28/hr avg) &times; 60% automation across
+                    scheduling, intake, follow-ups, and commerce.
                   </div>
-                  <span className="text-2xl font-bold font-display text-slate-900">{hours}h</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="5" 
-                  max="40" 
-                  value={hours}
-                  onChange={(e) => setHours(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-700 transition-all"
-                />
-                <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <span>5 hours</span>
-                  <span>40 hours</span>
-                </div>
-              </div>
-
-              {/* Info Box */}
-              <div className="bg-slate-50 rounded-xl p-4 text-[11px] text-slate-500 flex gap-3 border border-slate-100">
-                <div className="w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center shrink-0 text-[10px] font-bold">i</div>
-                <div className="leading-relaxed">
-                  <span className="font-bold text-slate-700 block mb-0.5 uppercase tracking-wider text-[9px]">How we calculate this</span>
-                  Based on US healthcare admin wages ($22–$28/hr avg) and 60% automation across scheduling, intake, follow-ups, and commerce tasks.
                 </div>
               </div>
             </div>
+          </motion.div>
 
-            {/* Right: Output */}
-            <div className="bg-slate-100/40 rounded-2xl p-8 border border-slate-200 text-center flex flex-col justify-center relative overflow-hidden">
-              <div className="w-10 h-10 bg-slate-200 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="w-5 h-5 text-slate-600" />
-              </div>
-              <p className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Admin Capacity Freed Annually</p>
-              <h3 className="text-5xl font-bold font-display text-slate-900 mb-2">
-                ${displayValue.toLocaleString()}
-              </h3>
-              <p className="text-[10px] text-slate-400 mb-8 font-medium">worth of time reallocated to patient care</p>
-
-              <div className="border-t border-slate-200 pt-6 grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-xl font-bold text-slate-900">{daysFreed}</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">days/week freed</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-slate-900">{hoursYear}</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">hours/year</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-slate-900">{fte}</p>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">FTE equivalent</p>
-                </div>
-              </div>
-              <p className="text-[9px] text-slate-400 mt-6 italic font-medium">Time reallocated to higher-value work — not headcount reduction</p>
-            </div>
+          {/* Outcome strip */}
+          <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
+            {[
+              { v: '12–20h', l: 'Admin time saved / week', icon: Clock },
+              { v: '5–10%', l: 'Revenue per visit', icon: TrendingUp },
+              { v: '20–35%', l: 'Fewer no-shows', icon: Users },
+            ].map(({ v, l, icon: Icon }, i) => (
+              <motion.div key={l} {...fadeUpInView(i * 0.06)} className="mf-card p-6">
+                <span className="mf-stat-chip">
+                  <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                </span>
+                <p className="mf-display mt-4 text-[28px] text-navy">{v}</p>
+                <p className="mt-1 text-[13px] text-ink-muted">{l}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
-
-        {/* Bottom Stats */}
-        <div className="max-w-4xl mx-auto mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            whileInView={{ opacity: 1, y: 0 }} 
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
-          >
-            <p className="text-2xl font-bold font-display text-slate-900 mb-1">12–20h</p>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Admin time saved / week <br/><span className="text-[9px] lowercase opacity-60">for Clinics</span></p>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            whileInView={{ opacity: 1, y: 0 }} 
-            viewport={{ once: true }} 
-            transition={{ delay: 0.1, duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
-          >
-            <p className="text-2xl font-bold font-display text-slate-900 mb-1">5–10%</p>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">More revenue per patient</p>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            whileInView={{ opacity: 1, y: 0 }} 
-            viewport={{ once: true }} 
-            transition={{ delay: 0.2, duration: 0.6, ease: [0.4, 0, 0.6, 1] }}
-          >
-            <p className="text-2xl font-bold font-display text-slate-900 mb-1">20–35%</p>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Reduction in patient no-shows</p>
-          </motion.div>
-        </div>
-
       </div>
     </section>
-  );
+  )
+}
+
+// ─────────────────────────── Pieces ──────────────────────────────────
+
+function AnswerStat({ value, unit, label }: { value: string; unit: string; label: string }) {
+  return (
+    <div>
+      <p className="mf-display text-[20px] text-white">
+        {value}
+        <span className="ml-1 text-[12px] text-white/50">{unit}</span>
+      </p>
+      <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-white/50">{label}</p>
+    </div>
+  )
+}
+
+type SliderRowProps = {
+  icon: React.ReactNode
+  label: string
+  value: number
+  unit?: string
+  min: number
+  max: number
+  onChange: (v: number) => void
+  minLabel: string
+  maxLabel: string
+}
+
+function SliderRow({
+  icon,
+  label,
+  value,
+  unit = '',
+  min,
+  max,
+  onChange,
+  minLabel,
+  maxLabel,
+}: SliderRowProps) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="mf-eyebrow flex items-center gap-2 text-ink-muted">
+          <span className="text-ink-faint">{icon}</span>
+          {label}
+        </span>
+        <span className="mf-display text-[22px] text-navy">
+          {value}
+          {unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="mt-3 w-full cursor-pointer"
+        style={{ accentColor: '#0D9488' }}
+        aria-label={label}
+      />
+      <div className="mt-2 flex justify-between text-[10.5px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+    </div>
+  )
 }

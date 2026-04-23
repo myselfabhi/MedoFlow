@@ -26,6 +26,15 @@
     --subtle: 210 40% 96%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 84% 5%;
+
+    --mf-navy: #1e3a5f;
+    --mf-canvas: #fafafa;
+    --mf-hairline: #e5e7eb;
+    --mf-ink: #111827;
+    --mf-ink-muted: #6b7280;
+    --mf-teal: #0d9488;
+    --mf-teal-hover: #0f766e;
+    --mf-teal-wash: #f0fdfa;
   }
   .dark {
     --background: 222 84% 5%;
@@ -50,23 +59,167 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-[#fafafa];
+    @apply bg-[#fafafa] text-[color:var(--mf-ink)];
+    font-feature-settings: 'cv11', 'ss01';
   }
   ::selection {
     background-color: rgba(13, 148, 136, 0.15);
-    color: #1E3A5F;
+    color: #1e3a5f;
+  }
+}
+
+@layer components {
+  .mf-zone-navy {
+    background-color: var(--mf-navy);
+    color: #fff;
+  }
+  .mf-zone-white {
+    background-color: var(--mf-canvas);
+    color: var(--mf-ink);
+  }
+
+  .mf-card {
+    background-color: #ffffff;
+    border: 1px solid var(--mf-hairline);
+    border-radius: 12px;
+  }
+  .mf-card--hover {
+    transition: border-color 160ms cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  .mf-card--hover:hover {
+    border-color: #d4d4d8;
+  }
+
+  .mf-eyebrow {
+    font-family: var(--font-inter), Inter, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mf-teal);
+  }
+  .mf-zone-navy .mf-eyebrow {
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  .mf-display {
+    font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+
+  .mf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 44px;
+    padding: 0 1.25rem;
+    border-radius: 8px;
+    font-family: var(--font-inter), Inter, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    transition:
+      background-color 140ms cubic-bezier(0.4, 0, 0.6, 1),
+      color 140ms cubic-bezier(0.4, 0, 0.6, 1),
+      border-color 140ms cubic-bezier(0.4, 0, 0.6, 1);
+    white-space: nowrap;
+  }
+  .mf-btn-primary {
+    background-color: var(--mf-teal);
+    color: #fff;
+  }
+  .mf-btn-primary:hover {
+    background-color: var(--mf-teal-hover);
+  }
+  .mf-btn-ghost {
+    background-color: transparent;
+    color: var(--mf-teal);
+  }
+  .mf-btn-ghost:hover {
+    background-color: var(--mf-teal-wash);
+  }
+  .mf-btn-outline {
+    background-color: transparent;
+    color: var(--mf-navy);
+    border: 1px solid var(--mf-hairline);
+  }
+  .mf-btn-outline:hover {
+    background-color: var(--mf-canvas);
+    border-color: #d4d4d8;
+  }
+  .mf-zone-navy .mf-btn-primary {
+    background-color: #ffffff;
+    color: var(--mf-navy);
+  }
+  .mf-zone-navy .mf-btn-primary:hover {
+    background-color: rgba(255, 255, 255, 0.92);
+  }
+  .mf-zone-navy .mf-btn-ghost {
+    background-color: transparent;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  .mf-zone-navy .mf-btn-ghost:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.55);
+  }
+  .mf-btn-sm {
+    height: 36px;
+    padding: 0 0.875rem;
+    font-size: 13px;
+  }
+  .mf-btn-lg {
+    height: 52px;
+    padding: 0 1.75rem;
+    font-size: 15px;
+  }
+
+  .mf-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+  .mf-dot--ok {
+    background-color: #10b981;
+  }
+  .mf-dot--warn {
+    background-color: #f59e0b;
+  }
+  .mf-dot--err {
+    background-color: #ef4444;
+  }
+
+  .mf-stat-chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background-color: #f4f4f5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
   }
 }
 
 @layer utilities {
   .ai-gradient-text {
-    background: linear-gradient(135deg, #1C8B81 0%, #1A6B7A 50%, #223C58 100%);
+    background: linear-gradient(135deg, #1c8b81 0%, #1a6b7a 50%, #223c58 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .ai-gradient-bg {
-    background: linear-gradient(135deg, #1C8B81 0%, #1A6B7A 50%, #223C58 100%);
+    background: linear-gradient(135deg, #1c8b81 0%, #1a6b7a 50%, #223c58 100%);
+  }
+  .mf-grid-pattern {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
   }
 }
 
@@ -78,5 +231,32 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* EKG-style stroke-draw for MedoflowLoader.
+   Phase 1 (0 → 50%): line draws in from the left (dashoffset 100 → 0).
+   Phase 2 (50% → 100%): line sweeps off to the right (dashoffset 0 → -100).
+   Loops infinitely. One pathLength=100 makes the dasharray work on any
+   viewBox without hand-computed lengths. */
+@keyframes mf-ekg-draw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.mf-ekg-draw {
+  animation: mf-ekg-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-ekg-draw {
+    animation-duration: 3s;
   }
 }

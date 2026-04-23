@@ -1,4 +1,4 @@
-import type { Config } from 'tailwindcss';
+import type { Config } from 'tailwindcss'
 
 const config: Config = {
   darkMode: ['class'],
@@ -71,6 +71,24 @@ const config: Config = {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
         },
+        // MedoFlow semantic tokens — used by landing design system
+        navy: {
+          DEFAULT: '#1E3A5F',
+          soft: 'rgba(255, 255, 255, 0.72)',
+        },
+        ink: {
+          DEFAULT: '#111827',
+          muted: '#6B7280',
+          faint: '#9CA3AF',
+        },
+        hairline: '#E5E7EB',
+        teal: {
+          DEFAULT: '#0D9488',
+          hover: '#0F766E',
+          wash: '#F0FDFA',
+          bright: '#5EEAD4',
+        },
+        canvas: '#FAFAFA',
       },
       borderRadius: {
         lg: '0.75rem',
@@ -101,16 +119,16 @@ const config: Config = {
           to: { height: '0' },
         },
         'medoflow-float': {
-          '0%, 100%': { 
+          '0%, 100%': {
             transform: 'translateY(0)',
           },
-          '50%': { 
+          '50%': {
             transform: 'translateY(-10px)',
           },
         },
-        'buoyancy': {
+        buoyancy: {
           '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-6px)' }
+          '50%': { transform: 'translateY(-6px)' },
         },
         'logo-entrance': {
           '0%': { opacity: '0', transform: 'scale(0.85) translateY(4px)' },
@@ -121,7 +139,7 @@ const config: Config = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.85' },
         },
-        'marquee': {
+        marquee: {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
@@ -133,16 +151,16 @@ const config: Config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'float': 'medoflow-float 6s infinite ease-in-out',
-        'buoyancy': 'buoyancy 4s infinite ease-in-out',
+        float: 'medoflow-float 6s infinite ease-in-out',
+        buoyancy: 'buoyancy 4s infinite ease-in-out',
         'logo-entrance': 'logo-entrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         'logo-pulse': 'logo-pulse 3s ease-in-out infinite',
-        'marquee': 'marquee 30s linear infinite',
+        marquee: 'marquee 30s linear infinite',
         'pulse-glow': 'pulse-glow 4s ease-in-out infinite',
       },
     },
   },
   plugins: [require('tailwindcss-animate')],
-};
+}
 
-export default config;
+export default config
