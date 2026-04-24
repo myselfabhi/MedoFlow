@@ -182,11 +182,12 @@ const validateAppointmentWindow = (startTime: Date, endTime: Date) => {
   }
 }
 
-const lockBookingScope = async (
-  tx: Prisma.TransactionClient,
-  providerId: string,
-  patientId: string
-) => {
+// Using `any` for the tx type: Prisma.TransactionClient doesn't match
+// the shape produced by an extended client's $transaction. The call is
+// purely raw SQL (pg_advisory_xact_lock) so the structural type of the
+// tx doesn't matter beyond having $executeRaw, which any Prisma tx has.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lockBookingScope = async (tx: any, providerId: string, patientId: string) => {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-provider:${providerId}`}))`
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appointment-patient:${patientId}`}))`
 }

@@ -4,9 +4,15 @@ import { asyncHandler } from '../utils/asyncHandler'
 import { successResponse } from '../utils/apiResponse'
 import { validateRequest } from '../middleware/validateRequest'
 import { authRateLimit } from '../middleware/rateLimit'
+import { withPublicScope } from '../middleware/auth'
 import * as tenantService from '../services/tenantService'
 
 const router = Router()
+
+// Signup flow creates the first tenant/clinic/user before any user context
+// exists. The whole router runs in bypass scope; the service layer is
+// trusted to stamp tenantId on everything it creates.
+router.use(withPublicScope('tenant_signup'))
 
 const signupSchema = z.object({
   ownerName: z.string().min(2).max(100),

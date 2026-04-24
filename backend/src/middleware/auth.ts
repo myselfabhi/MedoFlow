@@ -4,6 +4,7 @@ import prisma from '../config/prisma'
 import { Role } from '@prisma/client'
 import { ApiError } from '../types/errors'
 import { hasPermission } from '../config/permissions'
+import { withTenantBypass, withTenantContext } from '../config/tenantContext'
 
 export const protect = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -85,7 +86,25 @@ export const protect = async (req: Request, _res: Response, next: NextFunction):
     // explicitly (or use requireClinicScope/requireTenantScope middleware).
     req.tenantId = user.clinic?.tenantId ?? null
     req.tenantContext = user.clinic?.tenant ?? null
-    next()
+
+    // Run the rest of the request chain inside an ALS scope so the Prisma
+    // tenant guard can assert that every clinic-scoped query carries this
+    // user's clinicId. PLATFORM_ADMIN gets a bypass (they work across
+    // tenants by design).
+    if (user.role === 'PLATFORM_ADMIN') {
+      withTenantBypass('platform_admin', () => next())
+      return
+    }
+    withTenantContext(
+      {
+        clinicId: user.clinicId,
+        tenantId: user.clinic?.tenantId ?? null,
+        userId: user.id,
+        role: user.role,
+        bypassReason: null,
+      },
+      () => next()
+    )
   } catch (err) {
     const error = err as ApiError
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
@@ -253,9 +272,41 @@ export const optionalProtect = async (
       req.clinicId = user.clinicId
       req.tenantId = user.clinic?.tenantId ?? null
       req.tenantContext = user.clinic?.tenant ?? null
+
+      if (user.role === 'PLATFORM_ADMIN') {
+        withTenantBypass('platform_admin:optional', () => next())
+        return
+      }
+      withTenantContext(
+        {
+          clinicId: user.clinicId,
+          tenantId: user.clinic?.tenantId ?? null,
+          userId: user.id,
+          role: user.role,
+          bypassReason: null,
+        },
+        () => next()
+      )
+      return
     }
-    next()
+    // No authenticated user — bypass the guard so public routes (e.g. the
+    // storefront, which hits Product/Package/Membership) can run. These
+    // endpoints still scope their queries by a clinic lookup from the
+    // subdomain/host, so data exposure is bounded at the route layer.
+    withTenantBypass('optional_protect:unauthenticated', () => next())
   } catch {
-    next()
+    withTenantBypass('optional_protect:error', () => next())
+  }
+}
+
+/**
+ * Mount on any router that intentionally operates outside clinic scope
+ * (login, register, refresh, webhooks, public storefront). The reason
+ * string is logged if the tenant guard ever sees this context, so pick
+ * something grep-able.
+ */
+export const withPublicScope = (reason: string) => {
+  return (_req: Request, _res: Response, next: NextFunction): void => {
+    withTenantBypass(`public:${reason}`, () => next())
   }
 }
