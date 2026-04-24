@@ -29,6 +29,15 @@ export const protect = async (req: Request, _res: Response, next: NextFunction):
         isActive: true,
         customRoleId: true,
         hasSeenPatientTour: true,
+        // Pull tenant info in the same round-trip — this is the canonical
+        // source of req.tenantId. PLATFORM_ADMIN has clinicId=null so this
+        // include just yields null.
+        clinic: {
+          select: {
+            tenantId: true,
+            tenant: { select: { status: true, plan: true } },
+          },
+        },
         customRole: {
           select: {
             id: true,
@@ -71,6 +80,11 @@ export const protect = async (req: Request, _res: Response, next: NextFunction):
       hasSeenPatientTour: user.hasSeenPatientTour,
     }
     req.clinicId = user.clinicId
+    // Canonical tenantId from clinic.tenantId. Null for PLATFORM_ADMIN or
+    // any legacy user without a clinic — downstream code MUST handle null
+    // explicitly (or use requireClinicScope/requireTenantScope middleware).
+    req.tenantId = user.clinic?.tenantId ?? null
+    req.tenantContext = user.clinic?.tenant ?? null
     next()
   } catch (err) {
     const error = err as ApiError
@@ -147,6 +161,34 @@ export const requirePermission = (...requiredKeys: string[]) => {
   }
 }
 
+/**
+ * Hard guard for routes that operate on clinic-scoped data. Returns 400 if
+ * the authenticated user has no clinicId — which happens for PLATFORM_ADMIN
+ * and for SUPER_ADMIN whose clinic setup isn't finished. Use this on
+ * controllers that index into `clinicId` without a defensive check.
+ *
+ * Chain after `protect`. Example:
+ *   router.post('/items', protect, requireClinicScope, controller.addItem)
+ */
+export const requireClinicScope = (req: Request, _res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    const err = new Error('Authentication required') as ApiError
+    err.statusCode = 401
+    next(err)
+    return
+  }
+  if (!req.user.clinicId) {
+    const err = new Error(
+      'This action requires a clinic-scoped account. Platform admins must act on behalf of a specific clinic.'
+    ) as ApiError
+    err.statusCode = 400
+    err.code = 'clinic_scope_required'
+    next(err)
+    return
+  }
+  next()
+}
+
 export const optionalProtect = async (
   req: Request,
   _res: Response,
@@ -173,6 +215,12 @@ export const optionalProtect = async (
         isActive: true,
         customRoleId: true,
         hasSeenPatientTour: true,
+        clinic: {
+          select: {
+            tenantId: true,
+            tenant: { select: { status: true, plan: true } },
+          },
+        },
         customRole: {
           select: {
             id: true,
@@ -203,6 +251,8 @@ export const optionalProtect = async (
         hasSeenPatientTour: user.hasSeenPatientTour,
       }
       req.clinicId = user.clinicId
+      req.tenantId = user.clinic?.tenantId ?? null
+      req.tenantContext = user.clinic?.tenant ?? null
     }
     next()
   } catch {

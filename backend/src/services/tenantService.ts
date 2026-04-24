@@ -52,7 +52,10 @@ const RESERVED_SUBDOMAINS = new Set([
   'dev',
   'staging',
   'medoflow',
-  'default',
+  // 'default' was listed here historically but the seed tenant uses that
+  // slug — removing it so the reserved list reflects what's actually
+  // forbidden for new signups. Tenant slug uniqueness is still enforced
+  // via the unique constraint on Brand.subdomain.
 ])
 
 /**

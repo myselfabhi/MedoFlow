@@ -7,6 +7,13 @@ export interface CreateClinicData {
   name: string
   email: string
   subscriptionPlan?: string
+  /**
+   * Required. The tenant this clinic belongs to. Callers must resolve the
+   * correct tenantId before calling — usually by creating a Tenant first
+   * (see `tenantService.provisionTenant`) or by reading the acting user's
+   * existing tenant context.
+   */
+  tenantId: string
 }
 
 export interface UpdateClinicData {
@@ -28,7 +35,7 @@ export const createClinic = async (data: CreateClinicData): Promise<Clinic> => {
       name: data.name,
       email: data.email,
       subscriptionPlan: data.subscriptionPlan || 'free',
-      tenantId: 'tenant_default',
+      tenantId: data.tenantId,
     },
   })
 }
@@ -95,6 +102,53 @@ export const getClinicForUser = async (userId: string) => {
   }
 }
 
+/**
+ * Resolves the tenant the given SUPER_ADMIN belongs to, creating one if none
+ * exists. This path is only reached by legacy accounts that predate the
+ * tenantService.provisionTenant signup flow — new signups always have a
+ * tenant already. The slug is derived from the user's email so re-runs are
+ * idempotent (no duplicate tenants per owner).
+ */
+async function resolveOrCreateTenantForOwner(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, clinicId: true },
+  })
+  if (!user) {
+    const err = new Error('User not found') as ApiError
+    err.statusCode = 404
+    throw err
+  }
+
+  // If the user already has a clinic, use its tenant (idempotent).
+  if (user.clinicId) {
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: user.clinicId },
+      select: { tenant: true },
+    })
+    if (clinic?.tenant) return clinic.tenant
+  }
+
+  // Derive a deterministic slug from the user's email local-part so we
+  // don't accumulate ghost tenants on retries.
+  const localPart = user.email.split('@')[0] || user.email
+  const slug = `owner-${localPart
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .slice(0, 40)}-${user.id.slice(-6)}`
+
+  return prisma.tenant.upsert({
+    where: { slug },
+    update: {},
+    create: {
+      name: user.email,
+      slug,
+      status: 'TRIAL',
+      plan: 'FREE',
+    },
+  })
+}
+
 export const setupClinicForSuperAdmin = async (
   userId: string,
   data: CreateClinicData & { location: UpsertLaunchLocationData }
@@ -116,13 +170,19 @@ export const setupClinicForSuperAdmin = async (
     throw err
   }
 
+  // Late-binding: the SUPER_ADMIN completing clinic setup for the first time
+  // may not yet have a tenant. If not, provision one keyed to their email
+  // (deterministic so re-runs are idempotent). Normal signups come through
+  // tenantService.provisionTenant and never hit this path.
+  const tenant = await resolveOrCreateTenantForOwner(userId)
+
   const clinic = await prisma.$transaction(async (tx) => {
     const createdClinic = await tx.clinic.create({
       data: {
         name: data.name.trim(),
         email: data.email.trim().toLowerCase(),
         subscriptionPlan: data.subscriptionPlan || 'free',
-        tenantId: 'tenant_default',
+        tenantId: tenant.id,
       },
     })
 
