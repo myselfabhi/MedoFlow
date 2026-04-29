@@ -9,7 +9,7 @@
  */
 
 import React from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { LoadingSkeleton } from '@/components/ui-system'
 import { useAuth } from '@/contexts/AuthContext'
 import { PublicNav } from '@/components/layout/PublicNav'
@@ -32,9 +32,15 @@ function isGatedPath(pathname: string | null): boolean {
 
 // On any clinic-owned route the visitor is a patient — they should never
 // see the Medoflow marketing chrome (nav + footer).
-function isClinicSite(pathname: string | null): boolean {
+//
+// /checkout is shared between Medoflow and clinic flows, so it's only
+// considered "clinic" when the cart drawer carried a `?clinic=<slug>`
+// param through to it (see CartModal#goToCheckout).
+function isClinicSite(pathname: string | null, search: URLSearchParams | null): boolean {
   if (!pathname) return false
-  return pathname.startsWith('/clinic/') || pathname.startsWith('/book/')
+  if (pathname.startsWith('/clinic/') || pathname.startsWith('/book/')) return true
+  if (pathname === '/checkout' && search?.get('clinic')) return true
+  return false
 }
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -53,7 +59,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   const needsAuthRedirect = !isLoading && !isAuthenticated && isGatedPath(pathname)
   const isLanding = pathname === '/'
-  const onClinicSite = isClinicSite(pathname)
+  const searchParams = useSearchParams()
+  const onClinicSite = isClinicSite(pathname, searchParams)
 
   return (
     <AuthModalProvider>

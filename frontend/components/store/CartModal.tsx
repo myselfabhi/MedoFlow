@@ -17,9 +17,15 @@ import { cn } from '@/lib/utils'
 import { useCart, type CartItem } from '@/hooks/useCart'
 import { categorize } from '@/lib/product-categories'
 
+const DEFAULT_ACCENT = '#0F766E' // teal-700 — matches the Medoflow store
+
+type ClinicCartCtx = { themeColor: string; routeId: string }
+
 type CartModalContextValue = {
   open: boolean
   setOpen: (v: boolean) => void
+  clinicCtx: ClinicCartCtx | null
+  setClinicCtx: (c: ClinicCartCtx | null) => void
 }
 
 const CartModalContext = React.createContext<CartModalContextValue | null>(null)
@@ -28,30 +34,60 @@ export function useCartModal() {
   const ctx = React.useContext(CartModalContext)
   if (!ctx) throw new Error('useCartModal must be used inside <CartModalProvider>')
   return {
-    open: () => ctx.setOpen(true),
+    /** Open the cart drawer. Pass clinic context to theme the CTA + carry
+     *  the routeId through to /checkout (so checkout stays clinic-branded). */
+    open: (clinic?: ClinicCartCtx | null) => {
+      if (clinic !== undefined) ctx.setClinicCtx(clinic ?? null)
+      ctx.setOpen(true)
+    },
     close: () => ctx.setOpen(false),
     isOpen: ctx.open,
+    /** Imperative setter for cases where another flow seeds the context. */
+    setClinicCtx: ctx.setClinicCtx,
   }
 }
 
 export function CartModalProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false)
-  const value = React.useMemo(() => ({ open, setOpen }), [open])
+  const [clinicCtx, setClinicCtx] = React.useState<ClinicCartCtx | null>(null)
+  const value = React.useMemo(
+    () => ({ open, setOpen, clinicCtx, setClinicCtx }),
+    [open, clinicCtx]
+  )
   return (
     <CartModalContext.Provider value={value}>
       {children}
-      <CartModal open={open} onOpenChange={setOpen} />
+      <CartModal open={open} onOpenChange={setOpen} clinicCtx={clinicCtx} />
     </CartModalContext.Provider>
   )
 }
 
-function CartModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function CartModal({
+  open,
+  onOpenChange,
+  clinicCtx,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  clinicCtx: ClinicCartCtx | null
+}) {
   const router = useRouter()
-  const { cart, subtotal, totalItems, updateQuantity, removeItem, isLoading } = useCart()
+  const { cart, subtotal, totalItems, updateQuantity, removeItem, isLoading, fetchCartItems } = useCart()
+  const accent = clinicCtx?.themeColor || DEFAULT_ACCENT
+
+  // Refetch every time the drawer is opened so items added from another
+  // surface (storefront card, product modal) appear immediately even if
+  // the underlying useCart instance was mounted before the addition.
+  React.useEffect(() => {
+    if (open) fetchCartItems()
+  }, [open, fetchCartItems])
 
   const goToCheckout = () => {
     onOpenChange(false)
-    router.push('/checkout')
+    const path = clinicCtx?.routeId
+      ? `/checkout?clinic=${encodeURIComponent(clinicCtx.routeId)}`
+      : '/checkout'
+    router.push(path)
   }
 
   return (
@@ -59,22 +95,26 @@ function CartModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: bo
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={cn(
-            'fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm',
+            'fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0'
           )}
         />
         <DialogPrimitive.Content
           className={cn(
-            'fixed right-0 top-0 z-[61] flex h-full w-full max-w-md flex-col bg-white shadow-2xl',
+            'fixed left-1/2 top-1/2 z-[61] flex max-h-[85vh] w-[96vw] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl bg-white shadow-2xl',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
-            'duration-300'
+            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
+            'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
+            'duration-200'
           )}
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: accent }}
+              >
                 <ShoppingBag className="h-4 w-4" />
               </div>
               <div>
@@ -131,7 +171,8 @@ function CartModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: bo
               <button
                 type="button"
                 onClick={goToCheckout}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                style={{ backgroundColor: accent }}
               >
                 Proceed to checkout
                 <ArrowRight className="h-4 w-4" />

@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAuthModal } from '@/components/auth/AuthModal'
 import { getMyAppointments } from '@/lib/patientApi'
 import type { Clinic, Service, Provider, Location } from '@/lib/types/booking'
+import { ClinicStorefront } from './ClinicStorefront'
 
 const TESTIMONIAL = {
   quote:
@@ -76,10 +77,14 @@ export function ClinicLanding({
   themeColor: string
   onBook: (serviceId: string) => void
 }) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
   const { openLogin, openSignup } = useAuthModal()
   const isPatient = user?.role === 'PATIENT'
-  const showPrivate = isAuthenticated && isPatient
+  // Patient is allowed to see private content only if they belong to THIS
+  // clinic. Cross-clinic patients are shown a wrong-clinic notice instead.
+  const belongsHere = isPatient && user?.clinicId === clinic.id
+  const showPrivate = isAuthenticated && isPatient && belongsHere
+  const wrongClinic = isAuthenticated && isPatient && !belongsHere
 
   const accentBg = `${themeColor}15`
   const accentBorder = `${themeColor}30`
@@ -435,7 +440,61 @@ export function ClinicLanding({
               )}
             </div>
           </section>
+
+          {/* ─── STOREFRONT PREVIEW (logged-in patients only) ──────────── */}
+          <section id="storefront" className="border-t border-slate-100 bg-slate-50/50">
+            <ClinicStorefront
+              clinicId={clinic.id}
+              routeId={clinic.slug ?? clinic.id}
+              clinicName={clinic.name}
+              themeColor={themeColor}
+              variant="preview"
+            />
+          </section>
         </>
+      ) : wrongClinic ? (
+        <section className="border-t border-slate-100 bg-slate-50 py-20 lg:py-24">
+          <div className="mx-auto max-w-2xl px-4 text-center lg:px-8">
+            <div
+              className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white"
+              style={{ backgroundColor: themeColor }}
+            >
+              <CalendarCheck className="h-6 w-6" />
+            </div>
+            <h2 className="mt-6 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              You're signed in to a different clinic
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-slate-500">
+              {clinic.name} is only available to its own patients. Log out and sign in
+              with a {clinic.name} account, or create one in 30 seconds.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  logout()
+                  // logout() keeps us on /clinic/* — let the modal open
+                  // after the auth state flips so the user can sign up.
+                  setTimeout(() => openSignup(), 80)
+                }}
+                className="inline-flex h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white shadow-md transition-opacity hover:opacity-90"
+                style={{ backgroundColor: themeColor }}
+              >
+                Log out & sign up here
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logout()
+                  setTimeout(() => openLogin(), 80)
+                }}
+                className="inline-flex h-12 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-bold text-slate-800 transition-colors hover:bg-slate-50"
+              >
+                Log out & sign in
+              </button>
+            </div>
+          </div>
+        </section>
       ) : (
         <section className="border-t border-slate-100 bg-slate-50 py-20 lg:py-24">
           <div className="mx-auto max-w-3xl px-4 text-center lg:px-8">

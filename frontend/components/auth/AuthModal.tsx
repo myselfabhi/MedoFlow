@@ -459,7 +459,11 @@ function LoginForm({
     setError(null)
     setSubmitting(true)
     try {
-      const user = await login(data.email, data.password)
+      // Forward the clinic from the path (slug or cuid) so the backend can
+      // reject cross-clinic logins from a clinic-branded surface. The same
+      // generic 401 is returned to avoid clinic enumeration.
+      const clinicHint = clinicIdFromPath(pathname)
+      const user = await login(data.email, data.password, clinicHint)
       onSuccess()
       const isPatientOnClinicSite =
         user.role === 'PATIENT' && pathname?.startsWith('/clinic/')
@@ -568,7 +572,7 @@ function SignupForm({
       const clinicId = clinicIdFromPath(pathname)
       await api.post('/auth/register', { ...data, clinicId: clinicId ?? undefined })
       try {
-        await login(data.email, data.password)
+        await login(data.email, data.password, clinicId)
         onSuccess()
       } catch {
         // Auto-login failed (rare) — fall back to the sign-in tab so the
