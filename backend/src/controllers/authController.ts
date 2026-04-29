@@ -46,7 +46,11 @@ export const register = asyncHandler(
 
 export const login = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const { email, password } = req.body
+    const { email, password, clinicId: clinicHint } = req.body as {
+      email: string
+      password: string
+      clinicId?: string | null
+    }
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -71,6 +75,27 @@ export const login = asyncHandler(
       const err = new Error('Invalid email or password') as ApiError
       err.statusCode = 401
       throw err
+    }
+
+    // Cross-clinic login guard.
+    //
+    // When the request comes from a clinic-branded page (`/clinic/<slug>`),
+    // the frontend forwards `clinicId` as a slug or cuid. We deliberately
+    // surface the SAME generic 401 here ("Invalid email or password") so an
+    // attacker can't enumerate which accounts belong to which clinic.
+    //
+    // PATIENT role is the only one this applies to — staff/SUPER_ADMIN sign
+    // in from /dashboard, not a clinic page, and never carry a clinicId hint.
+    if (clinicHint && user.role === 'PATIENT') {
+      const targetClinic = await prisma.clinic.findFirst({
+        where: { isActive: true, OR: [{ id: clinicHint }, { slug: clinicHint }] },
+        select: { id: true },
+      })
+      if (targetClinic && user.clinicId !== targetClinic.id) {
+        const err = new Error('Invalid email or password') as ApiError
+        err.statusCode = 401
+        throw err
+      }
     }
 
     const accessToken = generateAccessToken({

@@ -392,7 +392,7 @@ function CartButton({ translucent, cartCount }: { translucent: boolean; cartCoun
   return (
     <button
       type="button"
-      onClick={cartModal.open}
+      onClick={() => cartModal.open()}
       className={`relative p-2 transition-colors ${
         translucent ? 'text-white/80 hover:text-white' : 'text-ink-muted hover:text-ink'
       }`}

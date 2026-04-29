@@ -16,17 +16,20 @@ import React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useQuery } from '@tanstack/react-query'
 import {
+  ArrowRight,
   CalendarCheck,
   CalendarClock,
   ClipboardList,
   Loader2,
   Mail,
   MapPin,
+  ShoppingBag,
   Stethoscope,
   User as UserIcon,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   getMyAppointments,
   type PatientAppointment,
@@ -146,6 +149,7 @@ export function PatientHubModal({
                 appointments={appointments}
                 loading={appointmentsLoading}
                 themeColor={themeColor}
+                onClose={() => onOpenChange(false)}
               />
             )}
             {tab === 'appointments' && (
@@ -177,11 +181,21 @@ function OverviewPanel({
   appointments,
   loading,
   themeColor,
+  onClose,
 }: {
   appointments: PatientAppointment[] | undefined
   loading: boolean
   themeColor: string
+  onClose: () => void
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  // Pull the clinic id/slug out of the current path so the Shop tile can
+  // route to /clinic/<id>/store. The hub is always opened from inside a
+  // /clinic/* route, so this is reliable.
+  const clinicMatch = pathname?.match(/^\/clinic\/([^/?#]+)/)
+  const clinicRouteId = clinicMatch?.[1] ?? null
+
   if (loading) return <Spinner />
   const now = new Date()
   const upcoming = (appointments ?? [])
@@ -229,6 +243,38 @@ function OverviewPanel({
           value={String((appointments ?? []).length)}
         />
       </div>
+
+      {/* Shop tile — routes to the dedicated clinic storefront */}
+      {clinicRouteId && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose()
+            router.push(`/clinic/${clinicRouteId}/store`)
+          }}
+          className="group relative flex w-full items-center justify-between gap-3 overflow-hidden rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+          style={{ borderColor: `${themeColor}30`, backgroundColor: `${themeColor}08` }}
+        >
+          <div className="flex items-center gap-4">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+              style={{ backgroundColor: themeColor }}
+            >
+              <ShoppingBag className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[15px] font-bold text-slate-900">Shop the storefront</p>
+              <p className="mt-0.5 text-[12px] text-slate-500">
+                Curated products from your clinic
+              </p>
+            </div>
+          </div>
+          <ArrowRight
+            className="h-4 w-4 transition-transform group-hover:translate-x-1"
+            style={{ color: themeColor }}
+          />
+        </button>
+      )}
     </div>
   )
 }

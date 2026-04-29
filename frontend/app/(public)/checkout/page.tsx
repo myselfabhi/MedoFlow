@@ -1,30 +1,51 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/Card'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/button'
 import api from '@/lib/api'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import { StripePaymentForm } from '@/components/StripePaymentForm'
 import { useCart } from '@/hooks/useCart'
-import { LogIn } from 'lucide-react'
+import { useClinicContext } from '@/hooks/useClinicContext'
+import { LogIn, ShoppingBag, Package, ShieldCheck } from 'lucide-react'
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder'
 )
+
+const DEFAULT_THEME = '#0F766E'
 
 export default function CheckoutPage() {
   const { cart, isLoading, isAuthenticated } = useCart()
   const [isDemoSubmitting, setIsDemoSubmitting] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Clinic context — set when the patient is checking out from inside a
+  // clinic-branded site. We can't read the path here (we're at /checkout),
+  // so the cart drawer in the clinic site passes the clinic via ?clinic=
+  // query param. Falls back to no clinic if unset.
+  const clinicQuery = searchParams.get('clinic')
+  const clinicCtx = useClinicContextFromQuery(clinicQuery)
+
+  const themeColor = clinicCtx?.themeColor || DEFAULT_THEME
+  const clinicHomePath = clinicCtx ? `/clinic/${clinicCtx.routeId}` : '/'
+  const storePath = clinicCtx ? `/clinic/${clinicCtx.routeId}/store` : '/store'
+  const billingReturnPath = clinicCtx
+    ? `/clinic/${clinicCtx.routeId}` // patient hub modal lives there
+    : '/?view=billing'
+  const appointmentsReturnPath = clinicCtx
+    ? `/clinic/${clinicCtx.routeId}`
+    : '/?view=appointments'
 
   const handleInitiateCheckout = async () => {
     if (!isAuthenticated) {
-      router.push('/?auth=login&returnUrl=/checkout')
+      router.push(`/?auth=login&returnUrl=/checkout${clinicQuery ? `?clinic=${clinicQuery}` : ''}`)
       return
     }
     try {
@@ -38,14 +59,14 @@ export default function CheckoutPage() {
   const handleDemoPayment = async () => {
     if (isDemoSubmitting) return
     if (!isAuthenticated) {
-      router.push('/?auth=login&returnUrl=/checkout')
+      router.push(`/?auth=login&returnUrl=/checkout${clinicQuery ? `?clinic=${clinicQuery}` : ''}`)
       return
     }
     try {
       setIsDemoSubmitting(true)
       await api.post('/carts/checkout-demo')
       toast.success('Demo Payment successful!')
-      router.push('/?view=billing')
+      router.push(billingReturnPath)
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Demo Payment failed')
     } finally {
@@ -53,13 +74,17 @@ export default function CheckoutPage() {
     }
   }
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-24 space-y-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+        <div
+          className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200"
+          style={{ borderTopColor: themeColor }}
+        />
         <p className="text-slate-500 font-medium">Loading your items...</p>
       </div>
     )
+  }
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -69,7 +94,11 @@ export default function CheckoutPage() {
         </div>
         <h1 className="text-3xl font-bold text-slate-900">Your cart is empty</h1>
         <p className="text-slate-500">Looks like you haven't added anything to your cart yet.</p>
-        <Button onClick={() => router.push('/store')} className="rounded-full px-8">
+        <Button
+          onClick={() => router.push(storePath)}
+          className="rounded-full px-8 text-white"
+          style={{ backgroundColor: themeColor }}
+        >
           Go to Store
         </Button>
       </div>
@@ -87,6 +116,11 @@ export default function CheckoutPage() {
         <h1 className="text-[28px] font-black tracking-tight text-slate-900 sm:text-4xl">
           Review Order
         </h1>
+        {clinicCtx?.clinic && (
+          <p className="text-[12px] font-bold uppercase tracking-widest" style={{ color: themeColor }}>
+            {clinicCtx.clinic.name}
+          </p>
+        )}
         {!isAuthenticated && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2">
             <LogIn className="h-4 w-4" /> Guest Session
@@ -143,7 +177,10 @@ export default function CheckoutPage() {
         </div>
 
         <div className="space-y-6">
-          <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-primary text-white">
+          <Card
+            className="border-none shadow-xl rounded-[2rem] overflow-hidden text-white"
+            style={{ backgroundColor: themeColor }}
+          >
             <CardHeader className="p-8 border-none pb-0">
               <CardTitle className="text-white/60 text-sm font-black uppercase tracking-widest">
                 Order Summary
@@ -162,12 +199,12 @@ export default function CheckoutPage() {
               {!isAuthenticated ? (
                 <div className="space-y-4 pt-4">
                   <p className="text-xs text-center text-white/60 leading-relaxed font-medium">
-                    You are currently a guest. Please sign in to securely finalize your purchase and
-                    sync order to your account.
+                    You are currently a guest. Please sign in to securely finalize your purchase.
                   </p>
                   <Button
-                    className="w-full h-14 text-lg rounded-2xl bg-white text-primary hover:bg-white/90 font-bold shadow-2xl shadow-black/20"
-                    onClick={() => router.push('/?auth=login&returnUrl=/checkout')}
+                    className="w-full h-14 text-lg rounded-2xl bg-white hover:bg-white/90 font-bold shadow-2xl shadow-black/20"
+                    style={{ color: themeColor }}
+                    onClick={() => router.push(`/?auth=login&returnUrl=/checkout${clinicQuery ? `?clinic=${clinicQuery}` : ''}`)}
                   >
                     Login to Checkout
                   </Button>
@@ -177,7 +214,8 @@ export default function CheckoutPage() {
                   {!clientSecret ? (
                     <div className="space-y-4">
                       <Button
-                        className="w-full h-14 text-lg rounded-2xl bg-white text-primary hover:bg-white/90 font-bold shadow-2xl shadow-black/20"
+                        className="w-full h-14 text-lg rounded-2xl bg-white hover:bg-white/90 font-bold shadow-2xl shadow-black/20"
+                        style={{ color: themeColor }}
                         onClick={handleInitiateCheckout}
                       >
                         Secure Checkout
@@ -197,7 +235,7 @@ export default function CheckoutPage() {
                         <StripePaymentForm
                           clientSecret={clientSecret}
                           buttonLabel={`Pay $${subtotal.toFixed(2)}`}
-                          onSuccess={() => router.push('/?view=appointments')}
+                          onSuccess={() => router.push(appointmentsReturnPath)}
                         />
                       </Elements>
                     </div>
@@ -207,7 +245,7 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
           <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 flex items-start gap-4">
-            <ShieldCheck className="h-6 w-6 text-primary-600 shrink-0" />
+            <ShieldCheck className="h-6 w-6 shrink-0" style={{ color: themeColor }} />
             <div>
               <p className="text-sm font-bold text-slate-900">Secure Payment</p>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -215,11 +253,42 @@ export default function CheckoutPage() {
               </p>
             </div>
           </div>
+          {clinicCtx && (
+            <button
+              type="button"
+              onClick={() => router.push(clinicHomePath)}
+              className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-900"
+            >
+              ← Back to {clinicCtx.clinic?.name ?? 'clinic'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// Add these icons to the imports if missing
-import { ShoppingBag, Package, ShieldCheck } from 'lucide-react'
+// ─────────────────────── Local helper ────────────────────────────────
+
+import { useQuery } from '@tanstack/react-query'
+import { getClinic } from '@/lib/clinicApi'
+import type { Clinic } from '@/lib/types/booking'
+
+/**
+ * Reads `?clinic=<slug|cuid>` from the checkout URL and resolves to a
+ * Clinic + theme color. Cart drawer on the clinic site appends this so
+ * /checkout knows which brand to render.
+ */
+function useClinicContextFromQuery(idOrSlug: string | null) {
+  const { data } = useQuery({
+    queryKey: ['clinic', idOrSlug],
+    queryFn: () => getClinic(idOrSlug as string),
+    enabled: !!idOrSlug,
+  })
+  if (!idOrSlug) return null
+  return {
+    clinic: (data ?? null) as Clinic | null,
+    themeColor: data?.themeColor?.trim() || DEFAULT_THEME,
+    routeId: idOrSlug,
+  }
+}

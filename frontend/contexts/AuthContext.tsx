@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<User>
+  login: (email: string, password: string, clinicId?: string | null) => Promise<User>
   logout: () => Promise<void>
   getCurrentUser: () => Promise<User | null>
   refetchUser: () => Promise<User | null>
@@ -52,11 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, clinicId?: string | null) => {
+    // `clinicId` (slug or cuid) is forwarded so the backend can reject
+    // cross-clinic logins from a clinic-branded sign-in surface. Backend
+    // returns the same generic 401 for safety.
     const { data } = await api.post<{
       success: boolean
       data: { accessToken: string; user: User }
-    }>('/auth/login', { email, password })
+    }>('/auth/login', { email, password, clinicId })
     const payload = data?.data
     if (!payload?.accessToken || !payload?.user) {
       throw new Error((data as { message?: string })?.message || 'Invalid response from server')

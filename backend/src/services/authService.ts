@@ -1,6 +1,7 @@
 import * as argon2 from 'argon2'
 import prisma from '../config/prisma'
 import { ApiError } from '../types/errors'
+import { ensurePatientClinicMembership } from './patientMembershipService'
 
 export interface RegisterBody {
   name: string
@@ -53,7 +54,7 @@ export const registerUser = async (body: RegisterBody) => {
     resolvedClinicId = found?.id ?? null
   }
 
-  return prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       name: body.name.trim(),
       email: body.email.trim().toLowerCase(),
@@ -71,4 +72,26 @@ export const registerUser = async (body: RegisterBody) => {
       createdAt: true,
     },
   })
+
+  // Patients who sign up from a clinic site (clinicId carried via path) need
+  // a PatientClinicMembership row — that's the source of truth that
+  // `requireClinicScope` consults before allowing cart mutations, bookings,
+  // etc. Without this row, fresh signups would 403 the moment they try to
+  // shop or book.
+  if (resolvedClinicId) {
+    try {
+      await ensurePatientClinicMembership({
+        clinicId: resolvedClinicId,
+        patientId: created.id,
+      })
+    } catch (err) {
+      // Don't block signup if membership upsert fails — the user is still
+      // valid; they'll hit a clearer error path on the next clinic-scoped
+      // action and an admin can re-link them.
+      // eslint-disable-next-line no-console
+      console.error('[authService] ensurePatientClinicMembership failed', err)
+    }
+  }
+
+  return created
 }
