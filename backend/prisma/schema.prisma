@@ -242,6 +242,9 @@ model Clinic {
   tenantId         String
   name             String
   email            String
+  slug             String?  @unique
+  logoUrl          String?
+  themeColor       String?
   subscriptionPlan String   @default("free")
   isActive         Boolean  @default(true)
   aiEnabled        Boolean  @default(true)

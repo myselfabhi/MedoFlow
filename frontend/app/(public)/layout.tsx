@@ -20,13 +20,21 @@ import { ProductDetailProvider } from '@/components/store/ProductDetailModal'
 import { BookingModalProvider } from '@/components/booking/BookingModal'
 
 // Routes within (public) that require authentication.
-// Per PRD §8.2 logged-out users only see landing (/), clinic landing (/clinic/*),
-// and login/signup. Everything below requires a patient (or higher) to be signed in.
-const GATED_PREFIXES = ['/store', '/book', '/checkout', '/payment', '/intake', '/account']
+// `/book` is intentionally NOT here — the clinic page handles its own
+// patient auth via the in-page modal so we never bounce a clinic visitor
+// to the Medoflow marketing site.
+const GATED_PREFIXES = ['/store', '/checkout', '/payment', '/intake', '/account']
 
 function isGatedPath(pathname: string | null): boolean {
   if (!pathname) return false
   return GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
+
+// On any clinic-owned route the visitor is a patient — they should never
+// see the Medoflow marketing chrome (nav + footer).
+function isClinicSite(pathname: string | null): boolean {
+  if (!pathname) return false
+  return pathname.startsWith('/clinic/') || pathname.startsWith('/book/')
 }
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +53,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   const needsAuthRedirect = !isLoading && !isAuthenticated && isGatedPath(pathname)
   const isLanding = pathname === '/'
+  const onClinicSite = isClinicSite(pathname)
 
   return (
     <AuthModalProvider>
@@ -52,10 +61,11 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         <ProductDetailProvider>
           <BookingModalProvider>
             <div className="min-h-screen bg-canvas">
-              <PublicNav />
-              {/* Landing page bleeds into the nav (transparent hero); interior pages
-                need top padding since the nav is fixed. */}
-              <main className={isLanding ? '' : 'pt-16 md:pt-18'}>
+              {/* Hide Medoflow chrome on clinic-owned URLs — patient never
+                  sees the marketing brand. The clinic page renders its
+                  own themed header + footer. */}
+              {!onClinicSite && <PublicNav />}
+              <main className={isLanding || onClinicSite ? '' : 'pt-16 md:pt-18'}>
                 {needsAuthRedirect ? (
                   <div className="mx-auto max-w-md px-4 py-20">
                     <LoadingSkeleton variant="card" />
@@ -64,7 +74,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                   children
                 )}
               </main>
-              <PublicFooter />
+              {!onClinicSite && <PublicFooter />}
             </div>
           </BookingModalProvider>
         </ProductDetailProvider>

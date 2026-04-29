@@ -6,6 +6,10 @@ export interface RegisterBody {
   name: string
   email: string
   password: string
+  // Optional. Carried through from the clinic page (`/clinic/[idOrSlug]`)
+  // so a new patient is auto-linked to the clinic they signed up from.
+  // Can be either a cuid or a slug; we resolve to the canonical cuid.
+  clinicId?: string | null
 }
 
 const validateRegistration = (body: RegisterBody): void => {
@@ -37,13 +41,25 @@ export const registerUser = async (body: RegisterBody) => {
     parallelism: 1,
   })
 
+  // Resolve the optional clinic carry-through. Accepts either the cuid
+  // or the public slug. Falls back silently to null if unknown so a bad
+  // value never blocks signup.
+  let resolvedClinicId: string | null = null
+  if (body.clinicId) {
+    const found = await prisma.clinic.findFirst({
+      where: { isActive: true, OR: [{ id: body.clinicId }, { slug: body.clinicId }] },
+      select: { id: true },
+    })
+    resolvedClinicId = found?.id ?? null
+  }
+
   return prisma.user.create({
     data: {
       name: body.name.trim(),
       email: body.email.trim().toLowerCase(),
       password: hashedPassword,
       role: 'PATIENT',
-      clinicId: null,
+      clinicId: resolvedClinicId,
     },
     select: {
       id: true,

@@ -72,9 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearAccessToken()
       setUser(null)
-      router.push('/')
+      // If the user is currently on a clinic site, drop them back to the
+      // clinic landing — never bounce them to the Medoflow marketing root.
+      const onClinicSite = pathname?.startsWith('/clinic/')
+      const target = onClinicSite ? pathname! : '/'
+      router.push(target)
     }
-  }, [router])
+  }, [pathname, router])
 
   const markPatientTourSeen = useCallback(async () => {
     try {

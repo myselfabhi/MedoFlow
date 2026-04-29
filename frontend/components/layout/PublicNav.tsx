@@ -32,6 +32,7 @@ import { useCart } from '@/hooks/useCart'
 import { useCartModal } from '@/components/store/CartModal'
 import { useBookingModal } from '@/components/booking/BookingModal'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { toast } from 'sonner'
 
 export function PublicNav() {
   const pathname = usePathname()
@@ -55,9 +56,10 @@ export function PublicNav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [isLanding])
 
-  // Close drawer whenever we navigate away.
+  // Close drawer and dismiss stale toasts whenever we navigate away.
   React.useEffect(() => {
     setDrawerOpen(false)
+    toast.dismiss()
   }, [pathname])
 
   // Outside-click for avatar menu.
@@ -146,7 +148,7 @@ export function PublicNav() {
               onClick={openLogin}
               className={`mf-btn mf-btn-sm ${translucent ? 'mf-btn-primary' : 'mf-btn-outline'} whitespace-nowrap`}
             >
-              Log in
+              Clinic login
             </button>
           )}
 

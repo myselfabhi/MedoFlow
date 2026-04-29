@@ -7,6 +7,7 @@ import * as clinicController from '../controllers/clinicController';
 import {
   clinicSetupSchema,
   clinicUpdateSchema,
+  generateWebsiteSchema,
   locationUpsertSchema,
 } from '../validation/module1Schemas';
 
@@ -39,6 +40,13 @@ router.put(
   requireClinic,
   validateRequest(locationUpsertSchema),
   clinicController.upsertLaunchLocation
+);
+router.post(
+  '/generate-website',
+  setClinicFromUser,
+  requireClinic,
+  validateRequest(generateWebsiteSchema),
+  clinicController.generateWebsite
 );
 
 export default router;

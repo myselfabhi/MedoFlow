@@ -108,6 +108,18 @@ function BookingPageContent() {
     enabled: !!clinicId,
   })
 
+  // Apply the clinic's brand color across the booking page so the patient
+  // never sees Medoflow's teal — just the clinic accent they came from.
+  const themeColor = clinic?.themeColor?.trim() || '#0D9488'
+  const themeStyle = React.useMemo(
+    () =>
+      ({
+        // Override Tailwind's primary-* tokens for this subtree only.
+        ['--clinic-accent' as string]: themeColor,
+      }) as React.CSSProperties,
+    [themeColor]
+  )
+
   const { data: services } = useQuery({
     queryKey: ['clinic-services', clinicId],
     queryFn: () => getClinicServices(clinicId),
@@ -226,6 +238,12 @@ function BookingPageContent() {
     }
   }
 
+  // Track the just-confirmed appointment so we can render a themed
+  // celebration card without leaving the clinic site. Replaces the old
+  // `router.push('/?view=appointments')` bounce that dropped patients
+  // back onto the Medoflow marketing root.
+  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string | null>(null)
+
   const handleBooking = async () => {
     try {
       const { appointment, clientSecret } = await createAppointment({
@@ -244,8 +262,8 @@ function BookingPageContent() {
       if (clientSecret) {
         router.push(`/payment/${appointment.id}?clientSecret=${clientSecret}`)
       } else {
-        toast.success('Appointment booked successfully!')
-        router.push('/?view=appointments')
+        setConfirmedAppointmentId(appointment.id)
+        setStep(4)
       }
     } catch (err) {
       toast.error('Booking failed. Please try again.')
@@ -273,15 +291,30 @@ function BookingPageContent() {
     )
   }
 
+  // Build a "Back to clinic" target that lands on /clinic/[slug or id]
+  // rather than the Medoflow root.
+  const backHref = clinic?.slug
+    ? `/clinic/${clinic.slug}`
+    : clinicId
+      ? `/clinic/${clinicId}`
+      : '/'
+
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-slate-50 min-h-screen" style={themeStyle}>
       <div className="container mx-auto px-4 py-12 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-3 items-start">
           <div className="lg:col-span-2 space-y-8">
             <div className="space-y-2">
               <Link
-                href="/"
-                className="inline-flex items-center text-sm text-slate-500 hover:text-primary-600 transition-colors"
+                href={backHref}
+                className="inline-flex items-center text-sm text-slate-500 transition-colors"
+                style={{ color: undefined }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = themeColor
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = ''
+                }}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to clinic
               </Link>
@@ -289,7 +322,7 @@ function BookingPageContent() {
                 Book {service?.name || 'Consultation'}
               </h1>
 
-              <div className="flex items-center gap-4 pt-4">
+              <div className={cn('flex items-center gap-4 pt-4', step === 4 && 'hidden')}>
                 {STEPS.map((s, i) => (
                   <React.Fragment key={s}>
                     <div className="flex items-center gap-2">
@@ -299,9 +332,10 @@ function BookingPageContent() {
                           i < step
                             ? 'bg-emerald-500 text-white'
                             : i === step
-                              ? 'bg-primary-600 text-white'
+                              ? 'text-white'
                               : 'bg-slate-200 text-slate-500'
                         )}
+                        style={i === step ? { backgroundColor: themeColor } : undefined}
                       >
                         {i < step ? <CheckCircle2 className="h-5 w-5" /> : i + 1}
                       </div>
@@ -349,9 +383,17 @@ function BookingPageContent() {
                           className={cn(
                             'flex items-center justify-between p-6 rounded-2xl border-2 transition-all text-left',
                             !providerId
-                              ? 'border-primary-600 bg-primary-50/30'
+                              ? ''
                               : 'border-slate-100 hover:border-slate-200'
                           )}
+                          style={
+                            !providerId
+                              ? {
+                                  borderColor: themeColor,
+                                  backgroundColor: `${themeColor}10`,
+                                }
+                              : undefined
+                          }
                         >
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
@@ -381,9 +423,17 @@ function BookingPageContent() {
                             className={cn(
                               'flex items-center justify-between p-6 rounded-2xl border-2 transition-all text-left',
                               providerId === p.id
-                                ? 'border-primary-600 bg-primary-50/30'
+                                ? ''
                                 : 'border-slate-100 hover:border-slate-200'
                             )}
+                            style={
+                              providerId === p.id
+                                ? {
+                                    borderColor: themeColor,
+                                    backgroundColor: `${themeColor}10`,
+                                  }
+                                : undefined
+                            }
                           >
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center border-2 border-white shadow-sm">
@@ -452,17 +502,34 @@ function BookingPageContent() {
                                         onClick={() => handleSlotSelect(slot)}
                                         className={cn(
                                           'flex-1 h-14 rounded-2xl border-2 font-bold transition-all duration-200',
-                                          isPending
-                                            ? 'border-slate-400 bg-slate-600 text-white w-1/2'
-                                            : 'border-primary-100 text-primary-600 hover:border-primary-600 hover:bg-primary-50'
+                                          isPending && 'border-slate-400 bg-slate-600 text-white w-1/2'
                                         )}
+                                        style={
+                                          isPending
+                                            ? undefined
+                                            : {
+                                                borderColor: `${themeColor}33`,
+                                                color: themeColor,
+                                              }
+                                        }
+                                        onMouseEnter={(e) => {
+                                          if (isPending) return
+                                          e.currentTarget.style.borderColor = themeColor
+                                          e.currentTarget.style.backgroundColor = `${themeColor}10`
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (isPending) return
+                                          e.currentTarget.style.borderColor = `${themeColor}33`
+                                          e.currentTarget.style.backgroundColor = ''
+                                        }}
                                       >
                                         {format(parseISO(slot.start), 'h:mm a')}
                                       </button>
                                       {isPending && (
                                         <button
                                           onClick={() => handleSlotSelect(slot)}
-                                          className="h-14 px-6 bg-primary-600 text-white rounded-2xl font-bold animate-in slide-in-from-left-2 fade-in duration-200"
+                                          className="h-14 px-6 text-white rounded-2xl font-bold animate-in slide-in-from-left-2 fade-in duration-200"
+                                          style={{ backgroundColor: themeColor }}
                                         >
                                           Confirm
                                         </button>
@@ -578,7 +645,11 @@ function BookingPageContent() {
                         >
                           Back
                         </AppButton>
-                        <AppButton type="submit" className="flex-1 rounded-full h-12 shadow-lg">
+                        <AppButton
+                          type="submit"
+                          className="flex-1 rounded-full h-12 shadow-lg text-white border-0"
+                          style={{ backgroundColor: themeColor }}
+                        >
                           Continue <ArrowRight className="ml-2 h-4 w-4" />
                         </AppButton>
                       </div>
@@ -588,7 +659,13 @@ function BookingPageContent() {
 
                 {step === 3 && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 text-center">
-                    <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto text-primary-600 mb-6">
+                    <div
+                      className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+                      style={{
+                        backgroundColor: `${themeColor}15`,
+                        color: themeColor,
+                      }}
+                    >
                       <CheckCircle2 className="h-10 w-10" />
                     </div>
                     <h2 className="text-3xl font-black text-slate-900">Review & Confirm</h2>
@@ -677,14 +754,38 @@ function BookingPageContent() {
                         Back
                       </AppButton>
                       <AppButton
-                        className="w-full sm:w-auto px-12 rounded-full h-14 text-lg font-bold shadow-2xl"
+                        className="w-full sm:w-auto px-12 rounded-full h-14 text-lg font-bold shadow-2xl text-white border-0"
+                        style={{ backgroundColor: themeColor }}
                         onClick={handleBooking}
                       >
-                        {selectedPackageId ? 'Confirm with Package' : 'Proceed to Payment'}{' '}
+                        {selectedPackageId
+                          ? 'Confirm with Package'
+                          : `Confirm visit · $${service?.defaultPrice ?? '—'}`}{' '}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </AppButton>
                     </div>
                   </div>
+                )}
+
+                {step === 4 && confirmedAppointmentId && (
+                  <BookingConfirmation
+                    themeColor={themeColor}
+                    clinic={clinic}
+                    serviceName={service?.name ?? 'your visit'}
+                    providerName={
+                      selectedProvider
+                        ? `Dr. ${selectedProvider.firstName} ${selectedProvider.lastName}`
+                        : 'Your clinician'
+                    }
+                    startTime={selectedSlot?.start ?? null}
+                    locationName={
+                      locations?.find((l) => l.id === selectedSlot?.locationId)?.name ??
+                      locations?.[0]?.name ??
+                      null
+                    }
+                    backHref={backHref}
+                    patientFirstName={user?.name?.split(' ')[0] ?? 'there'}
+                  />
                 )}
               </AppCardContent>
             </AppCard>
@@ -722,5 +823,155 @@ export default function BookingPage() {
     <React.Suspense fallback={null}>
       <BookingPageContent />
     </React.Suspense>
+  )
+}
+
+// ─────────────────────── Booking confirmation ───────────────────────
+
+/**
+ * Themed in-clinic celebration card shown after a successful booking.
+ * Replaces the old `router.push('/?view=appointments')` bounce that
+ * dropped the patient onto the Medoflow marketing root.
+ */
+function BookingConfirmation({
+  themeColor,
+  clinic,
+  serviceName,
+  providerName,
+  startTime,
+  locationName,
+  backHref,
+  patientFirstName,
+}: {
+  themeColor: string
+  clinic?: { name?: string } | null | undefined
+  serviceName: string
+  providerName: string
+  startTime: string | null
+  locationName: string | null
+  backHref: string
+  patientFirstName: string
+}) {
+  // Build a downloadable .ics file inline so patients can drop the
+  // visit straight onto their calendar — the single highest-leverage
+  // post-booking action.
+  const icsHref = React.useMemo(() => {
+    if (!startTime) return null
+    const start = new Date(startTime)
+    const end = new Date(start.getTime() + 30 * 60 * 1000)
+    const fmt = (d: Date) =>
+      d
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d{3}/, '')
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Medoflow//Clinic Booking//EN',
+      'BEGIN:VEVENT',
+      `UID:${Date.now()}@medoflow`,
+      `DTSTAMP:${fmt(new Date())}`,
+      `DTSTART:${fmt(start)}`,
+      `DTEND:${fmt(end)}`,
+      `SUMMARY:${serviceName} at ${clinic?.name ?? 'Clinic'}`,
+      `DESCRIPTION:Appointment with ${providerName}`,
+      locationName ? `LOCATION:${locationName}` : '',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ]
+      .filter(Boolean)
+      .join('\r\n')
+    return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
+  }, [startTime, serviceName, providerName, clinic?.name, locationName])
+
+  const startLabel = startTime
+    ? new Date(startTime).toLocaleString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 text-center">
+      <div
+        className="mx-auto flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
+      >
+        <CheckCircle2 className="h-10 w-10" />
+      </div>
+      <div>
+        <h2 className="text-3xl font-black text-slate-900">
+          You're booked, {patientFirstName}.
+        </h2>
+        <p className="mx-auto mt-3 max-w-md text-slate-500">
+          We've sent a confirmation to your email. The clinic team will be ready for you.
+        </p>
+      </div>
+
+      <div
+        className="mx-auto max-w-md rounded-2xl border bg-white p-6 text-left"
+        style={{ borderColor: `${themeColor}30` }}
+      >
+        <p
+          className="text-[10px] font-black uppercase tracking-widest"
+          style={{ color: themeColor }}
+        >
+          {clinic?.name ?? 'Your visit'}
+        </p>
+        <p className="mt-2 text-lg font-bold text-slate-900">{serviceName}</p>
+        <div className="mt-4 space-y-2 text-sm text-slate-600">
+          {startLabel && (
+            <div className="flex items-start gap-2">
+              <CalendarIcon className="mt-0.5 h-4 w-4 text-slate-400" />
+              <span>{startLabel}</span>
+            </div>
+          )}
+          <div className="flex items-start gap-2">
+            <User className="mt-0.5 h-4 w-4 text-slate-400" />
+            <span>{providerName}</span>
+          </div>
+          {locationName && (
+            <div className="flex items-start gap-2">
+              <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
+              <span>{locationName}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-md rounded-2xl bg-slate-50 p-5 text-left">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+          What to bring
+        </p>
+        <ul className="mt-3 space-y-1.5 text-sm text-slate-600">
+          <li>• A valid photo ID</li>
+          <li>• Your insurance card (if applicable)</li>
+          <li>• A list of any current medications</li>
+        </ul>
+      </div>
+
+      <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row">
+        {icsHref && (
+          <a
+            href={icsHref}
+            download="appointment.ics"
+            className="inline-flex h-12 items-center gap-2 rounded-full px-6 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: themeColor }}
+          >
+            <CalendarIcon className="h-4 w-4" />
+            Add to calendar
+          </a>
+        )}
+        <Link
+          href={backHref}
+          className="inline-flex h-12 items-center rounded-full border border-slate-200 bg-white px-6 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          Back to clinic
+        </Link>
+      </div>
+    </div>
   )
 }

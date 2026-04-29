@@ -1,4 +1,5 @@
 import axios from 'axios';
+import authedApi from './api';
 import type { Clinic } from './types/booking';
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -45,4 +46,26 @@ export const getPublicClinicMemberships = async (clinicId: string) => {
 export const getPublicProduct = async (id: string) => {
   const { data } = await api.get(`/products/${id}`);
   return data.data.product;
+};
+
+export interface GenerateWebsiteInput {
+  name: string;
+  logoUrl?: string;
+  themeColor?: string;
+}
+
+export interface GenerateWebsiteResult {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  themeColor: string | null;
+  websiteUrl: string;
+}
+
+export const generateClinicWebsite = async (
+  input: GenerateWebsiteInput
+): Promise<GenerateWebsiteResult> => {
+  const { data } = await authedApi.post('/clinics/generate-website', input);
+  return data.data as GenerateWebsiteResult;
 };
