@@ -15,7 +15,7 @@ import { StatusChip } from './primitives'
 import { useAuthModal } from '@/components/auth/AuthModal'
 
 export function FinalCTASection() {
-  const { openSignup } = useAuthModal()
+  const { openLogin } = useAuthModal()
   return (
     <section className="mf-zone-navy relative overflow-hidden">
       <div className="absolute inset-0 mf-grid-pattern opacity-50" aria-hidden />
@@ -36,8 +36,8 @@ export function FinalCTASection() {
         </p>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <button type="button" onClick={openSignup} className="mf-btn mf-btn-lg mf-btn-primary">
-            Start free trial
+          <button type="button" onClick={openLogin} className="mf-btn mf-btn-lg mf-btn-primary">
+            Clinic login
             <ArrowRight className="h-4 w-4" />
           </button>
           <Link href="#demo" className="mf-btn mf-btn-lg mf-btn-ghost">

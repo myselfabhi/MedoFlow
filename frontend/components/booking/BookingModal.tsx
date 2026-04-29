@@ -183,6 +183,7 @@ function BookingModal({
         return
       }
       setConfirmedId(appointment.id)
+      toast.dismiss()
       setStep('success')
     } catch (err: unknown) {
       const msg =

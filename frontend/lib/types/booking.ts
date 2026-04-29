@@ -2,6 +2,9 @@ export interface Clinic {
   id: string;
   name: string;
   email: string;
+  slug?: string | null;
+  logoUrl?: string | null;
+  themeColor?: string | null;
   subscriptionPlan: string;
 }
 

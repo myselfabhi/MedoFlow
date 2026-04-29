@@ -8,6 +8,19 @@ import * as availabilityService from '../services/availabilityService';
 
 const ONLINE_LOCATION_NAMES = ['online', 'virtual'];
 
+// Public clinic routes accept either the cuid (e.g. `clinic_0dzeprrd`) or
+// the human slug (e.g. `everwell`) in the `:id` path param. Every handler
+// below normalises through this resolver so /clinic/everwell shows the same
+// data as /clinic/<cuid>.
+const resolveClinicId = async (idOrSlug: string): Promise<string | null> => {
+  if (!idOrSlug) return null;
+  const clinic = await prisma.clinic.findFirst({
+    where: { isActive: true, OR: [{ slug: idOrSlug }, { id: idOrSlug }] },
+    select: { id: true },
+  });
+  return clinic?.id ?? null;
+};
+
 export const listClinics = asyncHandler(
   async (_req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinics = await prisma.clinic.findMany({
@@ -16,6 +29,9 @@ export const listClinics = asyncHandler(
         id: true,
         name: true,
         email: true,
+        slug: true,
+        logoUrl: true,
+        themeColor: true,
         subscriptionPlan: true,
       },
       orderBy: { name: 'asc' },
@@ -24,15 +40,21 @@ export const listClinics = asyncHandler(
   }
 );
 
+// Resolve by slug first, then by id. Lets the same /clinics/:idOrSlug
+// route work for both pretty URLs and legacy cuid links without forking
+// the API surface.
 export const getClinic = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const id = req.params.id as string;
+    const idOrSlug = req.params.id as string;
     const clinic = await prisma.clinic.findFirst({
-      where: { id, isActive: true },
+      where: { isActive: true, OR: [{ slug: idOrSlug }, { id: idOrSlug }] },
       select: {
         id: true,
         name: true,
         email: true,
+        slug: true,
+        logoUrl: true,
+        themeColor: true,
         subscriptionPlan: true,
       },
     });
@@ -48,9 +70,14 @@ export const getClinic = asyncHandler(
 export const getClinicServices = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const id = req.params.id as string;
+    const clinicId = await resolveClinicId(id);
+    if (!clinicId) {
+      successResponse(res, 200, 'Services retrieved', { services: [] });
+      return;
+    }
     const services = await prisma.service.findMany({
       where: {
-        clinicId: id,
+        clinicId,
         isActive: true,
         isArchived: false,
         discipline: { isArchived: false },
@@ -69,7 +96,12 @@ export const getClinicServices = asyncHandler(
 
 export const getClinicProviders = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const clinicId = (req.params.id as string) || (req.query.clinicId as string);
+    const idOrSlug = (req.params.id as string) || (req.query.clinicId as string);
+    const clinicId = await resolveClinicId(idOrSlug);
+    if (!clinicId) {
+      successResponse(res, 200, 'Providers retrieved', { providers: [] });
+      return;
+    }
     const providers = await prisma.provider.findMany({
       where: { clinicId, isActive: true },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -106,9 +138,14 @@ export const getClinicProviders = asyncHandler(
 
 export const getClinicLocations = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const id = req.params.id as string;
+    const idOrSlug = req.params.id as string;
+    const clinicId = await resolveClinicId(idOrSlug);
+    if (!clinicId) {
+      successResponse(res, 200, 'Locations retrieved', { locations: [] });
+      return;
+    }
     const locations = await prisma.location.findMany({
-      where: { clinicId: id, isActive: true },
+      where: { clinicId, isActive: true },
       select: { id: true, name: true, address: true, timezone: true },
     });
     locations.sort((left, right) => {
@@ -122,10 +159,15 @@ export const getClinicLocations = asyncHandler(
 
 export const getClinicProducts = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const id = req.params.id as string;
+    const idOrSlug = req.params.id as string;
+    const clinicId = await resolveClinicId(idOrSlug);
+    if (!clinicId) {
+      successResponse(res, 200, 'Products retrieved', { products: [] });
+      return;
+    }
     const products = await prisma.product.findMany({
       where: {
-        clinicId: id,
+        clinicId,
         isActive: true,
       },
       include: {
@@ -139,10 +181,15 @@ export const getClinicProducts = asyncHandler(
 
 export const getClinicPackages = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const id = req.params.id as string;
+    const idOrSlug = req.params.id as string;
+    const clinicId = await resolveClinicId(idOrSlug);
+    if (!clinicId) {
+      successResponse(res, 200, 'Packages retrieved', { packages: [] });
+      return;
+    }
     const packages = await prisma.package.findMany({
       where: {
-        clinicId: id,
+        clinicId,
         isActive: true,
       },
       orderBy: { name: 'asc' },
@@ -153,10 +200,15 @@ export const getClinicPackages = asyncHandler(
 
 export const getClinicMemberships = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const id = req.params.id as string;
+    const idOrSlug = req.params.id as string;
+    const clinicId = await resolveClinicId(idOrSlug);
+    if (!clinicId) {
+      successResponse(res, 200, 'Memberships retrieved', { memberships: [] });
+      return;
+    }
     const memberships = await prisma.membership.findMany({
       where: {
-        clinicId: id,
+        clinicId,
         isActive: true,
       },
       orderBy: { name: 'asc' },

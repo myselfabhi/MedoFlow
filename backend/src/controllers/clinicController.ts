@@ -32,6 +32,19 @@ export const update = asyncHandler(
   }
 );
 
+export const generateWebsite = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+    const clinicId = req.clinicId;
+    if (!clinicId) {
+      const err = new Error('Clinic scope required') as ApiError;
+      err.statusCode = 400;
+      throw err;
+    }
+    const result = await clinicService.generateWebsite(clinicId, req.body, req.user!.id);
+    successResponse(res, 200, 'Website generated', result);
+  }
+);
+
 export const upsertLaunchLocation = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const clinicId = req.clinicId;

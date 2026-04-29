@@ -51,7 +51,7 @@ const stats = [
 ] as const
 
 export function HeroSection() {
-  const { openSignup } = useAuthModal()
+  const { openLogin } = useAuthModal()
   return (
     <section className="mf-zone-navy relative overflow-hidden">
       {/* Background atmosphere */}
@@ -101,10 +101,10 @@ export function HeroSection() {
             <motion.div {...fadeUp(0.28)} className="mt-10 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={openSignup}
+                onClick={openLogin}
                 className="mf-btn mf-btn-lg mf-btn-primary"
               >
-                Start free trial
+                Clinic login
                 <ArrowRight className="h-4 w-4" />
               </button>
               <Link href="#how-it-works" className="mf-btn mf-btn-lg mf-btn-ghost">

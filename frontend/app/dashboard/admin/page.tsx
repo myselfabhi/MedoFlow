@@ -12,7 +12,7 @@ import {
   DateRangeFilter,
   LoadingSkeleton,
 } from '@/components/ui-system'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { DateRangeOption, DateRange } from '@/components/ui-system/DateRangeFilter'
 import { PageContainer } from '@/components/layout'
 import {
@@ -20,14 +20,32 @@ import {
   Users,
   CreditCard,
   Activity,
-  AlertCircle,
   ArrowUpRight,
+  ArrowDownRight,
   ShoppingBag,
   Gauge,
+  Sparkles,
+  ExternalLink,
+  Globe2,
+  Wand2,
+  DollarSign,
+  Package,
+  Tag,
+  Clock,
+  CalendarCheck,
+  ListX,
+  UserX,
+  Banknote,
+  BarChart3,
+  FileText,
+  Receipt,
 } from 'lucide-react'
 import { AppButton } from '@/components/ui-system'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { WebsiteGeneratorModal } from '@/components/clinic/WebsiteGeneratorModal'
+import { getClinic } from '@/lib/clinicApi'
 
 export default function AdminDashboardPage() {
   const { user } = useAuth()
@@ -38,6 +56,30 @@ export default function AdminDashboardPage() {
 
   const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('ALL_TIME')
   const [dateRangeValues, setDateRangeValues] = useState<DateRange>({})
+  const [generatorOpen, setGeneratorOpen] = useState(false)
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('openWebsite') === '1') {
+      setGeneratorOpen(true)
+      const remaining = new URLSearchParams(searchParams.toString())
+      remaining.delete('openWebsite')
+      const suffix = remaining.toString()
+      router.replace(`/dashboard/admin${suffix ? `?${suffix}` : ''}`)
+    }
+  }, [searchParams, router])
+
+  const { data: currentClinic } = useQuery({
+    queryKey: ['clinic-current', user?.clinicId],
+    queryFn: () => getClinic(user!.clinicId as string),
+    enabled: !!user?.clinicId,
+  })
+
+  const websiteSlug = currentClinic?.slug ?? null
+  const websiteUrl = websiteSlug
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/clinic/${websiteSlug}`
+    : null
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-overview', dateRangeOption],
@@ -53,217 +95,459 @@ export default function AdminDashboardPage() {
   const stats = clinicData?.commandCenter
 
   return (
-    <PageContainer className="space-y-8">
+    <PageContainer className="space-y-6">
       <AppPageHeader
         title="Command Center"
         description="High-level clinic health and financial overview"
         actions={
-          <DateRangeFilter
-            value={dateRangeOption}
-            onChange={(opt, range) => {
-              setDateRangeOption(opt)
-              setDateRangeValues(range)
-            }}
-          />
+          <div className="flex items-center gap-3">
+            {!websiteSlug && (
+              <button
+                type="button"
+                onClick={() => setGeneratorOpen(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+              >
+                <Sparkles className="h-4 w-4" />
+                Generate Website
+              </button>
+            )}
+            <DateRangeFilter
+              value={dateRangeOption}
+              onChange={(opt, range) => {
+                setDateRangeOption(opt)
+                setDateRangeValues(range)
+              }}
+            />
+          </div>
         }
       />
 
-      {/* KPI Stats */}
+      <WebsiteGeneratorModal
+        open={generatorOpen}
+        onOpenChange={setGeneratorOpen}
+        mode={websiteSlug ? 'edit' : 'create'}
+        defaultName={currentClinic?.name ?? user?.clinic?.name ?? ''}
+        defaultLogoUrl={currentClinic?.logoUrl ?? undefined}
+        defaultThemeColor={currentClinic?.themeColor ?? undefined}
+      />
+
+      <WebsiteStatusBanner
+        clinicName={currentClinic?.name ?? user?.clinic?.name ?? 'your clinic'}
+        websiteUrl={websiteUrl}
+        themeColor={currentClinic?.themeColor ?? null}
+        logoUrl={currentClinic?.logoUrl ?? null}
+        onGenerate={() => setGeneratorOpen(true)}
+      />
+
+      {/* ── Row 1: Primary KPIs ───────────────────────────────────────── */}
       {isLoading ? (
         <LoadingSkeleton variant="stat" count={4} />
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <AppCard data-tour-id="kpi-revenue" className="relative overflow-hidden">
-            <AppCardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Total Revenue
-                </p>
-                <div className="p-2 bg-emerald-50 rounded-lg">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-900">
-                  ${stats?.finance.totalRevenue.toLocaleString()}
-                </h3>
-                <span className="flex items-center text-xs font-medium text-emerald-600">
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                  12%
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Total Revenue"
+            value={`$${(stats?.finance.totalRevenue ?? 0).toLocaleString()}`}
+            sub="vs last 30 days"
+            badge="+12%"
+            badgeUp
+            icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
+            iconBg="bg-emerald-50"
+            tourId="kpi-revenue"
+          />
+          <KpiCard
+            label="Appointments"
+            value={String(stats?.operations.totalAppointments ?? 0)}
+            sub="Total clinical volume"
+            badge="Steady"
+            icon={<CalendarCheck className="h-4 w-4 text-blue-600" />}
+            iconBg="bg-blue-50"
+            tourId="kpi-appointments"
+          />
+          <KpiCard
+            label="Store Orders"
+            value={String(stats?.commerce.ordersCount ?? 0)}
+            sub="Checked out this period"
+            badge={`${((stats?.commerce.attachRate ?? 0) * 100).toFixed(0)}% attach`}
+            icon={<ShoppingBag className="h-4 w-4 text-purple-600" />}
+            iconBg="bg-purple-50"
+            tourId="kpi-orders"
+          />
+          <KpiCard
+            label="Clinic Capacity"
+            value={`${(stats?.operations.clinicCapacityRate ?? 0).toFixed(1)}%`}
+            sub="Avg provider utilisation"
+            badge={(stats?.operations.clinicCapacityRate ?? 0) >= 70 ? 'Optimal' : 'Below target'}
+            badgeUp={(stats?.operations.clinicCapacityRate ?? 0) >= 70}
+            icon={<Gauge className="h-4 w-4 text-teal-600" />}
+            iconBg="bg-teal-50"
+            tourId="kpi-capacity"
+          />
+        </div>
+      )}
+
+      {/* ── Row 2: Clinical · Finance · Commerce ─────────────────────── */}
+      {isLoading ? (
+        <LoadingSkeleton variant="stat" count={3} />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Clinical pulse */}
+          <AppCard>
+            <AppCardHeader className="pb-3">
+              <AppCardTitle className="flex items-center gap-2 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50">
+                  <Activity className="h-3.5 w-3.5 text-blue-600" />
                 </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">vs last 30 days</p>
+                Clinical Pulse
+              </AppCardTitle>
+            </AppCardHeader>
+            <AppCardContent className="space-y-3">
+              <MetricRow
+                label="Cancellation rate"
+                value={`${(stats?.operations.cancellationRate ?? 0).toFixed(1)}%`}
+                icon={<ListX className="h-3.5 w-3.5 text-rose-400" />}
+                warn={(stats?.operations.cancellationRate ?? 0) > 15}
+              />
+              <MetricRow
+                label="No-show rate"
+                value={`${(stats?.operations.noShowRate ?? 0).toFixed(1)}%`}
+                icon={<UserX className="h-3.5 w-3.5 text-amber-400" />}
+                warn={(stats?.operations.noShowRate ?? 0) > 10}
+              />
+              <MetricRow
+                label="Avg visit duration"
+                value={`${stats?.operations.averageAppointmentDuration ?? 0} min`}
+                icon={<Clock className="h-3.5 w-3.5 text-slate-400" />}
+              />
+              <MetricRow
+                label="Upcoming load"
+                value={String(stats?.operations.upcomingLoadCount ?? 0)}
+                icon={<CalendarCheck className="h-3.5 w-3.5 text-teal-500" />}
+              />
+              <MetricRow
+                label="Waitlist"
+                value={`${stats?.operations.waitlistCount ?? 0} (${(stats?.operations.waitlistConversionRate ?? 0).toFixed(0)}% conv.)`}
+                icon={<Users className="h-3.5 w-3.5 text-indigo-400" />}
+              />
             </AppCardContent>
           </AppCard>
 
-          <AppCard data-tour-id="kpi-appointments">
-            <AppCardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Total Appointments
-                </p>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Users className="h-4 w-4 text-blue-600" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-900">
-                  {stats?.operations.totalAppointments}
-                </h3>
-                <span className="flex items-center text-xs font-medium text-blue-600">
-                  <Activity className="h-3 w-3 mr-0.5" />
-                  Steady
+          {/* Finance snapshot */}
+          <AppCard>
+            <AppCardHeader className="pb-3">
+              <AppCardTitle className="flex items-center gap-2 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50">
+                  <Banknote className="h-3.5 w-3.5 text-emerald-600" />
                 </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Total clinical volume</p>
+                Revenue Breakdown
+              </AppCardTitle>
+            </AppCardHeader>
+            <AppCardContent className="space-y-3">
+              <MetricRow
+                label="Collected"
+                value={`$${(stats?.finance.collectedRevenue ?? 0).toLocaleString()}`}
+                icon={<DollarSign className="h-3.5 w-3.5 text-emerald-500" />}
+              />
+              <MetricRow
+                label="Net collected"
+                value={`$${(stats?.finance.netCollectedRevenue ?? 0).toLocaleString()}`}
+                icon={<DollarSign className="h-3.5 w-3.5 text-emerald-400" />}
+              />
+              <MetricRow
+                label="Outstanding"
+                value={`$${(stats?.finance.outstandingReceivables ?? 0).toLocaleString()}`}
+                icon={<Receipt className="h-3.5 w-3.5 text-amber-400" />}
+                warn={(stats?.finance.outstandingReceivables ?? 0) > 0}
+              />
+              <MetricRow
+                label="Refunded"
+                value={`$${(stats?.finance.refundedAmount ?? 0).toLocaleString()}`}
+                icon={<ArrowDownRight className="h-3.5 w-3.5 text-rose-400" />}
+              />
+              <MetricRow
+                label="Avg per visit"
+                value={`$${(stats?.finance.averageRevenuePerVisit ?? 0).toFixed(0)}`}
+                icon={<BarChart3 className="h-3.5 w-3.5 text-blue-400" />}
+              />
             </AppCardContent>
           </AppCard>
 
-          <AppCard data-tour-id="kpi-orders">
-            <AppCardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Orders
-                </p>
-                <div className="p-2 bg-purple-50 rounded-lg">
-                  <ShoppingBag className="h-4 w-4 text-purple-600" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-900">
-                  {stats?.commerce.ordersCount ?? 0}
-                </h3>
-                <span className="flex items-center text-xs font-medium text-slate-500">
-                  checked out
+          {/* Commerce health */}
+          <AppCard>
+            <AppCardHeader className="pb-3">
+              <AppCardTitle className="flex items-center gap-2 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50">
+                  <ShoppingBag className="h-3.5 w-3.5 text-purple-600" />
                 </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Store orders this period</p>
-            </AppCardContent>
-          </AppCard>
-
-          <AppCard data-tour-id="kpi-capacity">
-            <AppCardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Clinic Optimum Capacity
-                </p>
-                <div className="p-2 bg-teal-50 rounded-lg">
-                  <Gauge className="h-4 w-4 text-teal-600" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-900">
-                  {(stats?.operations.clinicCapacityRate ?? 0).toFixed(1)}%
-                </h3>
-                <span
-                  className={cn(
-                    'flex items-center text-xs font-medium',
-                    (stats?.operations.clinicCapacityRate ?? 0) >= 70
-                      ? 'text-teal-600'
-                      : 'text-amber-500'
-                  )}
-                >
-                  {(stats?.operations.clinicCapacityRate ?? 0) >= 70 ? 'Optimal' : 'Below target'}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Avg provider utilisation</p>
+                Commerce Health
+              </AppCardTitle>
+            </AppCardHeader>
+            <AppCardContent className="space-y-3">
+              <MetricRow
+                label="Product revenue"
+                value={`$${(stats?.commerce.productRevenue ?? 0).toLocaleString()}`}
+                icon={<Tag className="h-3.5 w-3.5 text-purple-400" />}
+              />
+              <MetricRow
+                label="Package revenue"
+                value={`$${(stats?.commerce.packageRevenue ?? 0).toLocaleString()}`}
+                icon={<Package className="h-3.5 w-3.5 text-indigo-400" />}
+              />
+              <MetricRow
+                label="Membership revenue"
+                value={`$${(stats?.commerce.membershipRevenue ?? 0).toLocaleString()}`}
+                icon={<CreditCard className="h-3.5 w-3.5 text-pink-400" />}
+              />
+              <MetricRow
+                label="Active memberships"
+                value={String(stats?.memberships.activeCount ?? 0)}
+                icon={<Users className="h-3.5 w-3.5 text-teal-500" />}
+              />
+              <MetricRow
+                label="Churn rate"
+                value={`${((stats?.memberships.churnRate ?? 0) * 100).toFixed(1)}%`}
+                icon={<ArrowDownRight className="h-3.5 w-3.5 text-rose-400" />}
+                warn={(stats?.memberships.churnRate ?? 0) > 0.05}
+              />
             </AppCardContent>
           </AppCard>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
-        <AppCard>
-          <AppCardHeader>
-            <AppCardTitle>Quick Actions</AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent className="grid grid-cols-2 gap-4">
-            <AppButton asChild variant="outline" className="h-20 flex-col gap-2">
-              <Link href="/dashboard/providers">
-                <Users className="h-5 w-5" />
-                Manage Providers
-              </Link>
-            </AppButton>
-            <AppButton asChild variant="outline" className="h-20 flex-col gap-2">
-              <Link href="/dashboard/services">
-                <Activity className="h-5 w-5" />
-                Update Services
-              </Link>
-            </AppButton>
-            <AppButton asChild variant="outline" className="h-20 flex-col gap-2">
-              <Link href="/dashboard/products">
-                <CreditCard className="h-5 w-5" />
-                Store Catalog
-              </Link>
-            </AppButton>
-            <AppButton asChild variant="outline" className="h-20 flex-col gap-2">
-              <Link href="/dashboard/analytics">
-                <TrendingUp className="h-5 w-5" />
-                Deep Analytics
-              </Link>
-            </AppButton>
-          </AppCardContent>
-        </AppCard>
-
-        {/* Business Alerts */}
-        <AppCard className="border-l-4 border-l-amber-400 shadow-sm flex flex-col">
-          <AppCardHeader>
-            <AppCardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              Active Alerts
-            </AppCardTitle>
-          </AppCardHeader>
-          <AppCardContent className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-            {stats?.alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={cn(
-                  'flex items-start gap-3 p-3 rounded-lg text-sm border',
-                  alert.severity === 'critical'
-                    ? 'bg-rose-50 text-rose-800 border-rose-100'
-                    : 'bg-amber-50 text-amber-800 border-amber-100'
-                )}
+      {/* ── Row 3: Quick Actions ──────────────────────────────────────── */}
+      <AppCard>
+        <AppCardHeader className="pb-3">
+          <AppCardTitle className="text-sm">Quick Actions</AppCardTitle>
+        </AppCardHeader>
+        <AppCardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { href: '/dashboard/staff', icon: Users, label: 'Team', color: 'text-blue-600', bg: 'bg-blue-50' },
+              { href: '/dashboard/services', icon: Activity, label: 'Services', color: 'text-teal-600', bg: 'bg-teal-50' },
+              { href: '/dashboard/patients', icon: FileText, label: 'Patients', color: 'text-violet-600', bg: 'bg-violet-50' },
+              { href: '/dashboard/products', icon: ShoppingBag, label: 'Storefront', color: 'text-purple-600', bg: 'bg-purple-50' },
+              { href: '/dashboard/front-desk/invoices', icon: Receipt, label: 'Billing', color: 'text-amber-600', bg: 'bg-amber-50' },
+              { href: '/dashboard/analytics', icon: TrendingUp, label: 'Analytics', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            ].map(({ href, icon: Icon, label, color, bg }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center text-[13px] font-semibold text-slate-700 transition-all hover:border-slate-200 hover:bg-white hover:shadow-sm"
               >
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold">{alert.title}</p>
-                  <p>{alert.message}</p>
-                </div>
-              </div>
+                <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', bg)}>
+                  <Icon className={cn('h-5 w-5', color)} />
+                </span>
+                {label}
+              </Link>
             ))}
-            {(!stats?.alerts || stats.alerts.length === 0) && (
-              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg text-sm text-slate-500 border border-slate-100">
-                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
-                <div>
-                  <p className="font-semibold">All systems normal</p>
-                  <p>No critical business alerts at this time.</p>
-                </div>
-              </div>
-            )}
-          </AppCardContent>
-        </AppCard>
-      </div>
+          </div>
+        </AppCardContent>
+      </AppCard>
     </PageContainer>
   )
 }
 
-function CheckCircle2(props: any) {
+/* ── Sub-components ──────────────────────────────────────────────────── */
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  badge,
+  badgeUp,
+  icon,
+  iconBg,
+  tourId,
+}: {
+  label: string
+  value: string
+  sub: string
+  badge: string
+  badgeUp?: boolean
+  icon: React.ReactNode
+  iconBg: string
+  tourId?: string
+}) {
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <AppCard data-tour-id={tourId} className="relative overflow-hidden">
+      <AppCardContent className="p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+            {label}
+          </p>
+          <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', iconBg)}>
+            {icon}
+          </span>
+        </div>
+        <div className="mt-3 flex items-baseline gap-2">
+          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+          {badge && (
+            <span
+              className={cn(
+                'flex items-center text-xs font-semibold',
+                badgeUp === true
+                  ? 'text-emerald-600'
+                  : badgeUp === false
+                    ? 'text-rose-500'
+                    : 'text-slate-400'
+              )}
+            >
+              {badgeUp === true && <ArrowUpRight className="h-3 w-3 mr-0.5" />}
+              {badge}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-[11px] text-slate-400">{sub}</p>
+      </AppCardContent>
+    </AppCard>
+  )
+}
+
+function MetricRow({
+  label,
+  value,
+  icon,
+  warn,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+  warn?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
+        <span className="shrink-0">{icon}</span>
+        <span className="truncate">{label}</span>
+      </div>
+      <span
+        className={cn(
+          'shrink-0 text-sm font-semibold tabular-nums',
+          warn ? 'text-amber-600' : 'text-slate-800'
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * WebsiteStatusBanner — sits above the Command Center KPIs so the patient
+ * site is the first thing the admin sees on every visit.
+ */
+function WebsiteStatusBanner({
+  clinicName,
+  websiteUrl,
+  themeColor,
+  logoUrl,
+  onGenerate,
+}: {
+  clinicName: string
+  websiteUrl: string | null
+  themeColor: string | null
+  logoUrl: string | null
+  onGenerate: () => void
+}) {
+  if (!websiteUrl) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-6 sm:p-8">
+        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-md">
+              <Wand2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-violet-600">
+                One-tap setup · 30 seconds
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-slate-900">
+                Your patient website isn't live yet.
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-slate-600">
+                Generate a branded booking site for {clinicName}. Patients can sign up and
+                book the moment it's live.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="inline-flex h-12 shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 text-sm font-bold text-white shadow-md transition-opacity hover:opacity-90"
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Website
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const accent = themeColor || '#0D9488'
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl border bg-white p-6 sm:p-8"
+      style={{ borderColor: `${accent}30` }}
     >
-      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-50"
+        style={{
+          background: `radial-gradient(circle at 0% 0%, ${accent}25 0%, transparent 55%), radial-gradient(circle at 100% 100%, ${accent}10 0%, transparent 50%)`,
+        }}
+      />
+      <div className="relative flex flex-col items-start gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={`${clinicName} logo`}
+              className="h-12 w-12 shrink-0 rounded-2xl border border-white object-cover shadow-sm"
+            />
+          ) : (
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
+              style={{ backgroundColor: accent }}
+            >
+              <Globe2 className="h-6 w-6" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p
+              className="text-[10px] font-black uppercase tracking-widest"
+              style={{ color: accent }}
+            >
+              Patient website · Live
+            </p>
+            <h2 className="mt-1 truncate text-xl font-black text-slate-900 sm:text-2xl">
+              {clinicName}
+            </h2>
+            <code className="mt-1 inline-flex items-center gap-1 truncate font-mono text-xs text-slate-500">
+              {websiteUrl.replace(/^https?:\/\//, '')}
+            </code>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <a
+            href={websiteUrl.replace(typeof window !== 'undefined' ? window.location.origin : '', '')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open site
+          </a>
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <Wand2 className="h-4 w-4" />
+            Edit branding
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

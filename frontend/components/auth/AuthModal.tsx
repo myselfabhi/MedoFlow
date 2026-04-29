@@ -31,6 +31,29 @@ import api from '@/lib/api'
 import { useAuth, landingForRole } from '@/contexts/AuthContext'
 import { BrandLogo } from '@/components/common/BrandLogo'
 import { MedoflowLoader } from '@/components/common/MedoflowLoader'
+import { useQuery } from '@tanstack/react-query'
+import { getClinic } from '@/lib/clinicApi'
+
+const CLINIC_DEFAULT_THEME = '#0D9488'
+
+// When the auth modal opens from /clinic/[idOrSlug] we want the brand panel
+// to show the clinic, not Medoflow. This hook returns clinic context (and
+// the theme color for accents) when on a clinic site, otherwise null.
+function useClinicContext() {
+  const pathname = usePathname()
+  const match = pathname?.match(/^\/clinic\/([^/?#]+)/)
+  const idOrSlug = match?.[1] ?? null
+  const { data } = useQuery({
+    queryKey: ['clinic', idOrSlug],
+    queryFn: () => getClinic(idOrSlug as string),
+    enabled: !!idOrSlug,
+  })
+  if (!idOrSlug) return null
+  return {
+    clinic: data ?? null,
+    themeColor: data?.themeColor?.trim() || CLINIC_DEFAULT_THEME,
+  }
+}
 
 // ─────────────────────────── Context ─────────────────────────────────
 
@@ -122,6 +145,7 @@ function AuthQueryParamListener() {
 
 function AuthModal() {
   const { open, mode, close, switchMode } = useAuthModal()
+  const clinicCtx = useClinicContext()
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(v) => (v ? undefined : close())}>
@@ -146,10 +170,10 @@ function AuthModal() {
           style={{ boxShadow: '0 40px 80px -20px rgba(15, 23, 42, 0.35)' }}
         >
           {/* Desktop split panel */}
-          <BrandPanel mode={mode} />
+          <BrandPanel mode={mode} clinicCtx={clinicCtx} />
 
           {/* Mobile-only brand strip — keeps the modal feeling branded at 375px */}
-          <MobileBrandStrip mode={mode} />
+          <MobileBrandStrip mode={mode} clinicCtx={clinicCtx} />
 
           <div className="relative flex max-h-[92vh] flex-col overflow-y-auto bg-white p-6 sm:p-8 md:p-10">
             <DialogPrimitive.Close
@@ -171,21 +195,34 @@ function AuthModal() {
             </DialogPrimitive.Close>
 
             <DialogPrimitive.Title className="mf-display text-[26px] text-ink">
-              {mode === 'login' ? 'Welcome back' : 'Create your account'}
+              {mode === 'login'
+                ? clinicCtx?.clinic
+                  ? `Welcome back to ${clinicCtx.clinic.name}`
+                  : 'Welcome back'
+                : clinicCtx?.clinic
+                  ? `Create your ${clinicCtx.clinic.name} account`
+                  : 'Create your account'}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-1.5 text-[13.5px] text-ink-muted">
               {mode === 'login'
-                ? 'Sign in to pick up right where you left off.'
-                : 'Start your 14-day trial. No credit card required.'}
+                ? clinicCtx?.clinic
+                  ? 'Sign in to book a visit and review your care.'
+                  : 'Sign in to pick up right where you left off.'
+                : clinicCtx?.clinic
+                  ? 'Create a patient account to book and manage your visits.'
+                  : 'Start your 14-day trial. No credit card required.'}
             </DialogPrimitive.Description>
 
             <ModeSwitch mode={mode} onChange={switchMode} />
 
             <div className="mt-6">
               {mode === 'login' ? (
-                <LoginForm onSuccess={close} />
+                <LoginForm onSuccess={close} themeColor={clinicCtx?.themeColor} />
               ) : (
-                <SignupForm onSuccess={() => switchMode('login')} />
+                <SignupForm
+                  onSuccess={close}
+                  themeColor={clinicCtx?.themeColor}
+                />
               )}
             </div>
           </div>
@@ -197,7 +234,72 @@ function AuthModal() {
 
 // ─────────────────────────── Brand panel (left) ──────────────────────
 
-function BrandPanel({ mode }: { mode: AuthMode }) {
+type ClinicCtx = ReturnType<typeof useClinicContext>
+
+function BrandPanel({ mode, clinicCtx }: { mode: AuthMode; clinicCtx: ClinicCtx }) {
+  // Clinic-branded variant when the modal is opened on a /clinic/[id] page.
+  if (clinicCtx?.clinic) {
+    const { clinic, themeColor } = clinicCtx
+    return (
+      <aside
+        className="relative hidden overflow-hidden p-10 text-white md:flex md:flex-col md:justify-between"
+        style={{ backgroundColor: themeColor }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 0%, rgba(255,255,255,0.35) 0%, transparent 55%), radial-gradient(circle at 80% 80%, rgba(0,0,0,0.25) 0%, transparent 55%)',
+          }}
+        />
+        <div className="relative flex items-center gap-3">
+          {clinic.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={clinic.logoUrl}
+              alt={`${clinic.name} logo`}
+              className="h-10 w-10 rounded-full border-2 border-white/40 object-cover"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+          )}
+          <span className="text-base font-bold text-white">{clinic.name}</span>
+        </div>
+
+        <div className="relative">
+          <h3 className="mf-display text-[28px] leading-tight text-white">
+            {mode === 'login' ? (
+              <>
+                Welcome back. <br />
+                <span className="text-white/80">Care, on your terms.</span>
+              </>
+            ) : (
+              <>
+                Join {clinic.name}. <br />
+                <span className="text-white/80">Book in minutes.</span>
+              </>
+            )}
+          </h3>
+          <p className="mt-4 max-w-xs text-[13.5px] leading-relaxed text-white/80">
+            {mode === 'login'
+              ? 'Sign in to pick up where you left off — appointments, visit notes, and billing in one place.'
+              : 'Create your patient account to book visits, view records, and message the clinic team.'}
+          </p>
+        </div>
+
+        <ul className="relative mt-10 space-y-3 text-[13px] text-white/80">
+          <Proof>Verified facility</Proof>
+          <Proof>Secure self-pay booking</Proof>
+          <Proof>Same-day appointments</Proof>
+        </ul>
+      </aside>
+    )
+  }
+
+  // Default Medoflow staff/admin variant.
   return (
     <aside className="relative hidden overflow-hidden bg-navy p-10 text-white md:flex md:flex-col md:justify-between">
       {/* atmospheric bg */}
@@ -255,7 +357,34 @@ function Proof({ children }: { children: React.ReactNode }) {
  * hidden. Single navy strip, one-liner, one proof chip. Keeps the dialog
  * feeling on-brand without pushing the form out of the fold on a phone.
  */
-function MobileBrandStrip({ mode }: { mode: AuthMode }) {
+function MobileBrandStrip({ mode, clinicCtx }: { mode: AuthMode; clinicCtx: ClinicCtx }) {
+  if (clinicCtx?.clinic) {
+    const { clinic, themeColor } = clinicCtx
+    return (
+      <div
+        className="flex items-center gap-3 px-5 py-4 text-white md:hidden"
+        style={{ backgroundColor: themeColor }}
+      >
+        {clinic.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={clinic.logoUrl}
+            alt={`${clinic.name} logo`}
+            className="h-7 w-7 rounded-full border border-white/40 object-cover"
+          />
+        ) : (
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+        )}
+        <p className="mf-display min-w-0 truncate text-[13px] leading-tight text-white">
+          {mode === 'login'
+            ? `Welcome back to ${clinic.name}`
+            : `Join ${clinic.name}`}
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="flex items-center gap-3 bg-navy px-5 py-4 text-white md:hidden">
       <BrandLogo size="sm" tone="light" />
@@ -301,9 +430,17 @@ const loginSchema = z.object({
 })
 type LoginData = z.infer<typeof loginSchema>
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+function LoginForm({
+  onSuccess,
+  themeColor,
+}: {
+  onSuccess: () => void
+  themeColor?: string
+}) {
+  const isClinic = !!themeColor
   const router = useRouter()
   const search = useSearchParams()
+  const pathname = usePathname()
   const returnUrl = search.get('returnUrl')
   const { login } = useAuth()
 
@@ -316,13 +453,22 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     formState: { errors },
   } = useForm<LoginData>({ resolver: zodResolver(loginSchema) })
 
+  // Patients on a clinic site stay on the clinic site after login. Only
+  // staff/admin (non-PATIENT) get routed to their dashboard.
   const onSubmit = async (data: LoginData) => {
     setError(null)
     setSubmitting(true)
     try {
       const user = await login(data.email, data.password)
       onSuccess()
-      router.replace(returnUrl || landingForRole(user))
+      const isPatientOnClinicSite =
+        user.role === 'PATIENT' && pathname?.startsWith('/clinic/')
+      const target = returnUrl
+        ? returnUrl
+        : isPatientOnClinicSite
+          ? pathname!
+          : landingForRole(user)
+      router.replace(target)
       router.refresh()
     } catch (err: unknown) {
       setError(extractErrorMessage(err, 'Sign in failed'))
@@ -337,11 +483,12 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
       <Field
         id="login-email"
-        label="Work email"
+        label={isClinic ? 'Email' : 'Work email'}
         icon={Mail}
         type="email"
         autoComplete="email"
-        placeholder="name@clinic.com"
+        placeholder={isClinic ? 'you@email.com' : 'name@clinic.com'}
+        themeColor={themeColor}
         error={errors.email?.message}
         {...register('email')}
       />
@@ -353,11 +500,13 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         type="password"
         autoComplete="current-password"
         placeholder="••••••••"
+        themeColor={themeColor}
         error={errors.password?.message}
         trailing={
           <Link
             href="/forgot-password"
-            className="text-[11.5px] font-medium text-teal hover:text-teal-hover"
+            className="text-[11.5px] font-medium hover:underline"
+            style={{ color: themeColor ?? undefined }}
           >
             Forgot?
           </Link>
@@ -365,7 +514,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         {...register('password')}
       />
 
-      <SubmitButton submitting={submitting} label="Sign in" />
+      <SubmitButton submitting={submitting} label="Sign in" themeColor={themeColor} />
     </form>
   )
 }
@@ -379,9 +528,25 @@ const signupSchema = z.object({
 })
 type SignupData = z.infer<typeof signupSchema>
 
-function SignupForm({ onSuccess }: { onSuccess: () => void }) {
+// Pull the `:id` param out of /clinic/<id-or-slug>/... so a patient signing
+// up on the clinic site is auto-linked to that clinic on the server.
+function clinicIdFromPath(pathname: string | null): string | null {
+  if (!pathname) return null
+  const m = pathname.match(/^\/clinic\/([^/?#]+)/)
+  return m?.[1] ?? null
+}
+
+function SignupForm({
+  onSuccess,
+  themeColor,
+}: {
+  onSuccess: () => void
+  themeColor?: string
+}) {
+  const pathname = usePathname()
+  const isClinic = !!themeColor
+  const { login } = useAuth()
   const [error, setError] = React.useState<string | null>(null)
-  const [success, setSuccess] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
 
   const {
@@ -393,33 +558,28 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     defaultValues: { name: '', email: '', password: '' },
   })
 
+  // Register and immediately log the patient in. Skips the old "Account
+  // created — sign in to continue" intermediate state, which was the
+  // biggest friction point in the patient flow.
   const onSubmit = async (data: SignupData) => {
     setError(null)
     setSubmitting(true)
     try {
-      await api.post('/auth/register', data)
-      setSuccess(true)
-      // Give the user a moment to read the success note, then flip to login.
-      setTimeout(onSuccess, 1500)
+      const clinicId = clinicIdFromPath(pathname)
+      await api.post('/auth/register', { ...data, clinicId: clinicId ?? undefined })
+      try {
+        await login(data.email, data.password)
+        onSuccess()
+      } catch {
+        // Auto-login failed (rare) — fall back to the sign-in tab so the
+        // user can complete it manually instead of getting stuck.
+        onSuccess()
+      }
     } catch (err: unknown) {
       setError(extractErrorMessage(err, 'Registration failed'))
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (success) {
-    return (
-      <div className="rounded-[12px] border border-teal bg-teal-wash px-5 py-6 text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-teal text-white">
-          <ShieldCheck className="h-5 w-5" strokeWidth={2} />
-        </div>
-        <p className="mf-display mt-3 text-[18px] text-navy">Account created</p>
-        <p className="mt-1 text-[12.5px] text-ink-muted">
-          Sign in with your new credentials to continue.
-        </p>
-      </div>
-    )
   }
 
   return (
@@ -433,6 +593,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
         type="text"
         autoComplete="name"
         placeholder="Jane Doe"
+        themeColor={themeColor}
         error={errors.name?.message}
         {...register('name')}
       />
@@ -443,7 +604,8 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
         icon={Mail}
         type="email"
         autoComplete="email"
-        placeholder="jane@clinic.com"
+        placeholder={isClinic ? 'you@email.com' : 'jane@clinic.com'}
+        themeColor={themeColor}
         error={errors.email?.message}
         {...register('email')}
       />
@@ -455,23 +617,36 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
         type="password"
         autoComplete="new-password"
         placeholder="Min. 6 characters"
+        themeColor={themeColor}
         error={errors.password?.message}
         {...register('password')}
       />
 
       <p className="text-[11.5px] leading-relaxed text-ink-muted">
         By creating an account you agree to our{' '}
-        <Link href="#" className="font-medium text-teal hover:text-teal-hover">
+        <Link
+          href="#"
+          className="font-medium hover:underline"
+          style={{ color: themeColor ?? undefined }}
+        >
           Terms
         </Link>{' '}
         and{' '}
-        <Link href="#" className="font-medium text-teal hover:text-teal-hover">
+        <Link
+          href="#"
+          className="font-medium hover:underline"
+          style={{ color: themeColor ?? undefined }}
+        >
           Privacy Policy
         </Link>
         .
       </p>
 
-      <SubmitButton submitting={submitting} label="Create account" />
+      <SubmitButton
+        submitting={submitting}
+        label="Create account"
+        themeColor={themeColor}
+      />
     </form>
   )
 }
@@ -484,12 +659,24 @@ type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
   icon: React.ElementType
   error?: string
   trailing?: React.ReactNode
+  themeColor?: string
 }
 
 const Field = React.forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { id, label, icon: Icon, error, trailing, className, ...input },
+  { id, label, icon: Icon, error, trailing, className, themeColor, ...input },
   ref
 ) {
+  // When themed, swap the focus ring/border from Medoflow teal to the
+  // clinic's color via inline CSS variables. Tailwind can't do this
+  // because the value is dynamic per clinic.
+  const themedStyle = themeColor
+    ? ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ['--tw-ring-color' as any]: `${themeColor}40`,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ['--auth-field-focus-border' as any]: themeColor,
+      } as React.CSSProperties)
+    : undefined
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -509,10 +696,21 @@ const Field = React.forwardRef<HTMLInputElement, FieldProps>(function Field(
           {...input}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
+          style={themedStyle}
+          onFocus={(e) => {
+            if (themeColor) e.currentTarget.style.borderColor = themeColor
+            input.onFocus?.(e)
+          }}
+          onBlur={(e) => {
+            if (themeColor && !error) e.currentTarget.style.borderColor = ''
+            input.onBlur?.(e)
+          }}
           className={cn(
             'block h-11 w-full rounded-[10px] border bg-white pl-10 pr-3 text-[14px] text-ink',
             'placeholder:text-ink-faint',
-            'focus:outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal',
+            'focus:outline-none focus:ring-2',
+            // Default (Medoflow) focus tint when no theme provided.
+            !themeColor && 'focus:ring-teal/30 focus:border-teal',
             error ? 'border-destructive' : 'border-hairline hover:border-ink-faint',
             className
           )}
@@ -539,16 +737,29 @@ function FormError({ message }: { message: string }) {
   )
 }
 
-function SubmitButton({ submitting, label }: { submitting: boolean; label: string }) {
-  return (
-    <button
-      type="submit"
-      disabled={submitting}
-      className={cn(
+function SubmitButton({
+  submitting,
+  label,
+  themeColor,
+}: {
+  submitting: boolean
+  label: string
+  themeColor?: string
+}) {
+  // Themed: solid clinic background, white text. Without a theme we keep
+  // the Medoflow primary teal styling via the existing `mf-btn` class.
+  const themedClass = themeColor
+    ? cn(
+        'mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-[14px] font-bold text-white shadow-sm transition-opacity',
+        submitting ? 'cursor-not-allowed opacity-80' : 'hover:opacity-90'
+      )
+    : cn(
         'mf-btn mf-btn-primary mt-2 w-full',
         submitting && 'cursor-not-allowed opacity-80'
-      )}
-    >
+      )
+  const themedStyle = themeColor ? { backgroundColor: themeColor } : undefined
+  return (
+    <button type="submit" disabled={submitting} className={themedClass} style={themedStyle}>
       {submitting ? (
         <Spinner />
       ) : (

@@ -341,3 +341,90 @@ export const upsertLaunchLocation = async (
 
   return updated
 }
+
+// ──────────────────────── Website generation ────────────────────────
+
+export interface GenerateWebsiteData {
+  name: string
+  logoUrl?: string | null
+  themeColor?: string | null
+}
+
+const slugify = (raw: string): string =>
+  raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'clinic'
+
+const ensureUniqueSlug = async (base: string, ownClinicId: string): Promise<string> => {
+  let candidate = base
+  let n = 2
+  // Loop bounded by a sane cap; in practice 1–2 iterations.
+  for (let i = 0; i < 50; i += 1) {
+    const taken = await prisma.clinic.findFirst({
+      where: { slug: candidate, NOT: { id: ownClinicId } },
+      select: { id: true },
+    })
+    if (!taken) return candidate
+    candidate = `${base}-${n}`
+    n += 1
+  }
+  // Extremely unlikely fallback.
+  return `${base}-${Date.now().toString(36)}`
+}
+
+// Sets clinic name + slug + branding in one shot. Used by the
+// "Generate Website" demo flow on the admin dashboard.
+export const generateWebsite = async (
+  clinicId: string,
+  data: GenerateWebsiteData,
+  performedById: string
+) => {
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId } })
+  if (!clinic) {
+    const err = new Error('Clinic not found') as ApiError
+    err.statusCode = 404
+    throw err
+  }
+
+  const trimmedName = data.name.trim()
+  const baseSlug = slugify(trimmedName)
+  const slug = await ensureUniqueSlug(baseSlug, clinicId)
+
+  const updated = await prisma.clinic.update({
+    where: { id: clinicId },
+    data: {
+      name: trimmedName,
+      slug,
+      logoUrl: data.logoUrl?.trim() || null,
+      themeColor: data.themeColor?.trim() || '#0D9488',
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      themeColor: true,
+    },
+  })
+
+  await auditService.logAudit({
+    clinicId,
+    entityType: 'Clinic',
+    entityId: clinicId,
+    action: 'UPDATE',
+    fieldChanged: 'slug',
+    oldValue: clinic.slug,
+    newValue: updated.slug,
+    performedById,
+  })
+
+  return {
+    ...updated,
+    websiteUrl: `/clinic/${updated.slug}`,
+  }
+}

@@ -20,6 +20,10 @@ export const patientRegistrationSchema = {
     name: z.string().trim().min(1, 'Name is required'),
     email: emailSchema,
     password: z.string().min(6, 'Password must be at least 6 characters'),
+    // Optional. Carried through from the clinic page (`/clinic/[idOrSlug]`)
+    // so a new patient is auto-linked to that clinic. Backend resolves
+    // slug → cuid and falls back to null if unknown.
+    clinicId: z.string().optional().nullable(),
   }),
 }
 
@@ -45,6 +49,31 @@ export const clinicUpdateSchema = {
     .refine((value) => Object.keys(value).length > 0, {
       message: 'At least one field must be provided',
     }),
+}
+
+export const generateWebsiteSchema = {
+  body: z.object({
+    name: z.string().trim().min(1, 'Clinic name is required'),
+    // Logo can be a hosted https URL OR an inline data: URL (for the
+    // demo's drag-drop upload path which doesn't need an S3 bucket).
+    logoUrl: z
+      .string()
+      .trim()
+      .refine(
+        (v) =>
+          v === '' ||
+          v.startsWith('data:image/') ||
+          /^https?:\/\//i.test(v),
+        { message: 'Logo must be a valid image URL or upload' }
+      )
+      .optional(),
+    themeColor: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'Theme color must be a hex code like #14B8A6')
+      .optional()
+      .or(z.literal('')),
+  }),
 }
 
 export const locationUpsertSchema = {
