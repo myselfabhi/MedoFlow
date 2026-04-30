@@ -11,7 +11,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import { StripePaymentForm } from '@/components/StripePaymentForm'
 import { useCart } from '@/hooks/useCart'
 import { useClinicContext } from '@/hooks/useClinicContext'
-import { LogIn, ShoppingBag, Package, ShieldCheck } from 'lucide-react'
+import { LogIn, ShoppingBag, Package, ShieldCheck, Check, ArrowRight } from 'lucide-react'
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder'
@@ -20,9 +20,13 @@ const stripePromise = loadStripe(
 const DEFAULT_THEME = '#0F766E'
 
 export default function CheckoutPage() {
-  const { cart, isLoading, isAuthenticated } = useCart()
+  const { cart, isLoading, isAuthenticated, fetchCartItems } = useCart()
   const [isDemoSubmitting, setIsDemoSubmitting] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [confirmation, setConfirmation] = useState<null | {
+    items: Array<{ name: string; qty: number; price: number }>
+    total: number
+  }>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -64,9 +68,19 @@ export default function CheckoutPage() {
     }
     try {
       setIsDemoSubmitting(true)
+      // Snapshot what the patient bought BEFORE we clear the local cart so
+      // we can render the success card.
+      const snapshot = {
+        items: (cart?.items ?? []).map((it: any) => ({
+          name: it.product?.name || it.package?.name || it.membership?.name || it.service?.name || it.name || 'Item',
+          qty: it.quantity,
+          price: Number(it.unitPrice),
+        })),
+        total: subtotal,
+      }
       await api.post('/carts/checkout-demo')
-      toast.success('Demo Payment successful!')
-      router.push(billingReturnPath)
+      await fetchCartItems()
+      setConfirmation(snapshot)
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Demo Payment failed')
     } finally {
@@ -82,6 +96,68 @@ export default function CheckoutPage() {
           style={{ borderTopColor: themeColor }}
         />
         <p className="text-slate-500 font-medium">Loading your items...</p>
+      </div>
+    )
+  }
+
+  // Confirmation: rendered after a successful demo (or real) payment.
+  // Lives on /checkout so the patient sees a calm "you're set" screen
+  // instead of being immediately bounced to the clinic landing.
+  if (confirmation) {
+    return (
+      <div className="container mx-auto max-w-xl px-4 py-12 sm:py-20">
+        <div
+          className="overflow-hidden rounded-3xl border bg-white p-8 text-center shadow-sm"
+          style={{ borderColor: `${themeColor}30` }}
+        >
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-full text-white shadow"
+            style={{ backgroundColor: themeColor }}
+          >
+            <Check className="h-7 w-7" />
+          </div>
+          <h1 className="mt-5 text-2xl font-black text-slate-900 sm:text-3xl">
+            You're all set!
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Payment received{clinicCtx?.clinic ? ` by ${clinicCtx.clinic.name}` : ''}. A receipt is on its way to your email.
+          </p>
+
+          <ul className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-slate-50/40 text-left">
+            {confirmation.items.map((it, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">{it.name}</p>
+                  <p className="text-xs text-slate-400">Qty {it.qty} × ${it.price.toFixed(2)}</p>
+                </div>
+                <span className="text-sm font-bold text-slate-900">${(it.price * it.qty).toFixed(2)}</span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-bold text-slate-700">Total paid</span>
+              <span className="text-base font-black" style={{ color: themeColor }}>${confirmation.total.toFixed(2)}</span>
+            </li>
+          </ul>
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => router.push(storePath)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-3 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: themeColor }}
+            >
+              Keep shopping
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(clinicHomePath)}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Back to {clinicCtx?.clinic?.name ?? 'home'}
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -235,7 +311,18 @@ export default function CheckoutPage() {
                         <StripePaymentForm
                           clientSecret={clientSecret}
                           buttonLabel={`Pay $${subtotal.toFixed(2)}`}
-                          onSuccess={() => router.push(appointmentsReturnPath)}
+                          onSuccess={async () => {
+                            const snapshot = {
+                              items: (cart?.items ?? []).map((it: any) => ({
+                                name: it.product?.name || it.package?.name || it.membership?.name || it.service?.name || it.name || 'Item',
+                                qty: it.quantity,
+                                price: Number(it.unitPrice),
+                              })),
+                              total: subtotal,
+                            }
+                            await fetchCartItems()
+                            setConfirmation(snapshot)
+                          }}
                         />
                       </Elements>
                     </div>
