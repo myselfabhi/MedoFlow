@@ -16,6 +16,7 @@ import { PublicNav } from '@/components/layout/PublicNav'
 import { PublicFooter } from '@/components/layout/PublicFooter'
 import { AuthModalProvider } from '@/components/auth/AuthModal'
 import { CartModalProvider } from '@/components/store/CartModal'
+import { CartProvider } from '@/hooks/useCart'
 import { ProductDetailProvider } from '@/components/store/ProductDetailModal'
 import { BookingModalProvider } from '@/components/booking/BookingModal'
 
@@ -64,9 +65,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   return (
     <AuthModalProvider>
-      <CartModalProvider>
-        <ProductDetailProvider>
-          <BookingModalProvider>
+      <CartProvider>
+        <CartModalProvider>
+          <ProductDetailProvider>
+            <BookingModalProvider>
             <div className="min-h-screen bg-canvas">
               {/* Hide Medoflow chrome on clinic-owned URLs — patient never
                   sees the marketing brand. The clinic page renders its
@@ -82,10 +84,11 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 )}
               </main>
               {!onClinicSite && <PublicFooter />}
-            </div>
-          </BookingModalProvider>
-        </ProductDetailProvider>
-      </CartModalProvider>
+              </div>
+            </BookingModalProvider>
+          </ProductDetailProvider>
+        </CartModalProvider>
+      </CartProvider>
     </AuthModalProvider>
   )
 }
