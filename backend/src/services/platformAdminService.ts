@@ -137,15 +137,6 @@ export async function createClinicByPlatform(input: CreateClinicByPlatformInput)
       select: { id: true, email: true, name: true },
     })
 
-    await tx.location.create({
-      data: {
-        clinicId: clinic.id,
-        name: 'Main Location',
-        timezone: 'UTC',
-        isActive: true,
-      },
-    })
-
     return { tenant, clinic, user, subdomain }
   })
 

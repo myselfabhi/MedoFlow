@@ -1,6 +1,169 @@
 import prisma from '../config/prisma'
 import { ApiError } from '../types/errors'
 import type { SitePageStatus } from '@prisma/client'
+import { chatCompletion } from './aiProviderService'
+
+// ---------------------------------------------------------------------------
+// AI Bootstrap — section content defaults & generation
+// ---------------------------------------------------------------------------
+
+const SECTION_DEFAULTS: Record<string, Record<string, unknown>> = {
+  hero: {
+    eyebrow: 'Welcome',
+    headline: 'Care that fits your life.',
+    subheadline: 'Book a visit, message your provider, manage your care — all from one place.',
+    ctaLabel: 'Book a visit',
+    ctaHref: '#services',
+    backgroundImage: '',
+  },
+  'service-grid': {
+    title: 'What we offer',
+    intro: 'Browse our services and book the one that fits your needs.',
+    maxItems: 6,
+  },
+  'provider-bios': {
+    title: 'Meet the team',
+    intro: 'Our clinicians are here to help you get the care you need.',
+    maxItems: 6,
+  },
+  testimonials: {
+    title: 'What patients say',
+    quotes: [
+      '"Saved me hours of paperwork." — Sarah M.',
+      '"My provider actually listens." — James K.',
+      '"Best clinic experience I\'ve had in years." — Priya T.',
+    ],
+  },
+  faq: {
+    title: 'Frequently asked',
+    items: [
+      "Do you accept insurance?|We work with most major insurers. Bring your card to your first visit and we'll verify coverage.",
+      'How do I cancel or reschedule?|Log in to your patient portal and go to Appointments. You can cancel or reschedule up to 24 hours before your visit.',
+      'Is telehealth available?|Yes — we offer video consultations for follow-ups and many routine visits.',
+    ],
+  },
+  'booking-cta': {
+    headline: 'Ready when you are.',
+    subheadline: 'Same-day visits available most weekdays. No long waits.',
+    ctaLabel: 'Find an appointment',
+    ctaHref: '#services',
+  },
+  'rich-text': {
+    title: '',
+    body: 'Add any additional information you would like patients to know here.',
+  },
+}
+
+async function generateAISectionContent(
+  name: string,
+  sectionTypes: string[]
+): Promise<Record<string, Record<string, unknown>>> {
+  const validTypes = sectionTypes.filter((t) => SECTION_DEFAULTS[t])
+
+  // Build a concise JSON schema hint for the prompt
+  const schemaHints = validTypes
+    .map((type) => {
+      const defaults = SECTION_DEFAULTS[type]!
+      const keysStr = Object.entries(defaults)
+        .filter(([k]) => !['maxItems', 'ctaHref', 'backgroundImage'].includes(k))
+        .map(([k, v]) => `"${k}": ${Array.isArray(v) ? 'string[]' : '"string"'}`)
+        .join(', ')
+      return `"${type}": { ${keysStr} }`
+    })
+    .join(',\n  ')
+
+  const userMessage = `Generate professional website copy for a healthcare clinic named "${name}".
+
+Return ONLY valid JSON with this exact structure (no markdown fences, no extra keys):
+{
+  ${schemaHints}
+}
+
+Rules:
+- Headlines: 5–9 words, benefit-focused
+- Subheadlines: 1–2 sentences, warm and patient-centred
+- FAQ "items" must use "Question?|Answer." format (pipe separator, no extra quotes around it)
+- Testimonial "quotes" must use "\\"Quote text.\\" — FirstName L." format
+- Do NOT use lorem ipsum or generic filler
+- Write as if you know this specific clinic by name`
+
+  try {
+    const raw = await chatCompletion({
+      systemPrompt:
+        'You are an expert healthcare website copywriter. Output ONLY valid JSON — no markdown, no prose.',
+      userMessage,
+      jsonMode: true,
+      temperature: 0.7,
+    })
+
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>
+    const result: Record<string, Record<string, unknown>> = {}
+
+    for (const type of validTypes) {
+      const generated = parsed[type]
+      const defaults = SECTION_DEFAULTS[type]!
+      result[type] =
+        generated && typeof generated === 'object' ? { ...defaults, ...generated } : { ...defaults }
+    }
+    return result
+  } catch (e) {
+    console.warn('[aiBootstrap] Ollama generation failed — using defaults:', (e as Error).message)
+    const result: Record<string, Record<string, unknown>> = {}
+    for (const type of validTypes) {
+      result[type] = { ...SECTION_DEFAULTS[type]! }
+    }
+    return result
+  }
+}
+
+export async function aiBootstrapPage(
+  clinicId: string,
+  input: {
+    name: string
+    logoUrl?: string | null
+    themeColor?: string | null
+    sectionTypes: string[]
+  }
+) {
+  const aiContent = await generateAISectionContent(input.name, input.sectionTypes)
+
+  const sections = input.sectionTypes
+    .filter((t) => SECTION_DEFAULTS[t])
+    .map((type) => ({
+      id: `s_${Math.random().toString(36).slice(2, 10)}`,
+      type,
+      settings: aiContent[type] ?? SECTION_DEFAULTS[type] ?? {},
+      blocks: [],
+    }))
+
+  const existing = await prisma.sitePage.findUnique({
+    where: { clinicId_slug: { clinicId, slug: 'home' } },
+    select: { id: true },
+  })
+
+  let page
+  if (existing) {
+    page = await prisma.sitePage.update({
+      where: { id: existing.id },
+      data: { draftSectionsJson: sections as unknown as object },
+    })
+  } else {
+    page = await prisma.sitePage.create({
+      data: {
+        clinicId,
+        slug: 'home',
+        title: `${input.name.trim()} — Home`,
+        status: 'DRAFT' as SitePageStatus,
+        draftSectionsJson: sections as unknown as object,
+        sectionsJson: [] as unknown as object,
+        seoTitle: null,
+        seoDescription: null,
+      },
+    })
+  }
+
+  return { pageId: page.id, sections }
+}
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,60}[a-z0-9])?$/
 

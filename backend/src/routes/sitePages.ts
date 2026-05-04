@@ -58,6 +58,23 @@ function clinicId(req: { user?: { clinicId?: string | null } }): string {
   return id
 }
 
+// POST /ai-bootstrap  — AI-generate section content and save as draft
+router.post(
+  '/ai-bootstrap',
+  validateRequest({
+    body: z.object({
+      name: z.string().min(1).max(200),
+      logoUrl: z.string().optional().nullable(),
+      themeColor: z.string().max(20).optional().nullable(),
+      sectionTypes: z.array(z.string().min(1).max(60)).min(1).max(20),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const result = await sitePageService.aiBootstrapPage(clinicId(req), req.body)
+    successResponse(res, 200, 'Bootstrap complete', result)
+  })
+)
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {

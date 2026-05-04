@@ -97,14 +97,12 @@ export default function LocationsStepPage() {
     <OnboardingShell
       stepKey="locations"
       title="Where do you operate?"
-      subtitle="Add one or more clinic locations. Your first location was auto-created — just rename it or add details."
+      subtitle="Add your clinic location. You can add more locations later from the dashboard."
       nextLabel="Save & continue"
       nextDisabled={!allValid || isLoading}
       onNext={async () => {
-        // Create new drafts (ones without an id) — existing ones are read-only for Phase 2
         for (const d of drafts) {
-          if (d.id) continue // skip — no in-place edit in this step for simplicity
-          await api.post('/locations', {
+          const payload = {
             name: d.name.trim(),
             addressLine1: d.addressLine1.trim() || undefined,
             city: d.city.trim() || undefined,
@@ -112,7 +110,12 @@ export default function LocationsStepPage() {
             postalCode: d.postalCode.trim() || undefined,
             phone: d.phone.trim() || undefined,
             timezone: d.timezone,
-          })
+          }
+          if (d.id) {
+            await api.patch(`/locations/${d.id}`, payload)
+          } else {
+            await api.post('/locations', payload)
+          }
         }
         await api.patch('/onboarding/step', { step: 3 })
         router.push('/disciplines')
@@ -128,7 +131,6 @@ export default function LocationsStepPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-900">Location {idx + 1}</p>
-                  {d.id && <p className="text-xs text-slate-500">Already created</p>}
                 </div>
               </div>
               {drafts.length > 1 && !d.id && (
@@ -148,7 +150,6 @@ export default function LocationsStepPage() {
                   value={d.name}
                   onChange={(e) => updateDraft(idx, { name: e.target.value })}
                   placeholder="Downtown Clinic"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="Phone">
@@ -156,7 +157,6 @@ export default function LocationsStepPage() {
                   value={d.phone}
                   onChange={(e) => updateDraft(idx, { phone: e.target.value })}
                   placeholder="+1 (555) 123-4567"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="Street address" className="md:col-span-2">
@@ -164,7 +164,6 @@ export default function LocationsStepPage() {
                   value={d.addressLine1}
                   onChange={(e) => updateDraft(idx, { addressLine1: e.target.value })}
                   placeholder="123 Main Street"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="City">
@@ -172,7 +171,6 @@ export default function LocationsStepPage() {
                   value={d.city}
                   onChange={(e) => updateDraft(idx, { city: e.target.value })}
                   placeholder="New York"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="State / Region">
@@ -180,7 +178,6 @@ export default function LocationsStepPage() {
                   value={d.state}
                   onChange={(e) => updateDraft(idx, { state: e.target.value })}
                   placeholder="NY"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="Postal code">
@@ -188,14 +185,12 @@ export default function LocationsStepPage() {
                   value={d.postalCode}
                   onChange={(e) => updateDraft(idx, { postalCode: e.target.value })}
                   placeholder="10001"
-                  disabled={!!d.id}
                 />
               </AppFormField>
               <AppFormField label="Timezone" required>
                 <select
                   value={d.timezone}
                   onChange={(e) => updateDraft(idx, { timezone: e.target.value })}
-                  disabled={!!d.id}
                   className="flex h-10 w-full rounded-[12px] border border-slate-200/80 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                 >
                   {TIMEZONES.map((tz) => (
