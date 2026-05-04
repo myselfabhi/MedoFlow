@@ -65,7 +65,7 @@ const SECTION_OPTIONS: Array<{
   {
     type: 'service-grid',
     label: 'Services',
-    description: "Your clinic's service catalog",
+    description: 'Service catalog from your clinic',
     icon: LayoutGrid,
     defaultSelected: true,
   },
@@ -217,10 +217,14 @@ export function WebsiteGeneratorModal({
   const [websiteUrl, setWebsiteUrl] = React.useState<string | null>(null)
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  // Track previous open value so we only reset on false → true transition,
+  // not when parent props update mid-flow (e.g. after generateClinicWebsite
+  // triggers a parent refetch that changes defaultLogoUrl / defaultThemeColor).
+  const prevOpenRef = React.useRef(false)
 
-  // ── Reset on open ──────────────────────────────────────────────────────
+  // ── Reset on open (only on closed → open transition) ──────────────────
   React.useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
       setStep('form')
       setName(defaultName)
       setLogoUrl(defaultLogoUrl ?? '')
@@ -235,6 +239,7 @@ export function WebsiteGeneratorModal({
       setPublishError(null)
       setWebsiteUrl(null)
     }
+    prevOpenRef.current = open
   }, [open, defaultName, defaultLogoUrl, defaultThemeColor])
 
   // ── Color extraction from logo ─────────────────────────────────────────
