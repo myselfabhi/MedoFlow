@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   Zap,
+  Globe,
 } from 'lucide-react'
 import { BrandLogo } from '@/components/common/BrandLogo'
 
@@ -110,6 +111,10 @@ const superAdminSections: SidebarSection[] = [
       { href: '/dashboard/front-desk/invoices', label: 'Billing', icon: Receipt },
       { href: '/dashboard/commissions', label: 'Commissions', icon: Tags },
     ],
+  },
+  {
+    title: 'Website',
+    items: [{ href: '/dashboard/site/pages', label: 'Page Builder', icon: Globe }],
   },
   {
     title: 'Insights',

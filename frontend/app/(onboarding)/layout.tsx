@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { LoadingSkeleton } from '@/components/ui-system'
 
@@ -10,10 +10,15 @@ import { LoadingSkeleton } from '@/components/ui-system'
  * - No sidebar, no topbar (the wizard shell renders its own navigation)
  * - Only SUPER_ADMIN with a clinic + !onboardingCompletedAt can stay here.
  *   PATIENTs, PROVIDERs, and already-onboarded admins are redirected.
+ * - Tenants who haven't accepted the agreement are redirected to /agreement
+ *   before any other onboarding step is reachable.
  */
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, isLoading, isAuthenticated } = useAuth()
+
+  const isOnAgreement = pathname === '/agreement'
 
   useEffect(() => {
     if (isLoading) return
@@ -23,18 +28,27 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     }
     if (!user) return
 
-    // Only SUPER_ADMIN with a clinic needs onboarding
     if (user.role !== 'SUPER_ADMIN' || !user.clinicId) {
       router.replace('/dashboard')
       return
     }
 
-    // Already completed — nothing to do here
     if (user.clinic?.tenant?.onboardingCompletedAt) {
       router.replace('/dashboard')
       return
     }
-  }, [user, isLoading, isAuthenticated, router])
+
+    // Gate: agreement must be on file before any other wizard step is reachable.
+    const termsAccepted = Boolean(user.clinic?.tenant?.termsAcceptedAt)
+    if (!termsAccepted && !isOnAgreement) {
+      router.replace('/agreement')
+      return
+    }
+    if (termsAccepted && isOnAgreement) {
+      router.replace('/welcome')
+      return
+    }
+  }, [user, isLoading, isAuthenticated, router, isOnAgreement])
 
   if (isLoading || !user) {
     return (
@@ -47,6 +61,10 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
   if (user.role !== 'SUPER_ADMIN' || !user.clinicId || user.clinic?.tenant?.onboardingCompletedAt) {
     return null
   }
+
+  const termsAccepted = Boolean(user.clinic?.tenant?.termsAcceptedAt)
+  if (!termsAccepted && !isOnAgreement) return null
+  if (termsAccepted && isOnAgreement) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">

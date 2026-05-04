@@ -18,7 +18,14 @@ import {
   CalendarCheck,
   ChevronDown,
   ClipboardList,
+  CreditCard,
+  HelpCircle,
   LogOut,
+  MessageSquare,
+  Pill,
+  Receipt,
+  Repeat,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Stethoscope,
@@ -75,68 +82,81 @@ export function ClinicHeader({ clinic, themeColor, routeId, onOpenHub }: Props) 
 
   const isPatient = user?.role === 'PATIENT'
 
-  const goToShop = () => {
-    setMenuOpen(false)
-    router.push(`/clinic/${routeId}/store`)
-  }
-
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
-        <Link href={`/clinic/${routeId}`} className="flex items-center gap-3">
-          {clinic.logoUrl ? (
-            <Image
-              src={clinic.logoUrl}
-              alt={`${clinic.name} logo`}
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-full object-cover"
-              unoptimized
-            />
-          ) : (
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full text-white"
-              style={{ backgroundColor: themeColor }}
-            >
-              <Stethoscope className="h-5 w-5" />
-            </div>
-          )}
-          <span className="text-base font-bold text-slate-900">{clinic.name}</span>
-        </Link>
+        {/* Left cluster: logo + clinic name + storefront primary nav */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Link href={`/clinic/${routeId}`} className="flex items-center gap-3">
+            {clinic.logoUrl ? (
+              <Image
+                src={clinic.logoUrl}
+                alt={`${clinic.name} logo`}
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: themeColor }}
+              >
+                <Stethoscope className="h-5 w-5" />
+              </div>
+            )}
+            <span className="text-base font-bold text-slate-900">{clinic.name}</span>
+          </Link>
 
+          {/* Storefront primary nav, left of logo on desktop. Visible to
+              every patient (logged-in or not) so the storefront stays
+              browseable — Shopify-style. */}
+          <nav className="hidden md:flex items-center gap-1 border-l border-slate-200 pl-4 ml-2">
+            <Link
+              href={`/clinic/${routeId}/store`}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors ${
+                isOnStore ? 'text-white' : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              style={isOnStore ? { backgroundColor: themeColor } : undefined}
+            >
+              <ShoppingBag className="h-4 w-4" />
+              Storefront
+            </Link>
+          </nav>
+        </div>
+
+        {/* Right cluster: cart + avatar dropdown (or sign in) */}
         <div className="flex items-center gap-3">
-          {/* Store + Cart — only for patients of THIS clinic. Cart is
-              "always visible" once they're authenticated and belonging,
-              so a single tap reveals their basket from any clinic page. */}
+          {/* Cart — visible to authenticated patients of THIS clinic from
+              any page on the clinic site. */}
           {isAuthenticated && belongsHere && (
-            <>
-              <Link
-                href={`/clinic/${routeId}/store`}
-                className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3 sm:px-4 text-sm font-bold transition-colors ${
-                  isOnStore ? 'text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-                style={isOnStore ? { backgroundColor: themeColor } : undefined}
-              >
-                <ShoppingBag className="h-4 w-4" />
-                <span className="hidden sm:inline">Store</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => cartModal.open({ themeColor, routeId })}
-                aria-label={`Open cart${totalItems ? ` — ${totalItems} item${totalItems === 1 ? '' : 's'}` : ''}`}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <ShoppingCart className="h-4 w-4" />
-                {totalItems > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white shadow-sm"
-                    style={{ backgroundColor: themeColor }}
-                  >
-                    {totalItems > 9 ? '9+' : totalItems}
-                  </span>
-                )}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => cartModal.open({ themeColor, routeId })}
+              aria-label={`Open cart${totalItems ? ` — ${totalItems} item${totalItems === 1 ? '' : 's'}` : ''}`}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {totalItems > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white shadow-sm"
+                  style={{ backgroundColor: themeColor }}
+                >
+                  {totalItems > 9 ? '9+' : totalItems}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Mobile-only Storefront button */}
+          {!isOnStore && (
+            <Link
+              href={`/clinic/${routeId}/store`}
+              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              aria-label="Storefront"
+            >
+              <ShoppingBag className="h-4 w-4" />
+            </Link>
           )}
 
           {isAuthenticated && isPatient ? (
@@ -162,49 +182,89 @@ export function ClinicHeader({ clinic, themeColor, routeId, onOpenHub }: Props) 
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
+                  className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl"
                 >
                   <div className="border-b border-slate-100 px-4 py-3">
                     <p className="truncate text-sm font-bold text-slate-900">{user?.name}</p>
                     <p className="truncate text-xs text-slate-500">{user?.email}</p>
+                    <p
+                      className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: themeColor }}
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      {clinic.name}
+                    </p>
                   </div>
-                  <div className="p-1">
-                    <MenuItem
-                      icon={UserIcon}
-                      label="My account"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        onOpenHub?.('overview')
-                      }}
-                    />
+
+                  <div className="max-h-[60vh] overflow-y-auto p-1">
                     <MenuItem
                       icon={CalendarCheck}
-                      label="Appointments"
+                      label="My appointments"
                       onClick={() => {
                         setMenuOpen(false)
                         onOpenHub?.('appointments')
                       }}
                     />
                     <MenuItem
-                      icon={ShoppingBag}
-                      label="Shop"
-                      onClick={goToShop}
-                    />
-                    <MenuItem
                       icon={ClipboardList}
-                      label="Visit history"
+                      label="Visit summaries & documents"
                       onClick={() => {
                         setMenuOpen(false)
                         onOpenHub?.('visits')
                       }}
                     />
                     <MenuItem
+                      icon={Pill}
+                      label="Prescriptions & care plans"
+                      hint="Coming soon"
+                      onClick={() => setMenuOpen(false)}
+                      disabled
+                    />
+                    <MenuItem
+                      icon={MessageSquare}
+                      label="Messages"
+                      hint="Coming soon"
+                      onClick={() => setMenuOpen(false)}
+                      disabled
+                    />
+                    <MenuItem
+                      icon={CreditCard}
+                      label="Billing & payments"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        router.push('/account/billing')
+                      }}
+                    />
+                    <MenuItem
+                      icon={Repeat}
+                      label="Subscriptions & packages"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        router.push('/account/subscriptions')
+                      }}
+                    />
+                    <MenuItem
+                      icon={Receipt}
+                      label="Order history"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        router.push('/account/purchases')
+                      }}
+                    />
+                    <MenuItem
                       icon={UserIcon}
-                      label="Profile"
+                      label="Profile & preferences"
                       onClick={() => {
                         setMenuOpen(false)
                         onOpenHub?.('profile')
                       }}
+                    />
+                    <MenuItem
+                      icon={HelpCircle}
+                      label="Help"
+                      hint="Coming soon"
+                      onClick={() => setMenuOpen(false)}
+                      disabled
                     />
                   </div>
                   <div className="border-t border-slate-100 p-1">
@@ -218,7 +278,7 @@ export function ClinicHeader({ clinic, themeColor, routeId, onOpenHub }: Props) 
                       role="menuitem"
                     >
                       <LogOut className="h-4 w-4" />
-                      Log out
+                      Sign out
                     </button>
                   </div>
                 </div>
@@ -243,10 +303,14 @@ export function ClinicHeader({ clinic, themeColor, routeId, onOpenHub }: Props) 
 function MenuItem({
   icon: Icon,
   label,
+  hint,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
+  hint?: string
+  disabled?: boolean
   onClick: () => void
 }) {
   return (
@@ -254,10 +318,18 @@ function MenuItem({
       type="button"
       onClick={onClick}
       role="menuitem"
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+      disabled={disabled}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors ${
+        disabled ? 'cursor-not-allowed text-slate-400' : 'text-slate-700 hover:bg-slate-50'
+      }`}
     >
-      <Icon className="h-4 w-4 text-slate-400" />
-      {label}
+      <Icon className={`h-4 w-4 ${disabled ? 'text-slate-300' : 'text-slate-400'}`} />
+      <span className="flex-1">{label}</span>
+      {hint && (
+        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          {hint}
+        </span>
+      )}
     </button>
   )
 }

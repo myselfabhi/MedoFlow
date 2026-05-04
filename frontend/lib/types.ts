@@ -1,4 +1,5 @@
 export type Role =
+  | 'PLATFORM_ADMIN'
   | 'SUPER_ADMIN'
   | 'PROVIDER'
   | 'FRONT_DESK'
@@ -12,6 +13,8 @@ export interface UserTenantSummary {
   name: string
   onboardingCompletedAt: string | null
   onboardingStep: number
+  termsAcceptedAt: string | null
+  termsVersion: string | null
 }
 
 export interface UserClinicSummary {

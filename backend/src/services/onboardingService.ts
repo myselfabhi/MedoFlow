@@ -1,9 +1,15 @@
 import prisma from '../config/prisma'
 import { ApiError } from '../types/errors'
+import { logAudit } from './auditService'
+import { sendClinicAgreementConfirmation } from './emailService'
+
+export const CURRENT_TERMS_VERSION = 'v1-2026-05'
 
 export interface OnboardingStatus {
   completedAt: Date | null
   step: number
+  termsAcceptedAt: Date | null
+  termsVersion: string | null
   checklist: {
     brand: boolean
     locations: boolean
@@ -39,7 +45,12 @@ export async function getStatus(clinicId: string): Promise<OnboardingStatus> {
     await Promise.all([
       prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { onboardingCompletedAt: true, onboardingStep: true },
+        select: {
+          onboardingCompletedAt: true,
+          onboardingStep: true,
+          termsAcceptedAt: true,
+          termsVersion: true,
+        },
       }),
       prisma.brand.findUnique({
         where: { tenantId },
@@ -59,6 +70,8 @@ export async function getStatus(clinicId: string): Promise<OnboardingStatus> {
   return {
     completedAt: tenant?.onboardingCompletedAt ?? null,
     step: tenant?.onboardingStep ?? 0,
+    termsAcceptedAt: tenant?.termsAcceptedAt ?? null,
+    termsVersion: tenant?.termsVersion ?? null,
     checklist: {
       brand: brandCustomized,
       locations: locationCount > 0,
@@ -126,4 +139,107 @@ export async function updateBrand(
     where: { tenantId },
     data: updates,
   })
+}
+
+export interface AcceptTermsInput {
+  legalName: string
+  taxId: string
+  primaryContactName: string
+  primaryContactEmail: string
+  mailingAddress: string
+  estimatedSeats: number
+  acknowledgements: {
+    baa: boolean
+    hipaa: boolean
+    dataResidency: boolean
+    refundPolicy: boolean
+    authorizedSignatory: boolean
+  }
+}
+
+const REQUIRED_ACK_KEYS: Array<keyof AcceptTermsInput['acknowledgements']> = [
+  'baa',
+  'hipaa',
+  'dataResidency',
+  'refundPolicy',
+  'authorizedSignatory',
+]
+
+const ACK_LABELS: Record<keyof AcceptTermsInput['acknowledgements'], string> = {
+  baa: 'Business Associate Agreement (BAA)',
+  hipaa: 'HIPAA compliance & PHI handling',
+  dataResidency: 'US data residency',
+  refundPolicy: 'Refund & cancellation policy',
+  authorizedSignatory: 'Authorized to bind the clinic',
+}
+
+export async function acceptTerms(
+  clinicId: string,
+  userId: string,
+  input: AcceptTermsInput
+): Promise<{ acceptedAt: Date; version: string }> {
+  for (const key of REQUIRED_ACK_KEYS) {
+    if (!input.acknowledgements[key]) {
+      const err = new Error(`Acknowledgement "${key}" is required`) as ApiError
+      err.statusCode = 400
+      throw err
+    }
+  }
+
+  const tenantId = await tenantIdFromClinic(clinicId)
+  const acceptedAt = new Date()
+
+  const [tenant, user] = await Promise.all([
+    prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        termsAcceptedAt: acceptedAt,
+        termsAcceptedByUserId: userId,
+        termsVersion: CURRENT_TERMS_VERSION,
+      },
+      select: { name: true, plan: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    }),
+  ])
+
+  await logAudit({
+    clinicId,
+    entityType: 'Tenant',
+    entityId: tenantId,
+    action: 'TERMS_ACCEPTED',
+    fieldChanged: 'termsVersion',
+    oldValue: null,
+    newValue: {
+      version: CURRENT_TERMS_VERSION,
+      legalName: input.legalName,
+      taxId: input.taxId,
+      primaryContactName: input.primaryContactName,
+      primaryContactEmail: input.primaryContactEmail,
+      mailingAddress: input.mailingAddress,
+      estimatedSeats: input.estimatedSeats,
+    },
+    performedById: userId,
+  })
+
+  if (user?.email) {
+    try {
+      await sendClinicAgreementConfirmation({
+        to: user.email,
+        clinicName: tenant.name,
+        acceptedByName: user.name ?? input.primaryContactName,
+        acceptedAt,
+        termsVersion: CURRENT_TERMS_VERSION,
+        plan: tenant.plan,
+        acknowledgements: REQUIRED_ACK_KEYS.map((k) => ACK_LABELS[k]),
+      })
+    } catch (e) {
+      // Email is best-effort — never block agreement acceptance on SMTP.
+      console.error('[acceptTerms] failed to send confirmation email', e)
+    }
+  }
+
+  return { acceptedAt, version: CURRENT_TERMS_VERSION }
 }
