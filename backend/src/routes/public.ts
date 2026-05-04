@@ -1,7 +1,10 @@
 import { Router } from 'express'
 import * as publicController from '../controllers/publicController'
+import * as sitePageService from '../services/sitePageService'
 import { validateRequest } from '../middleware/validateRequest'
 import { withPublicScope } from '../middleware/auth'
+import { asyncHandler } from '../utils/asyncHandler'
+import { successResponse } from '../utils/apiResponse'
 import { publicAvailabilitySchema, publicSlotHoldSchema } from '../validation/module2Schemas'
 
 const router = Router()
@@ -20,6 +23,20 @@ router.get('/clinics/:id/locations', publicController.getClinicLocations)
 router.get('/clinics/:id/products', publicController.getClinicProducts)
 router.get('/clinics/:id/packages', publicController.getClinicPackages)
 router.get('/clinics/:id/memberships', publicController.getClinicMemberships)
+router.get(
+  '/clinics/:id/pages/:slug',
+  asyncHandler(async (req, res) => {
+    const page = await sitePageService.getPublishedBySlug(
+      String(req.params['id']),
+      String(req.params['slug'])
+    )
+    if (!page) {
+      res.status(404).json({ success: false, message: 'Page not found' })
+      return
+    }
+    successResponse(res, 200, 'Page', page)
+  })
+)
 router.get('/products/:id', publicController.getProduct)
 router.get('/patients/check', publicController.checkPatientExists)
 router.get(

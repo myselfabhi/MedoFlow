@@ -34,6 +34,8 @@ import patientRoutes from './patients'
 import roleRoutes from './roles'
 import tenantRoutes from './tenants'
 import onboardingRoutes from './onboarding'
+import platformRoutes from './platform'
+import sitePagesRoutes from './sitePages'
 
 const router = Router()
 
@@ -72,5 +74,7 @@ router.use('/memberships', membershipRoutes)
 router.use('/carts', cartRoutes)
 router.use('/roles', roleRoutes)
 router.use('/onboarding', onboardingRoutes)
+router.use('/platform', platformRoutes)
+router.use('/site-pages', sitePagesRoutes)
 
 export default router

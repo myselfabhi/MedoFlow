@@ -46,7 +46,11 @@ export const register = asyncHandler(
 
 export const login = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const { email, password, clinicId: clinicHint } = req.body as {
+    const {
+      email,
+      password,
+      clinicId: clinicHint,
+    } = req.body as {
       email: string
       password: string
       clinicId?: string | null
@@ -150,6 +154,8 @@ export const login = asyncHandler(
                 name: true,
                 onboardingCompletedAt: true,
                 onboardingStep: true,
+                termsAcceptedAt: true,
+                termsVersion: true,
               },
             },
           },
@@ -172,17 +178,17 @@ export const login = asyncHandler(
 export const markPatientTourSeen = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     if (!req.user) {
-      const err = new Error('Authentication required') as ApiError;
-      err.statusCode = 401;
-      throw err;
+      const err = new Error('Authentication required') as ApiError
+      err.statusCode = 401
+      throw err
     }
     await prisma.user.update({
       where: { id: req.user.id },
       data: { hasSeenPatientTour: true },
-    });
-    successResponse(res, 200, 'Tour marked as seen');
+    })
+    successResponse(res, 200, 'Tour marked as seen')
   }
-);
+)
 
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
@@ -314,6 +320,8 @@ export const me = asyncHandler(
                 name: true,
                 onboardingCompletedAt: true,
                 onboardingStep: true,
+                termsAcceptedAt: true,
+                termsVersion: true,
               },
             },
           },

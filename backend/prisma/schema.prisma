@@ -208,6 +208,9 @@ model Tenant {
   trialEndsAt           DateTime?
   onboardingStep        Int          @default(0)
   onboardingCompletedAt DateTime?
+  termsAcceptedAt       DateTime?
+  termsAcceptedByUserId String?
+  termsVersion          String?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
 
@@ -283,8 +286,42 @@ model Clinic {
   commissionRules           CommissionRule[]
   commissionRecords         CommissionRecord[]
   customRoles               CustomRole[]
+  scribeTemplates           ScribeTemplate[]
+  sitePages                 SitePage[]
 
   @@index([tenantId])
+}
+
+// Section-based clinic website ("Shopify for clinics"). Each clinic owns
+// a small set of pages (Home, About, Services, Contact, etc.). The page
+// body is a JSON array of typed sections rendered both in the dashboard
+// editor and on the public route. draftSectionsJson is what the editor
+// writes to; sectionsJson is what the public site renders. Publishing
+// copies draft → published.
+model SitePage {
+  id                  String    @id @default(cuid())
+  clinicId            String
+  slug                String
+  title               String
+  status              SitePageStatus @default(DRAFT)
+  sectionsJson        Json      @default("[]")
+  draftSectionsJson   Json      @default("[]")
+  seoTitle            String?
+  seoDescription      String?
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, slug])
+  @@index([clinicId])
+  @@index([status])
+}
+
+enum SitePageStatus {
+  DRAFT
+  PUBLISHED
 }
 
 model CustomRole {
@@ -383,17 +420,25 @@ model ProviderDiscipline {
 }
 
 model Provider {
-  id            String   @id @default(cuid())
-  clinicId      String
-  userId        String?  @unique
-  firstName     String
-  lastName      String
-  email         String?
-  phone         String?
-  bufferMinutes Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  clinicId        String
+  userId          String?  @unique
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  bufferMinutes   Int      @default(0)
+  bio             String?
+  headshotUrl     String?
+  signatureUrl    String?
+  licenseNumber   String?
+  languages       String[] @default([])
+  scribeTemplateId String?
+  scribeTone      ScribeTone @default(CONCISE)
+  scribeIncludeCoding Boolean @default(true)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   clinic                 Clinic                       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   disciplines            ProviderDiscipline[]
@@ -415,8 +460,38 @@ model Provider {
   consultationSessions   ConsultationSession[]
   commissionRules        CommissionRule[]
   commissionRecords      CommissionRecord[]
+  scribeTemplate         ScribeTemplate?              @relation(fields: [scribeTemplateId], references: [id], onDelete: SetNull)
 
   @@index([clinicId])
+}
+
+enum ScribeTone {
+  CONCISE
+  DETAILED
+}
+
+// Specialty-aware AI Scribe prompt template. Clinic-scoped so each clinic
+// can fork the platform defaults, but the seed templates have clinicId=null
+// to signal "system default" — those are visible to every clinic and cannot
+// be edited by clinic admins (only the platform admin can).
+model ScribeTemplate {
+  id           String   @id @default(cuid())
+  clinicId     String?
+  specialty    String
+  name         String
+  description  String?
+  systemPrompt String   @db.Text
+  outputSchema Json?
+  isDefault    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinic    Clinic?    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  providers Provider[]
+
+  @@index([clinicId])
+  @@index([specialty])
 }
 
 model ProviderLocationAssignment {

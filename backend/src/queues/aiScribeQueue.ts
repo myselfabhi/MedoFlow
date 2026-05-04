@@ -148,24 +148,49 @@ export interface ClinicalAnalysisResult {
   soap: aiScribeService.SoapDraft
 }
 
-async function generateClinicalAnalysis(transcript: string): Promise<ClinicalAnalysisResult> {
-  const cleaned = cleanTranscript(transcript)
-  const systemPrompt = `Convert this medical conversation into a clinical timeline and a structured SOAP note.
+async function resolveScribePrompt(
+  providerId: string,
+  tone: 'CONCISE' | 'DETAILED'
+): Promise<string> {
+  const fallbackPrompt = `Convert this medical conversation into a clinical timeline and a structured SOAP note.
 Return valid JSON only, no markdown or extra text:
-{
-  "timeline": {
-    "symptoms": ["symptom1", "symptom2"],
-    "duration": "e.g. 3 days or null if unknown",
-    "assessment": "brief clinical impression or null",
-    "plan": ["plan item 1", "plan item 2"]
-  },
-  "soap": {
-    "subjective": "",
-    "objective": "",
-    "assessment": "",
-    "plan": ""
+{"timeline": {"symptoms": [], "duration": "", "assessment": "", "plan": []}, "soap": {"subjective": "", "objective": "", "assessment": "", "plan": ""}}`
+
+  try {
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: {
+        scribeTemplate: { select: { systemPrompt: true, isActive: true } },
+      },
+    })
+    const tpl = provider?.scribeTemplate
+    if (tpl?.isActive && tpl.systemPrompt) {
+      const toneNote =
+        tone === 'DETAILED'
+          ? '\n\nWrite a thorough, complete note. Preserve clinically relevant detail.'
+          : '\n\nWrite a concise, scannable note. One or two crisp sentences per section unless complexity demands more.'
+      return tpl.systemPrompt + toneNote
+    }
+
+    // No per-provider template — fall back to the platform GENERIC default.
+    const generic = await prisma.scribeTemplate.findFirst({
+      where: { clinicId: null, specialty: 'GENERIC', isActive: true },
+      select: { systemPrompt: true },
+    })
+    if (generic?.systemPrompt) return generic.systemPrompt
+  } catch (e) {
+    console.warn('[scribeQueue] could not resolve template, falling back', e)
   }
-}`
+  return fallbackPrompt
+}
+
+async function generateClinicalAnalysis(
+  transcript: string,
+  providerId: string,
+  tone: 'CONCISE' | 'DETAILED'
+): Promise<ClinicalAnalysisResult> {
+  const cleaned = cleanTranscript(transcript)
+  const systemPrompt = await resolveScribePrompt(providerId, tone)
 
   const text = await aiProviderService.chatCompletion({
     systemPrompt,
@@ -243,7 +268,7 @@ async function processAiScribeJob(job: Job<AiScribeJobData>) {
 
   const session = await prisma.aIScribeSession.findUnique({
     where: { id: sessionId },
-    include: { provider: { select: { userId: true } } },
+    include: { provider: { select: { userId: true, scribeTone: true } } },
   })
   if (!session) {
     throw new Error('Session not found')
@@ -339,7 +364,12 @@ Output ONLY the dialogue, nothing else. Do not summarize, keep the exact words i
     console.warn('Pseudo-diarization failed, falling back to raw transcript', e)
   }
 
-  const { timeline, soap: soapDraft } = await generateClinicalAnalysis(finalTranscriptText)
+  const tone = session.provider?.scribeTone ?? 'CONCISE'
+  const { timeline, soap: soapDraft } = await generateClinicalAnalysis(
+    finalTranscriptText,
+    providerId,
+    tone
+  )
   await prisma.aIScribeSession.update({
     where: { id: sessionId },
     data: {
