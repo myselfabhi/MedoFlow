@@ -3,12 +3,12 @@
 /**
  * Public landing page.
  *
- * The sections below read like chapters in a story:
- *   1. Hero           — introduction & bold thesis
- *   2. TrustBanner    — numeric credibility bar
+ * Cinematic, scroll-driven story. Each section is a chapter:
+ *   1. Hero           — 3D arrival
+ *   2. TrustBanner    — credibility marquee
  *   3. ChaosSection   — the problem (tension)
  *   4. BentoGrid      — the four-pillar solution (resolve)
- *   5. DayInTheLife   — what a real day feels like (show, don't tell)
+ *   5. DayInTheLife   — what a real day feels like
  *   6. Commerce       — zoom into the revenue angle
  *   7. ROICalculator  — make it personal
  *   8. Testimonials   — social proof
@@ -25,10 +25,14 @@ import { CommerceSection } from '@/components/landing/CommerceSection'
 import { ROICalculatorSection } from '@/components/landing/ROICalculatorSection'
 import { TestimonialsSection } from '@/components/landing/TestimonialsSection'
 import { FinalCTASection } from '@/components/landing/FinalCTASection'
+import { SmoothScroll } from '@/components/landing/motion/SmoothScroll'
+import { ScrollProgress } from '@/components/landing/motion/ScrollProgress'
 
 export default function PublicHomePage() {
   return (
     <div className="flex flex-col">
+      <SmoothScroll />
+      <ScrollProgress />
       <HeroSection />
       <TrustBanner />
       <ChaosToClaritySection />

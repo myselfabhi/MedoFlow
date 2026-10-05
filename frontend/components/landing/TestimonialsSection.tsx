@@ -1,134 +1,235 @@
 'use client'
 
 /**
- * TestimonialsSection — chapter 8 of the narrative.
+ * TestimonialsSection — social proof, made human.
  *
- * Role: land the emotional proof that real providers already trust this.
- * Layout: asymmetric three-column masonry. No glossy portraits; the quotes
- * carry the weight, not the headshots.
+ * Big featured quote up top with a real provider's face. Three smaller
+ * testimonial tiles below from different specialties. Hover-tilt for
+ * a tactile feel.
  */
 
-import React from 'react'
+import React, { useRef } from 'react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
-import { Quote } from 'lucide-react'
-import { SectionHeader, fadeUpInView } from './primitives'
+import { motion, useMotionValue, useSpring } from 'framer-motion'
+import { Quote, Star } from 'lucide-react'
+import { SectionHeader } from './primitives'
 
 type Testimonial = {
   quote: string
-  name: string
+  who: string
   role: string
   clinic: string
+  location: string
   avatar: string
-  accent?: boolean
+  metric?: { value: string; label: string }
 }
 
-const testimonials: Testimonial[] = [
+const featured: Testimonial = {
+  quote:
+    'I came from Jane. I came from SimplePractice. I came from a $400/mo stack of tools I never fully understood. MedoFlow is the first one I open every morning without dreading it.',
+  who: 'Dr. Sarah Chen',
+  role: 'Founder & Physiotherapist',
+  clinic: 'Atlas Physiotherapy',
+  location: 'Austin, TX',
+  avatar: '/doctors/doctor-female-1.jpg',
+  metric: { value: '22 hrs', label: 'saved per week' },
+}
+
+const others: Testimonial[] = [
   {
     quote:
-      'We closed our EMR, our booking app, and our POS. Medoflow became the whole stack. Front desk went from panicked to bored.',
-    name: 'Dr. Priya Mehta',
-    role: 'Family medicine',
-    clinic: 'Mehta Clinic, Pune',
-    avatar: '/doctors/doctor-female-1.jpg',
-    accent: true,
-  },
-  {
-    quote: 'The scribe saves me 90 minutes a day. That\u2019s dinner with my kids back.',
-    name: 'Dr. James Rodriguez',
-    role: 'Internal medicine',
-    clinic: 'Valley Primary',
+      'My patients book appointments at 11 PM from their phone. They show up. They pay before they leave. The whole flow just works.',
+    who: 'Dr. Marcus Yeung',
+    role: 'Naturopath',
+    clinic: 'Pine Wellness',
+    location: 'Seattle, WA',
     avatar: '/doctors/doctor-male-1.jpg',
   },
   {
     quote:
-      'Our supplement revenue doubled the month we turned commerce on. The provider never even had to plug a card reader in.',
-    name: 'Anya Kapoor',
-    role: 'Practice manager',
-    clinic: 'Glow Dermatology',
+      'The AI scribe gave me my evenings back. I sign 12 charts during the day now — not at 9 PM with a glass of wine and a sigh.',
+    who: 'Dr. Priya Nair',
+    role: 'Family Medicine',
+    clinic: 'Lotus Family Med',
+    location: 'Phoenix, AZ',
     avatar: '/doctors/doctor-female-2.jpg',
   },
   {
     quote:
-      'Onboarding took us a Tuesday. That\u2019s it. By Wednesday morning we were live with 400 patient records imported.',
-    name: 'Dr. Michael Chen',
-    role: 'Integrative medicine',
-    clinic: 'Harmony Health',
-    avatar: '/doctors/doctor-male-2.jpg',
-  },
-  {
-    quote:
-      'No-shows dropped 34%. I\u2019m not even sure which reminder did it &mdash; probably all of them.',
-    name: 'Dr. Sarah Mitchell',
-    role: 'Pediatrician',
-    clinic: 'Cedar Pediatrics',
+      "Our front desk hires a new admin in week one — and they're productive by lunch. The interface just makes sense.",
+    who: 'Elena Vasquez',
+    role: 'Practice Manager',
+    clinic: 'BrightPath Mental Health',
+    location: 'Denver, CO',
     avatar: '/doctors/doctor-female-1.jpg',
-  },
-  {
-    quote: 'I haven\u2019t finished a chart after 6pm in three months.',
-    name: 'Dr. Emily Watson',
-    role: 'Psychiatrist',
-    clinic: 'Mindpath',
-    avatar: '/doctors/doctor-female-2.jpg',
   },
 ]
 
-export function TestimonialsSection() {
-  return (
-    <section className="mf-zone-white relative py-28 md:py-36 border-t border-hairline">
-      <div className="container mx-auto px-6">
-        <SectionHeader
-          eyebrow="Loved by providers"
-          title={
-            <>
-              Doctors who stopped <br className="hidden md:block" />
-              staying late.
-            </>
-          }
-          description="A handful of the 2,400+ clinics now running on Medoflow."
-        />
+function TiltCard({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const rx = useMotionValue(0)
+  const ry = useMotionValue(0)
+  const srx = useSpring(rx, { stiffness: 200, damping: 18, mass: 0.4 })
+  const sry = useSpring(ry, { stiffness: 200, damping: 18, mass: 0.4 })
 
-        {/* Masonry via column-count — reads as naturally staggered */}
-        <div className="mx-auto mt-20 max-w-6xl columns-1 gap-5 md:columns-2 lg:columns-3 [column-fill:_balance]">
-          {testimonials.map((t, i) => (
-            <Card key={t.name} t={t} index={i} />
-          ))}
-        </div>
-      </div>
-    </section>
+  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    ry.set(((e.clientX - cx) / rect.width) * 10)
+    rx.set(-((e.clientY - cy) / rect.height) * 10)
+  }
+  function handleLeave() {
+    rx.set(0)
+    ry.set(0)
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      style={{ rotateX: srx, rotateY: sry, transformStyle: 'preserve-3d', perspective: 1000 }}
+      className="h-full"
+    >
+      {children}
+    </motion.div>
   )
 }
 
-function Card({ t, index }: { t: Testimonial; index: number }) {
+function FeaturedCard({ t }: { t: Testimonial }) {
   return (
-    <motion.figure
-      {...fadeUpInView(index * 0.05)}
-      className={`mb-5 break-inside-avoid rounded-[12px] border p-6 ${
-        t.accent ? 'border-teal bg-teal-wash' : 'border-hairline bg-white'
-      }`}
+    <TiltCard>
+      <div className="relative h-full overflow-hidden rounded-3xl bg-navy p-10 text-white md:p-14">
+        <div
+          className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full opacity-50"
+          style={{
+            background: 'radial-gradient(circle, rgba(94,234,212,0.4), transparent 70%)',
+          }}
+          aria-hidden
+        />
+        <div className="relative grid grid-cols-1 items-center gap-10 md:grid-cols-[1fr_auto]">
+          <div>
+            <Quote className="h-7 w-7 text-teal-bright/50" strokeWidth={1.5} />
+            <p className="mf-display mt-5 text-[clamp(22px,2.8vw,32px)] leading-[1.3] text-white">
+              "{t.quote}"
+            </p>
+
+            <div className="mt-8 flex items-center gap-4">
+              <div className="relative h-12 w-12 overflow-hidden rounded-full ring-2 ring-teal-bright/50">
+                <Image src={t.avatar} alt={t.who} fill sizes="48px" className="object-cover" />
+              </div>
+              <div>
+                <p className="text-[14px] font-semibold text-white">{t.who}</p>
+                <p className="text-[12px] text-white/60">
+                  {t.role} · {t.clinic} · {t.location}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {t.metric && (
+            <div className="hidden flex-shrink-0 rounded-2xl border border-teal-bright/30 bg-white/[0.04] p-7 text-center backdrop-blur-sm md:block">
+              <p className="mf-display text-[clamp(36px,5vw,52px)] leading-none text-teal-bright">
+                {t.metric.value}
+              </p>
+              <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-white/60">
+                {t.metric.label}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </TiltCard>
+  )
+}
+
+function MiniCard({ t, delay }: { t: Testimonial; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-10% 0px' }}
+      transition={{ duration: 0.6, delay }}
+      className="h-full"
     >
-      <Quote
-        className={`mb-4 h-5 w-5 ${t.accent ? 'text-teal' : 'text-ink-faint'}`}
-        strokeWidth={1.5}
-      />
-      <blockquote
-        className={`mf-display text-[17px] leading-snug md:text-[18px] ${
-          t.accent ? 'text-navy' : 'text-ink'
-        }`}
-        // Quote strings include one &mdash;; render safely.
-        dangerouslySetInnerHTML={{ __html: `&ldquo;${t.quote}&rdquo;` }}
-      />
-      <figcaption className="mt-6 flex items-center gap-3">
-        <div className="relative h-9 w-9 overflow-hidden rounded-full border border-hairline">
-          <Image src={t.avatar} alt="" fill sizes="36px" className="object-cover" />
+      <TiltCard>
+        <div className="relative flex h-full flex-col rounded-2xl border border-hairline bg-white p-6 shadow-card transition-shadow hover:shadow-card-hover">
+          <div className="flex items-center gap-1 text-teal">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star key={s} className="h-3.5 w-3.5 fill-current" strokeWidth={0} />
+            ))}
+          </div>
+          <p className="mt-4 flex-1 text-[14px] leading-relaxed text-ink">"{t.quote}"</p>
+          <div className="mt-6 flex items-center gap-3 border-t border-hairline pt-4">
+            <div className="relative h-9 w-9 overflow-hidden rounded-full ring-1 ring-hairline">
+              <Image src={t.avatar} alt={t.who} fill sizes="36px" className="object-cover" />
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-ink">{t.who}</p>
+              <p className="text-[11px] text-ink-muted">
+                {t.clinic} · {t.location}
+              </p>
+            </div>
+          </div>
         </div>
-        <div>
-          <p className="text-[13px] font-medium text-ink">{t.name}</p>
-          <p className="text-[11.5px] text-ink-muted">
-            {t.role} &middot; {t.clinic}
-          </p>
+      </TiltCard>
+    </motion.div>
+  )
+}
+
+export function TestimonialsSection() {
+  return (
+    <section className="mf-zone-white relative py-28 md:py-36">
+      <div className="container mx-auto px-6">
+        <SectionHeader
+          eyebrow="The clinics already on MedoFlow"
+          title={
+            <>
+              Real owners. Real numbers. <span className="text-ink-muted">Real evenings off.</span>
+            </>
+          }
+          description="2,400+ clinics across 14 specialties — from solo therapists to 20-provider multi-location groups."
+        />
+
+        <div className="mx-auto mt-16 max-w-6xl">
+          <FeaturedCard t={featured} />
+
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+            {others.map((t, i) => (
+              <MiniCard key={t.who} t={t} delay={i * 0.08} />
+            ))}
+          </div>
         </div>
-      </figcaption>
-    </motion.figure>
+
+        {/* Trust strip — clinic name marquee */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="mx-auto mt-20 max-w-5xl text-center"
+        >
+          <p className="mf-eyebrow text-ink-muted">Also running on MedoFlow</p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[14px] font-medium text-ink-muted">
+            {[
+              'Cedar Health',
+              'Northstar PT',
+              'Bloom Pediatrics',
+              'Coastal Dermatology',
+              'Vertex Chiropractic',
+              'Quiet Mind Therapy',
+              'Origin Wellness',
+              'Apex Sports Med',
+            ].map((name) => (
+              <span key={name} className="hover:text-ink transition-colors">
+                {name}
+              </span>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </section>
   )
 }

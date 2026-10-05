@@ -56,15 +56,52 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
+    /* Lenis handles smooth scroll on landing — native smooth-scroll would fight it.
+       Other routes still get instant snap, which feels right for app shells. */
+    scroll-behavior: auto;
   }
   body {
     @apply bg-[#fafafa] text-[color:var(--mf-ink)];
     font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   ::selection {
-    background-color: rgba(13, 148, 136, 0.15);
+    background-color: rgba(13, 148, 136, 0.18);
     color: #1e3a5f;
+  }
+
+  /* Premium scrollbar — slim, teal-tinted, low-distraction.
+     WebKit only; Firefox falls back to its system default. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(30, 58, 95, 0.22);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 200ms ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(13, 148, 136, 0.55);
+    background-clip: padding-box;
+  }
+
+  /* Honor reduced-motion — disables our heavy 3D + transitions. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

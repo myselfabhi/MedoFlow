@@ -1,196 +1,319 @@
 'use client'
 
 /**
- * DayInTheLife — chapter 5 of the narrative.
+ * DayInTheLifeSection — pinned-scroll cinematic.
  *
- * Role: show how the product actually flows through a real day.
- * Layout: vertical timeline on a navy canvas. Each step is a white card
- * "hanging" off the timeline. This is deliberately the most distinctive
- * visual moment of the page.
+ * Sticky inner viewport. Four moments of a real Tuesday at Atlas Physio
+ * advance as the user scrolls. Each moment shows a real product UI slice
+ * and a quote from someone in the clinic at that exact moment.
  */
 
-import React from 'react'
-import { motion } from 'framer-motion'
-import { BrainCircuit, Mic, CreditCard, CalendarCheck, Wallet, Sun } from 'lucide-react'
-import { fadeUpInView, SectionHeader } from './primitives'
+import React, { useRef } from 'react'
+import { motion, useScroll, useTransform, MotionValue } from 'framer-motion'
+import { Calendar, Mic, CreditCard, BarChart3, Sun, Sunrise, Coffee, Moon } from 'lucide-react'
+import { MeshGradient } from './motion/MeshGradient'
 
-type Step = {
+type Moment = {
   time: string
-  title: string
-  description: string
-  outcome: string
+  ampm: string
   icon: React.ElementType
-  detail?: React.ReactNode
+  title: string
+  body: string
+  who: string
+  role: string
+  feature: string
 }
 
-const steps: Step[] = [
+const moments: Moment[] = [
   {
-    time: '08:00',
-    title: 'Morning brief',
-    description:
-      'Medoflow opens with today\u2019s schedule, flagged charts, and the AI summary for your first three patients.',
-    outcome: 'Ready before coffee.',
-    icon: Sun,
-    detail: (
-      <MiniCard label="Today\u2019s brief">
-        <p className="text-[12px] text-ink">
-          <span className="font-medium">3 new intake forms</span> &middot; 2 lab reports received
-          overnight &middot; Mrs. Watson&rsquo;s medication review is due.
-        </p>
-      </MiniCard>
-    ),
+    time: '8:42',
+    ampm: 'AM',
+    icon: Sunrise,
+    title: 'Coffee, then a one-glance brief.',
+    body: 'Sarah opens MedoFlow on the iPad. Twelve appointments today, two new patients, three telehealth. The AI has already pre-charted the regulars from their last visit.',
+    who: 'Dr. Sarah Chen',
+    role: 'Owner & Physiotherapist',
+    feature: 'Morning brief',
   },
   {
-    time: '10:30',
-    title: 'The visit',
-    description:
-      'Speak naturally. Medoflow drafts the SOAP note, orders labs, schedules follow-up, and flags any red-flag symptoms in real time.',
-    outcome: 'Documentation done in-session.',
+    time: '10:38',
+    ampm: 'AM',
     icon: Mic,
-    detail: (
-      <MiniCard label="Recording &middot; live">
-        <div className="flex items-center gap-1.5">
-          {[3, 4, 2, 5, 3, 2, 4, 1, 2, 3].map((h, i) => (
-            <motion.span
-              key={i}
-              animate={{ height: [4, h * 3, 4] }}
-              transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.06, ease: 'easeInOut' }}
-              className="block w-[3px] rounded-full bg-teal"
-            />
-          ))}
-        </div>
-        <p className="mt-2 text-[11.5px] text-ink-muted">00:12:04 &middot; Dr. Chen + Sarah M.</p>
-      </MiniCard>
-    ),
+    title: 'The consult ends. The note is already written.',
+    body: 'During the session, MedoFlow listened. Now Sarah reviews a structured SOAP note, edits three lines, signs. The patient gets a friendly summary in their portal before they reach the parking lot.',
+    who: 'Dr. Sarah Chen',
+    role: 'Physiotherapist',
+    feature: 'AI Scribe',
   },
   {
-    time: '10:52',
-    title: 'Checkout',
-    description:
-      'Patient pays, picks up recommended products, and books a 2-week follow-up from the same tap-to-pay screen.',
-    outcome: 'Patient leaves fully set.',
-    icon: CreditCard,
-    detail: (
-      <MiniCard label="Order #4029">
-        <p className="mf-display text-[20px] text-navy">$109.97</p>
-        <p className="text-[11.5px] text-ink-muted">
-          Consult + Vitamin D3 + follow-up booked for 2 weeks
-        </p>
-      </MiniCard>
-    ),
+    time: '1:15',
+    ampm: 'PM',
+    icon: Coffee,
+    title: 'A walk-in. No chaos. No "let me check."',
+    body: 'Maya at the front desk opens the POS. Adds the session, an exercise band from inventory, applies the membership discount. Stripe ping. Receipt sent. Commission posted to Sarah automatically.',
+    who: 'Maya Patel',
+    role: 'Front Desk',
+    feature: 'Point of Sale',
   },
   {
-    time: '16:45',
-    title: 'Afternoon rhythm',
-    description:
-      'Between visits, Medoflow auto-confirms tomorrow\u2019s appointments, nudges no-response patients, and reconciles this morning\u2019s payments.',
-    outcome: 'No manual catch-up required.',
-    icon: CalendarCheck,
-  },
-  {
-    time: '18:00',
-    title: 'Close of day',
-    description:
-      'Charts are signed, revenue is reconciled, and tomorrow is pre-loaded. You walk out at 6:00 &mdash; not 11:00.',
-    outcome: 'Log off with a clean inbox.',
-    icon: Wallet,
+    time: '6:04',
+    ampm: 'PM',
+    icon: Moon,
+    title: 'End of day. The numbers are already in.',
+    body: "No spreadsheet to update. No reconciliation. MedoFlow shows revenue, top services, who came in, who didn't, and which two patients need a follow-up call this week. Sarah closes the iPad. Drives home.",
+    who: 'Dr. Sarah Chen',
+    role: 'Owner',
+    feature: 'Analytics',
   },
 ]
 
-export function DayInTheLifeSection() {
-  return (
-    <section id="how-it-works" className="mf-zone-navy relative overflow-hidden py-28 md:py-36">
-      <div className="absolute inset-0 mf-grid-pattern opacity-40" aria-hidden />
-      <div
-        className="absolute left-1/2 top-[10%] h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-[200px]"
-        style={{ backgroundColor: 'rgba(13, 148, 136, 0.18)' }}
-        aria-hidden
-      />
-
-      <div className="container relative z-10 mx-auto px-6">
-        <SectionHeader
-          onNavy
-          eyebrow="A day in the clinic"
-          title={
-            <>
-              One Tuesday. <span className="text-white/55">No switches.</span>
-            </>
-          }
-          description="What it actually looks like when intake, charting, commerce, and billing live on one surface."
-        />
-
-        {/* ─── Timeline ─────────────────────────────────────────── */}
-        <div className="mx-auto mt-20 max-w-3xl">
-          <div className="relative">
-            {/* vertical rail */}
+function MomentVisual({ moment, idx }: { moment: Moment; idx: number }) {
+  if (idx === 0) {
+    return (
+      <div className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/10">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+          Tuesday · 12 appointments
+        </p>
+        <div className="space-y-1.5">
+          {[
+            { t: '9:00', n: 'New patient · Wellness check' },
+            { t: '10:30', n: 'James R. · Follow-up' },
+            { t: '11:45', n: 'Emily W. · Consultation' },
+            { t: '1:30', n: 'Telehealth · Marco V.' },
+            { t: '2:45', n: 'New patient · Post-op intake' },
+          ].map((s) => (
             <div
-              className="absolute left-[18px] top-2 h-[calc(100%-20px)] w-px bg-white/15 md:left-1/2"
-              aria-hidden
-            />
-
-            {steps.map((s, i) => (
-              <TimelineStep key={s.time} step={s} index={i} />
-            ))}
+              key={s.t}
+              className="flex items-center justify-between rounded bg-white/[0.04] px-2.5 py-2 text-[11px]"
+            >
+              <span className="font-mono text-white/60">{s.t}</span>
+              <span className="text-white/80">{s.n}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  if (idx === 1) {
+    return (
+      <div className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/10">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="rounded-full bg-teal-bright/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-teal-bright">
+            SOAP · Auto-generated
+          </span>
+          <span className="text-[10px] font-mono text-white/40">04:12</span>
+        </div>
+        <div className="space-y-2.5 text-[12px]">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+              Subjective
+            </p>
+            <p className="mt-0.5 text-white/80">
+              Pain down to 3/10 from 7. Sleeping through night.
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+              Assessment
+            </p>
+            <p className="mt-0.5 text-white/80">L4-L5 strain resolving. Mobility 80% baseline.</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Plan</p>
+            <p className="mt-0.5 text-white/80">Continue PT 2×/wk. Add foam roll. Re-eval 2wk.</p>
           </div>
         </div>
       </div>
-    </section>
+    )
+  }
+  if (idx === 2) {
+    return (
+      <div className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/10">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+          Walk-in · Maya Patel
+        </p>
+        <div className="space-y-1.5 text-[12px]">
+          <div className="flex justify-between text-white/80">
+            <span>30-min session</span>
+            <span>$85.00</span>
+          </div>
+          <div className="flex justify-between text-white/80">
+            <span>Exercise band · qty 1</span>
+            <span>$24.00</span>
+          </div>
+          <div className="flex justify-between text-white/50">
+            <span>Wellness member 15% off</span>
+            <span>−$16.35</span>
+          </div>
+          <div className="my-2 h-px bg-white/10" />
+          <div className="flex justify-between text-[13px] font-semibold text-white">
+            <span>Total</span>
+            <span>$92.65</span>
+          </div>
+          <button className="mt-2 w-full rounded-md bg-teal-bright px-2 py-2 text-[11px] font-semibold text-navy">
+            Tap card · Stripe Terminal
+          </button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/10">
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+        Today's wrap
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: 'Revenue', v: '$4,280', d: '+12% vs avg' },
+          { label: 'Visits', v: '12', d: '0 no-shows' },
+          { label: 'New patients', v: '3', d: 'via website' },
+          { label: 'Follow-ups due', v: '2', d: 'queued' },
+        ].map((m) => (
+          <div key={m.label} className="rounded-lg bg-white/[0.04] p-3">
+            <p className="text-[10px] uppercase tracking-wider text-white/50">{m.label}</p>
+            <p className="mf-display mt-1 text-[18px] text-white">{m.v}</p>
+            <p className="text-[10px] text-teal-bright">{m.d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
-// ─────────────────────────── Pieces ──────────────────────────────────
+function MomentPanel({
+  moment,
+  idx,
+  progress,
+  total,
+}: {
+  moment: Moment
+  idx: number
+  progress: MotionValue<number>
+  total: number
+}) {
+  // Each moment is visible during a window of the scroll progress.
+  // Hard-edged windows — no overlap — so moments don't stack visually.
+  const window = 1 / total
+  const start = idx * window
+  const end = start + window
+  // Tiny fade-in/out (2% of window) at the edges only.
+  const fadeMs = window * 0.08
+  const inEnd = start + fadeMs
+  const outStart = end - fadeMs
+  const opacity = useTransform(
+    progress,
+    [Math.max(0, start - 0.001), start, inEnd, outStart, end, Math.min(1, end + 0.001)],
+    [0, 0, 1, 1, 0, 0]
+  )
+  const y = useTransform(progress, [start, inEnd, outStart, end], [30, 0, 0, -30])
 
-function TimelineStep({ step, index }: { step: Step; index: number }) {
-  const Icon = step.icon
-  const side = index % 2 === 0 ? 'left' : 'right'
+  const Icon = moment.icon
 
   return (
     <motion.div
-      {...fadeUpInView(index * 0.06)}
-      className="relative pb-14 last:pb-0 md:grid md:grid-cols-2 md:gap-10"
+      style={{ opacity, y }}
+      className="absolute inset-0 flex items-center justify-center px-6"
     >
-      {/* Node */}
-      <div className="absolute left-[10px] top-1 flex h-4 w-4 items-center justify-center md:left-1/2 md:-translate-x-1/2">
-        <span className="h-2 w-2 rounded-full bg-teal-bright" />
-        <span
-          className="absolute h-4 w-4 rounded-full border border-teal-bright/40"
-          style={{ boxShadow: '0 0 0 4px rgba(30,58,95,1)' }}
-        />
-      </div>
-
-      {/* Content */}
-      <div
-        className={`pl-12 md:pl-0 ${
-          side === 'left' ? 'md:col-start-1 md:pr-12 md:text-right' : 'md:col-start-2 md:pl-12'
-        }`}
-      >
-        <p className="mf-eyebrow text-white/50">{step.time}</p>
-        <h3 className="mf-display mt-2 text-[22px] text-white md:text-[24px]">{step.title}</h3>
-        <p className="mt-2 text-[14px] leading-relaxed text-white/65">{step.description}</p>
-        <p
-          className={`mt-3 inline-flex items-center gap-2 text-[12.5px] font-medium text-teal-bright ${
-            side === 'left' ? 'md:flex-row-reverse' : ''
-          }`}
-        >
-          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-          {step.outcome}
-        </p>
-
-        {step.detail && (
-          <div className={`mt-5 ${side === 'left' ? 'md:ml-auto' : ''} inline-block text-left`}>
-            {step.detail}
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 md:grid-cols-2">
+        {/* Left: copy + quote */}
+        <div className="text-left">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm">
+            <Icon className="h-3.5 w-3.5 text-teal-bright" strokeWidth={2} />
+            <span className="text-[11px] font-medium text-white/70">
+              {moment.time} {moment.ampm} · {moment.feature}
+            </span>
           </div>
-        )}
+
+          <h3 className="mf-display mt-5 text-[clamp(28px,4vw,44px)] leading-[1.1] text-white">
+            {moment.title}
+          </h3>
+
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-white/70">{moment.body}</p>
+
+          <div className="mt-7 flex items-center gap-3 border-l-2 border-teal-bright/40 pl-4">
+            <div>
+              <p className="text-[13px] font-medium text-white">{moment.who}</p>
+              <p className="text-[11px] text-white/50">{moment.role} · Atlas Physiotherapy</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: live product surface */}
+        <div className="max-w-md">
+          <MomentVisual moment={moment} idx={idx} />
+        </div>
       </div>
     </motion.div>
   )
 }
 
-function MiniCard({ label, children }: { label: string; children: React.ReactNode }) {
+export function DayInTheLifeSection() {
+  const ref = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start start', 'end end'],
+  })
+
+  // Time-of-day indicator line — fills as you scroll through the day.
+  const timelineWidth = useTransform(scrollYProgress, [0, 1], ['0%', '100%'])
+
   return (
-    <div className="mf-card inline-block p-4 text-left">
-      <p className="mf-eyebrow text-ink-muted">{label}</p>
-      <div className="mt-2">{children}</div>
-    </div>
+    <section ref={ref} className="relative h-[400vh] bg-[#0B1E35]">
+      <MeshGradient variant="navy" />
+
+      <div className="sticky top-0 flex h-screen flex-col overflow-hidden">
+        {/* Top-left header (always visible) */}
+        <div className="absolute left-6 top-8 z-20 md:left-12 md:top-12">
+          <p className="mf-eyebrow text-teal-bright">A day in the life</p>
+          <h2 className="mf-display mt-2 text-[22px] text-white md:text-[28px]">
+            Atlas Physiotherapy · Tuesday
+          </h2>
+        </div>
+
+        {/* Time-of-day icons (top-right) */}
+        <div className="absolute right-6 top-8 z-20 hidden items-center gap-3 md:right-12 md:top-12 md:flex">
+          {[Sunrise, Sun, Coffee, Moon].map((I, i) => (
+            <span
+              key={i}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.04] text-white/40 ring-1 ring-white/10"
+            >
+              <I className="h-3 w-3" strokeWidth={1.5} />
+            </span>
+          ))}
+        </div>
+
+        {/* Slides */}
+        <div className="relative flex-1">
+          {moments.map((m, i) => (
+            <MomentPanel
+              key={m.time}
+              moment={m}
+              idx={i}
+              progress={scrollYProgress}
+              total={moments.length}
+            />
+          ))}
+        </div>
+
+        {/* Bottom timeline */}
+        <div className="relative z-20 mx-6 mb-8 md:mx-12 md:mb-12">
+          <div className="relative h-[2px] w-full overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="absolute inset-y-0 left-0 origin-left rounded-full"
+              style={{
+                width: timelineWidth,
+                background: 'linear-gradient(90deg, #0D9488, #5EEAD4)',
+              }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-[10px] font-mono text-white/40">
+            <span>8 AM</span>
+            <span>11 AM</span>
+            <span>2 PM</span>
+            <span>6 PM</span>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }

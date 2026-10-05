@@ -1,16 +1,20 @@
 'use client'
 
 /**
- * PublicFooter — anchoring navy edge at the bottom of the marketing shell.
+ * PublicFooter — premium cinematic close.
  *
- * Layout: tagline + newsletter on the left, column groups on the right.
- * Navy treatment matches the design system: edges are navy, teal for actions.
+ * Layout: oversized brand statement → trust strip → newsletter →
+ * refined link columns → quiet legal bar. Each row separated by a
+ * gradient hairline so the footer feels like a deliberate composition,
+ * not a sitemap dump.
  */
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Activity, Lock, Sparkles } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { BrandLogo } from '@/components/common/BrandLogo'
+import { MeshGradient } from '@/components/landing/motion/MeshGradient'
 
 type FooterColumn = {
   title: string
@@ -56,76 +60,203 @@ const columns: FooterColumn[] = [
   },
 ]
 
+const trustItems = [
+  { icon: ShieldCheck, label: 'HIPAA compliant' },
+  { icon: Lock, label: 'SOC 2 Type II' },
+  { icon: Activity, label: '99.98% uptime' },
+] as const
+
+function GradientDivider() {
+  return (
+    <div
+      className="h-px w-full"
+      style={{
+        background:
+          'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%)',
+      }}
+      aria-hidden
+    />
+  )
+}
+
 export function PublicFooter() {
   return (
-    <footer className="mf-zone-navy relative overflow-hidden">
-      <div className="absolute inset-0 mf-grid-pattern opacity-30" aria-hidden />
-      <div className="container relative z-10 mx-auto px-6 pt-20 pb-10 md:pt-24">
-        <div className="grid gap-14 lg:grid-cols-[1.1fr_2fr]">
-          {/* Brand + newsletter */}
-          <div className="max-w-sm">
-            <BrandLogo size="lg" tone="light" />
-            <p className="mt-5 text-[14px] leading-relaxed text-white/65">
-              The operating system for modern clinics. Intake to paid, on one timeline.
+    <footer className="relative overflow-hidden bg-[#0B1E35]">
+      <MeshGradient variant="navy" />
+
+      {/* Fine grid texture — only at top, fading down */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[60vh] opacity-[0.06]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+          maskImage: 'linear-gradient(to bottom, black 0%, transparent 80%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 80%)',
+        }}
+        aria-hidden
+      />
+
+      <div className="container relative z-10 mx-auto px-6 lg:px-8">
+        {/* ─── Top: oversized brand statement ───────────────────────── */}
+        <div className="grid gap-12 pt-24 lg:grid-cols-[1.3fr_1fr] lg:gap-20 lg:pt-32">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5 text-[#5EEAD4]" strokeWidth={2} />
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+                MedoFlow
+              </span>
+            </div>
+
+            <h3 className="mf-display mt-6 text-[clamp(36px,5vw,60px)] leading-[1.05] tracking-[-0.02em] text-white">
+              The operating system <br className="hidden md:block" />
+              <span className="bg-gradient-to-r from-[#5EEAD4] via-[#2DD4BF] to-[#5EEAD4] bg-clip-text text-transparent">
+                for modern clinics.
+              </span>
+            </h3>
+
+            <p className="mt-6 max-w-md text-[15px] leading-relaxed text-white/60">
+              Intake to paid, on one timeline. Built for clinics that want to grow, not get
+              nickel-and-dimed.
+            </p>
+
+            {/* Trust strip */}
+            <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3">
+              {trustItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <div
+                    key={item.label}
+                    className="flex items-center gap-2 text-[12.5px] text-white/65"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5EEAD4]/10 text-[#5EEAD4] ring-1 ring-[#5EEAD4]/20">
+                      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                    </span>
+                    {item.label}
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+
+          {/* Newsletter — refined */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm"
+          >
+            <p className="mf-eyebrow text-[#5EEAD4]">Stay in the loop</p>
+            <h4 className="mf-display mt-3 text-[22px] leading-snug text-white">
+              Get product updates &amp; clinic-ops insights.
+            </h4>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+              Twice a month. No spam, no fluff. Unsubscribe in one click.
             </p>
 
             <form
-              className="mt-8"
+              className="mt-6"
               onSubmit={(e) => {
                 e.preventDefault()
-                // Wired by the ops team — placeholder submit.
               }}
             >
-              <label htmlFor="footer-email" className="mf-eyebrow text-white/55">
-                Get product updates
-              </label>
-              <div className="mt-3 flex overflow-hidden rounded-[10px] border border-white/15 bg-white/[0.06]">
+              <div className="group flex items-center gap-2 rounded-[12px] border border-white/15 bg-[#0B1E35]/60 p-1.5 transition-colors focus-within:border-[#5EEAD4]/50">
                 <input
                   id="footer-email"
                   type="email"
                   required
                   placeholder="you@clinic.com"
-                  className="flex-1 bg-transparent px-4 py-2.5 text-[13px] text-white placeholder:text-white/40 focus:outline-none"
+                  className="flex-1 bg-transparent px-3 py-2 text-[13px] text-white placeholder:text-white/35 focus:outline-none"
                 />
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 bg-white px-4 text-[12.5px] font-medium text-navy transition-colors hover:bg-white/90"
+                  className="group/btn inline-flex items-center gap-1.5 rounded-[8px] bg-white px-4 py-2 text-[13px] font-semibold text-[#0B1E35] shadow-[0_4px_20px_-4px_rgba(94,234,212,0.4)] transition-all hover:shadow-[0_8px_28px_-4px_rgba(94,234,212,0.7)]"
                 >
                   Subscribe
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-0.5" />
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+
+        <div className="mt-20">
+          <GradientDivider />
+        </div>
+
+        {/* ─── Middle: brand + link columns ────────────────────────── */}
+        <div className="grid gap-12 py-16 lg:grid-cols-[1fr_2.4fr] lg:gap-20">
+          <div className="max-w-sm">
+            <BrandLogo size="lg" tone="light" />
+            <p className="mt-5 text-[13px] leading-relaxed text-white/55">
+              &copy; {new Date().getFullYear()} MedoFlow Inc.
+              <br />
+              Built for independent clinics.
+            </p>
           </div>
 
-          {/* Link columns */}
           <div className="grid grid-cols-2 gap-10 md:grid-cols-4">
-            {columns.map((c) => (
-              <div key={c.title}>
-                <h4 className="mf-eyebrow text-white/55">{c.title}</h4>
+            {columns.map((c, ci) => (
+              <motion.div
+                key={c.title}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: ci * 0.05 }}
+              >
+                <h4 className="mf-eyebrow text-white/45">{c.title}</h4>
                 <ul className="mt-5 space-y-3">
                   {c.links.map((l) => (
                     <li key={l.label}>
                       <Link
                         href={l.href}
-                        className="text-[13px] text-white/75 transition-colors hover:text-white"
+                        className="group inline-flex items-center gap-1.5 text-[13.5px] text-white/70 transition-colors hover:text-white"
                       >
-                        {l.label}
+                        <span
+                          className="bg-gradient-to-r from-[#5EEAD4] to-[#5EEAD4] bg-no-repeat transition-[background-size] duration-300"
+                          style={{
+                            backgroundSize: '0% 1px',
+                            backgroundPosition: '0 100%',
+                          }}
+                        >
+                          {l.label}
+                        </span>
+                        <ArrowRight
+                          className="h-3 w-3 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                          strokeWidth={2}
+                        />
                       </Link>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="mt-16 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-8 md:flex-row md:items-center">
-          <p className="text-[12.5px] text-white/50">
-            &copy; {new Date().getFullYear()} Medoflow. All rights reserved.
-          </p>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px] text-white/55">
+        <GradientDivider />
+
+        {/* ─── Bottom: quiet legal bar ─────────────────────────────── */}
+        <div className="flex flex-col items-start justify-between gap-4 py-8 md:flex-row md:items-center">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-white/45">
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              </span>
+              All systems operational
+            </span>
+            <span className="hidden md:inline text-white/20">·</span>
+            <span>Made with care in San Francisco</span>
+          </div>
+
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px] text-white/55">
             <Link href="#" className="transition-colors hover:text-white">
               Privacy
             </Link>
@@ -133,13 +264,36 @@ export function PublicFooter() {
               Terms
             </Link>
             <Link href="#" className="transition-colors hover:text-white">
-              HIPAA compliance
+              HIPAA notice
             </Link>
             <Link href="#" className="transition-colors hover:text-white">
               Security
             </Link>
+            <Link href="#" className="transition-colors hover:text-white">
+              Status
+            </Link>
           </div>
         </div>
+      </div>
+
+      {/* Giant low-opacity wordmark — Stripe/Linear-style premium touch */}
+      <div
+        aria-hidden
+        className="pointer-events-none relative -mb-12 mt-4 select-none overflow-hidden"
+      >
+        <p
+          className="mf-display text-center text-[clamp(120px,22vw,260px)] font-bold leading-[0.85] tracking-[-0.05em]"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(94, 234, 212, 0.10) 0%, rgba(94, 234, 212, 0.0) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            color: 'transparent',
+          }}
+        >
+          MedoFlow
+        </p>
       </div>
     </footer>
   )
