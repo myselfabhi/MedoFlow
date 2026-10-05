@@ -36,6 +36,7 @@ import tenantRoutes from './tenants'
 import onboardingRoutes from './onboarding'
 import platformRoutes from './platform'
 import sitePagesRoutes from './sitePages'
+import voiceAgentRoutes from './voiceAgent'
 
 const router = Router()
 
@@ -76,5 +77,6 @@ router.use('/roles', roleRoutes)
 router.use('/onboarding', onboardingRoutes)
 router.use('/platform', platformRoutes)
 router.use('/site-pages', sitePagesRoutes)
+router.use('/voice-agent', voiceAgentRoutes)
 
 export default router

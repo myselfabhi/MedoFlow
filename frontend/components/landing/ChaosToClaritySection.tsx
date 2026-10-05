@@ -1,193 +1,265 @@
 'use client'
 
 /**
- * ChaosSection — chapter 3 of the narrative.
+ * ChaosToClaritySection — chapter 3.
  *
- * Role: state the problem. Visually: disconnected tools drifting, broken
- * dashed lines between them, a raw quote, a cost-of-status-quo callout.
- * We intentionally don't show the "solution" here — the next section (Bento)
- * is the reveal.
+ * Split-screen: the real pain on the left (8 disconnected tools, daily-life
+ * micro-frustrations) versus the calm single MedoFlow surface on the right.
+ * Customer-quote anchor below grounds the abstraction in a real person.
  */
 
-import React from 'react'
-import { motion } from 'framer-motion'
+import React, { useRef } from 'react'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
+  AlertCircle,
   Calendar,
-  Mail,
   CreditCard,
-  Database,
-  Activity,
   FileText,
-  BellRing,
-  MessagesSquare,
-  Clock,
+  Mail,
+  MessageSquare,
+  Phone,
+  Receipt,
+  Users,
 } from 'lucide-react'
-import { fadeUpInView, SectionHeader } from './primitives'
+import { SectionHeader } from './primitives'
 
-type ToolIconProps = {
-  icon: React.ReactNode
-  top?: string
-  left?: string
-  right?: string
-  bottom?: string
-  delay?: number
-  label: string
-}
-
-const tools: ToolIconProps[] = [
-  { icon: <Mail />, top: '6%', left: '4%', delay: 0, label: 'Email' },
-  { icon: <Calendar />, top: '2%', right: '22%', delay: 0.4, label: 'Calendly' },
-  { icon: <Database />, top: '38%', left: '22%', delay: 0.8, label: 'Spreadsheet' },
-  { icon: <MessagesSquare />, bottom: '28%', right: '6%', delay: 0.2, label: 'WhatsApp' },
-  { icon: <CreditCard />, bottom: '8%', left: '8%', delay: 1.0, label: 'POS' },
-  { icon: <Activity />, top: '30%', right: '4%', delay: 0.6, label: 'EMR' },
-  { icon: <FileText />, bottom: '6%', right: '30%', delay: 1.4, label: 'Notes app' },
-  { icon: <BellRing />, top: '58%', left: '48%', delay: 1.8, label: 'Reminders' },
+const messyTools = [
+  'Jane App',
+  'Calendly',
+  'Google Sheets',
+  'Stripe Dashboard',
+  'SimplePractice',
+  'Heidi Health',
+  'Mailchimp',
+  'Squarespace',
 ]
 
-export function ChaosToClaritySection() {
+const dailyPains = [
+  { icon: Calendar, label: 'Double-booked Tuesday', tone: 'red' as const },
+  { icon: Mail, label: '47 unread patient emails', tone: 'amber' as const },
+  { icon: FileText, label: '12 charts still open from Monday', tone: 'red' as const },
+  { icon: Receipt, label: '$8,420 in unpaid invoices', tone: 'amber' as const },
+  { icon: Phone, label: '6 voicemails, none returned', tone: 'red' as const },
+  { icon: AlertCircle, label: 'Insurance denial — 3rd this week', tone: 'red' as const },
+]
+
+function PainCard() {
   return (
-    <section className="mf-zone-white relative py-28 md:py-36">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-6">
+      <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-rose-600 ring-1 ring-rose-200">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+        </span>
+        Tuesday, 6:42 PM
+      </div>
+
+      <p className="mb-4 text-[12px] font-semibold uppercase tracking-wider text-rose-700/80">
+        Your clinic, right now
+      </p>
+
+      <div className="mb-5 flex flex-wrap gap-1.5">
+        {messyTools.map((name, i) => (
+          <motion.span
+            key={name}
+            initial={{ opacity: 0, y: 4 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.3, delay: i * 0.04 }}
+            className="rounded-full border border-rose-200 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-rose-900/70"
+          >
+            {name}
+          </motion.span>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {dailyPains.map((p, i) => {
+          const Icon = p.icon
+          return (
+            <motion.div
+              key={p.label}
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35, delay: 0.2 + i * 0.06 }}
+              className="flex items-center gap-3 rounded-lg bg-white/70 px-3 py-2.5 ring-1 ring-rose-100"
+            >
+              <span
+                className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md ${
+                  p.tone === 'red' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+              </span>
+              <span className="text-[13px] font-medium text-ink">{p.label}</span>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      <p className="mt-5 text-[12px] italic text-rose-700/70">
+        Sound familiar? This is what 8 disconnected tools looks like.
+      </p>
+    </div>
+  )
+}
+
+function CalmCard() {
+  const calmRows = [
+    {
+      icon: Calendar,
+      title: 'Today · 12 booked',
+      subtitle: '3 telehealth · 9 in-clinic · 2 prepaid',
+      right: '+2 vs avg',
+    },
+    {
+      icon: FileText,
+      title: 'Charts caught up',
+      subtitle: 'Last note signed 12 min ago',
+      right: '0 backlog',
+    },
+    {
+      icon: CreditCard,
+      title: 'Collected today',
+      subtitle: '14 payments · 2 packages sold',
+      right: '$4,280',
+    },
+    {
+      icon: Users,
+      title: 'New patients this week',
+      subtitle: 'Booked through your MedoFlow site',
+      right: '9',
+    },
+  ]
+
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-hairline bg-white p-6 shadow-card">
+      <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-teal-wash px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-teal ring-1 ring-teal/20">
+        <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+        On track
+      </div>
+
+      <p className="mb-5 text-[12px] font-semibold uppercase tracking-wider text-teal">
+        Same clinic, on MedoFlow
+      </p>
+
+      <div className="space-y-3">
+        {calmRows.map((row, i) => {
+          const Icon = row.icon
+          return (
+            <motion.div
+              key={row.title}
+              initial={{ opacity: 0, y: 6 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="flex items-center justify-between rounded-lg bg-canvas px-3.5 py-3 ring-1 ring-hairline"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-teal-wash text-teal">
+                  <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p className="text-[13px] font-medium text-ink">{row.title}</p>
+                  <p className="text-[11px] text-ink-muted">{row.subtitle}</p>
+                </div>
+              </div>
+              <span className="text-[12px] font-semibold text-teal">{row.right}</span>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      <p className="mt-5 text-[12px] italic text-ink-muted">One screen. One bill. Home by 6.</p>
+    </div>
+  )
+}
+
+function FlowOrb() {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 md:flex">
+      <motion.div
+        initial={{ scale: 0.6, opacity: 0 }}
+        whileInView={{ scale: 1, opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7, delay: 0.4 }}
+        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-card-hover ring-1 ring-hairline"
+      >
+        <motion.div
+          className="absolute inset-0 rounded-full bg-teal/20"
+          animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }}
+          transition={{ duration: 2.4, repeat: Infinity }}
+        />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="text-teal">
+          <path
+            d="M5 12h14m-6-6 6 6-6 6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </motion.div>
+    </div>
+  )
+}
+
+export function ChaosToClaritySection() {
+  const ref = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'end start'],
+  })
+  const leftX = useTransform(scrollYProgress, [0, 0.5], [-30, 0])
+  const rightX = useTransform(scrollYProgress, [0, 0.5], [30, 0])
+
+  return (
+    <section ref={ref} className="mf-zone-white relative py-28 md:py-36">
       <div className="container mx-auto px-6">
         <SectionHeader
           eyebrow="The problem"
           title={
             <>
-              Care is messy.{' '}
-              <span className="text-ink-muted">
-                The software you use to run it,
-                <br className="hidden md:block" /> somehow messier.
-              </span>
+              You didn't start a clinic <br className="hidden md:block" />
+              <span className="text-ink-muted">to manage software.</span>
             </>
           }
-          description="Most clinics stitch together 7–12 tools that don't talk. The result: staff playing human middleware, patients falling through cracks, revenue quietly leaking."
+          description="Most clinics juggle 6 to 10 disconnected tools. The cost isn't just the bills — it's the 2 hours every night reconciling them."
         />
 
-        <div className="mx-auto mt-20 grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-14">
-          {/* ─── Left: the chaos canvas ───────────────────────────── */}
-          <motion.div {...fadeUpInView(0.1)} className="relative mx-auto h-[420px] w-full max-w-xl">
-            {/* Dashed broken connectors (visual metaphor) */}
-            <svg className="absolute inset-0 h-full w-full" aria-hidden>
-              <defs>
-                <pattern
-                  id="chaos-dots"
-                  x="0"
-                  y="0"
-                  width="16"
-                  height="16"
-                  patternUnits="userSpaceOnUse"
-                >
-                  <circle cx="1" cy="1" r="0.8" fill="#E5E7EB" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#chaos-dots)" opacity="0.8" />
-              {/* broken link fragments */}
-              {[
-                { x1: '12%', y1: '18%', x2: '44%', y2: '52%' },
-                { x1: '76%', y1: '12%', x2: '54%', y2: '48%' },
-                { x1: '56%', y1: '72%', x2: '14%', y2: '90%' },
-                { x1: '88%', y1: '60%', x2: '60%', y2: '78%' },
-                { x1: '30%', y1: '46%', x2: '70%', y2: '38%' },
-              ].map((l, i) => (
-                <line
-                  key={i}
-                  {...l}
-                  stroke="#E5E7EB"
-                  strokeWidth="1.25"
-                  strokeDasharray="5 6"
-                  strokeLinecap="round"
-                />
-              ))}
-            </svg>
-
-            {tools.map((t) => (
-              <ToolChip key={t.label} {...t} />
-            ))}
-
-            {/* central "help" question */}
-            <motion.div
-              {...fadeUpInView(0.4)}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white px-4 py-1.5 text-[11px] font-medium text-ink-muted"
-              style={{ border: '1px solid #E5E7EB' }}
-            >
-              <span className="mr-1.5" aria-hidden>
-                ?
-              </span>
-              Where did that intake form go?
-            </motion.div>
+        <div className="relative mx-auto mt-16 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
+          <motion.div style={{ x: leftX }} className="relative min-h-[480px]">
+            <PainCard />
           </motion.div>
 
-          {/* ─── Right: cost of status quo ────────────────────────── */}
-          <div className="max-w-md">
-            <motion.figure {...fadeUpInView(0.15)}>
-              <svg
-                className="mb-5 h-6 w-6 text-hairline"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden
-              >
-                <path d="M14.017 21v-7.391C14.017 8.37 17.092 5.32 22 4v2.87c-2.52 1.35-3.79 3.38-3.79 5.77h3.79V21h-7.983zm-14.017 0v-7.391C.0 8.37 3.075 5.32 7.983 4v2.87c-2.52 1.35-3.79 3.38-3.79 5.77h3.79V21H0z" />
-              </svg>
-              <blockquote className="mf-display text-[22px] leading-snug text-navy md:text-[26px]">
-                &ldquo;I finish charts at 11pm. My front desk texts patients from her personal
-                phone. We lose a consult every week because no one reconciled the calendar.&rdquo;
-              </blockquote>
-              <figcaption className="mt-4 text-[13px] text-ink-muted">
-                &mdash; Dr. Priya Mehta, family medicine, Pune
-              </figcaption>
-            </motion.figure>
+          <FlowOrb />
 
-            <motion.div
-              {...fadeUpInView(0.25)}
-              className="mt-10 grid grid-cols-2 gap-4 rounded-[12px] border border-hairline bg-canvas p-5"
-            >
-              <CostStat value="11.4 hrs" label="Weekly admin swamp per provider" />
-              <CostStat value="₹42K" label="Avg. monthly revenue leaked" />
-              <CostStat value="24%" label="No-shows without reminders" />
-              <CostStat value="7+ tools" label="Daily tab-switching tax" />
-            </motion.div>
-          </div>
+          <motion.div style={{ x: rightX }} className="relative min-h-[480px]">
+            <CalmCard />
+          </motion.div>
         </div>
+
+        <motion.figure
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="mx-auto mt-20 max-w-3xl text-center"
+        >
+          <MessageSquare className="mx-auto h-5 w-5 text-teal" strokeWidth={1.5} />
+          <blockquote className="mf-display mt-5 text-[clamp(22px,3vw,32px)] leading-[1.3] text-ink">
+            "I was paying for 7 tools that didn't talk to each other.
+            <br className="hidden md:block" />
+            <span className="text-teal">MedoFlow replaced all of them.</span> I haven't worked past
+            6 PM in three months."
+          </blockquote>
+          <figcaption className="mt-6 text-[14px] text-ink-muted">
+            <span className="font-medium text-ink">Dr. Sarah Chen</span> · Founder, Atlas
+            Physiotherapy · Austin, TX
+          </figcaption>
+        </motion.figure>
       </div>
     </section>
-  )
-}
-
-function ToolChip({ icon, top, left, right, bottom, delay = 0, label }: ToolIconProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ delay: 0.1 + delay * 0.06, duration: 0.4 }}
-      className="absolute"
-      style={{ top, left, right, bottom }}
-    >
-      <motion.div
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 5 + (delay % 2), repeat: Infinity, ease: 'easeInOut', delay }}
-        className="flex items-center gap-2 rounded-[10px] border border-hairline bg-white px-3 py-2"
-      >
-        <span className="flex h-6 w-6 items-center justify-center text-ink-faint">
-          {React.cloneElement(icon as React.ReactElement, {
-            className: 'h-4 w-4',
-            strokeWidth: 1.75,
-          })}
-        </span>
-        <span className="text-[11px] font-medium text-ink-muted">{label}</span>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function CostStat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" strokeWidth={1.75} />
-      <div>
-        <p className="mf-display text-[20px] text-navy">{value}</p>
-        <p className="mt-0.5 text-[11.5px] leading-snug text-ink-muted">{label}</p>
-      </div>
-    </div>
   )
 }

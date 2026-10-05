@@ -288,6 +288,8 @@ model Clinic {
   customRoles               CustomRole[]
   scribeTemplates           ScribeTemplate[]
   sitePages                 SitePage[]
+  voiceAgentConfig          VoiceAgentConfig?
+  voiceCalls                VoiceCall[]
 
   @@index([tenantId])
 }
@@ -1443,4 +1445,105 @@ model CommissionRecord {
   @@index([invoiceId])
   @@index([status])
   @@index([earnedAt])
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Voice Agent (AI Front Desk)
+//
+// Per-clinic AI receptionist that answers the phone. Configured by the
+// clinic owner, executed via OpenAI Realtime API. Calls land here either
+// from the in-browser tester (Phase 1) or from Twilio Media Streams once
+// telephony is wired (Phase 2). Every call is fully transcribed and
+// summarized for compliance + clinic-owner review.
+// ────────────────────────────────────────────────────────────────────────
+
+enum VoiceCallStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  TRANSFERRED
+  ABANDONED
+}
+
+enum VoiceCallChannel {
+  BROWSER     // in-app voice test
+  PHONE       // real phone via Twilio
+}
+
+enum VoiceCallOutcome {
+  APPOINTMENT_BOOKED
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+  MESSAGE_TAKEN
+  REFILL_REQUESTED
+  INFO_PROVIDED
+  TRANSFERRED_TO_HUMAN
+  NO_ACTION
+}
+
+enum VoicePersona {
+  WARM        // friendly, conversational (default for primary care)
+  PROFESSIONAL // clinical, concise (default for specialists)
+  UPBEAT      // energetic (default for wellness/aesthetics)
+}
+
+model VoiceAgentConfig {
+  id           String   @id @default(cuid())
+  clinicId     String   @unique
+  enabled      Boolean  @default(false)
+  greeting     String   @default("Hi! Thanks for calling. I'm an AI assistant who can help with booking, rescheduling, and answering questions about the clinic. How can I help you today?")
+  persona      VoicePersona @default(WARM)
+  voice        String   @default("alloy") // OpenAI Realtime voice: alloy, ash, ballad, coral, echo, sage, shimmer, verse
+  businessHours Json?   // { mon: { open: "09:00", close: "17:00" }, ... }
+  afterHoursMessage String @default("We're closed right now. I can take a message and a staff member will get back to you on the next business day. Or, would you like to book online?")
+  escalationPhone String? // forward to human when needed
+  capabilities Json    @default("{\"book\":true,\"reschedule\":true,\"cancel\":true,\"refill\":true,\"messages\":true,\"transfer\":true,\"info\":true}")
+  systemPromptExtra String? // clinic-specific instructions appended to system prompt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+}
+
+model VoiceCall {
+  id           String           @id @default(cuid())
+  clinicId     String
+  channel      VoiceCallChannel @default(BROWSER)
+  status       VoiceCallStatus  @default(IN_PROGRESS)
+  outcome      VoiceCallOutcome?
+  callerPhone  String?
+  callerName   String?
+  patientId    String?
+  startedAt    DateTime         @default(now())
+  endedAt      DateTime?
+  durationSec  Int              @default(0)
+  transcript   Json             @default("[]") // [{role, content, ts}, ...]
+  summary      String?
+  recordingUrl String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  clinic  Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  events  VoiceCallEvent[]
+
+  @@index([clinicId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([patientId])
+}
+
+model VoiceCallEvent {
+  id        String   @id @default(cuid())
+  callId    String
+  type      String   // "tool_call", "transfer", "error", "interrupt"
+  toolName  String?
+  argsJson  Json?
+  resultJson Json?
+  errorMessage String?
+  ts        DateTime @default(now())
+
+  call VoiceCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@index([callId])
+  @@index([type])
 }

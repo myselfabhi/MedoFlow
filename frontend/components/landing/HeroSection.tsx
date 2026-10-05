@@ -1,240 +1,198 @@
 'use client'
 
-import React from 'react'
+/**
+ * Hero — cinematic opening.
+ *
+ * The 3D ClinicStack lives behind the typography. Scroll progress drives
+ * camera pull-back and content opacity, creating a sense of arrival.
+ */
+
+import React, { useRef } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import Image from 'next/image'
-import { motion } from 'framer-motion'
-import { ArrowRight, Calendar, FileText, Wallet, Sparkles } from 'lucide-react'
-import { fadeUp, StatusChip } from './primitives'
+import { motion, useScroll, useTransform } from 'framer-motion'
+import { ArrowRight, Sparkles, ChevronDown } from 'lucide-react'
+import { MeshGradient } from './motion/MeshGradient'
+import { MagneticButton } from './motion/MagneticButton'
 import { useAuthModal } from '@/components/auth/AuthModal'
 
-type PatientRow = {
-  name: string
-  type: string
-  time: string
-  status: string
-  tone: 'ok' | 'warn' | 'err'
-  avatar: string
+const ClinicStack = dynamic(() => import('./three/ClinicStack'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full" aria-hidden />,
+})
+
+const eyebrowMotion = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
 }
-
-const patientRows: PatientRow[] = [
-  {
-    name: 'Sarah Mitchell',
-    type: 'Wellness check',
-    time: '9:00 AM',
-    status: 'Confirmed',
-    tone: 'ok',
-    avatar: '/doctors/doctor-female-1.jpg',
-  },
-  {
-    name: 'James Rodriguez',
-    type: 'Follow up',
-    time: '10:30 AM',
-    status: 'In room',
-    tone: 'warn',
-    avatar: '/doctors/doctor-male-1.jpg',
-  },
-  {
-    name: 'Emily Watson',
-    type: 'Consultation',
-    time: '11:45 AM',
-    status: 'Waiting',
-    tone: 'ok',
-    avatar: '/doctors/doctor-female-2.jpg',
-  },
-]
-
-const stats = [
-  { icon: Calendar, label: 'Appointments', value: '12' },
-  { icon: FileText, label: 'Follow ups', value: '7' },
-  { icon: Wallet, label: 'Revenue', value: '$4.2K' },
-] as const
 
 export function HeroSection() {
   const { openLogin } = useAuthModal()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start start', 'end start'],
+  })
+
+  // Parallax — content drifts up, 3D drifts down, creates depth.
+  const contentY = useTransform(scrollYProgress, [0, 1], ['0%', '-30%'])
+  const sceneY = useTransform(scrollYProgress, [0, 1], ['0%', '15%'])
+  const sceneScale = useTransform(scrollYProgress, [0, 1], [1, 1.12])
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0])
+  const sceneOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0.3])
+
   return (
-    <section className="mf-zone-navy relative overflow-hidden">
-      {/* Background atmosphere */}
-      <div className="absolute inset-0 mf-grid-pattern opacity-50" aria-hidden />
+    <section
+      ref={containerRef}
+      className="relative h-[100vh] min-h-[760px] w-full overflow-hidden bg-[#0B1E35]"
+    >
+      {/* Atmospheric gradient — drifts continuously */}
+      <MeshGradient variant="navy" />
+
+      {/* Fine grid texture for high-tech feel */}
       <div
-        className="absolute -top-40 right-0 h-[520px] w-[520px] rounded-full blur-[160px]"
-        style={{ backgroundColor: 'rgba(13, 148, 136, 0.28)' }}
-        aria-hidden
-      />
-      <div
-        className="absolute -bottom-32 -left-20 h-[360px] w-[360px] rounded-full blur-[140px]"
-        style={{ backgroundColor: 'rgba(94, 234, 212, 0.08)' }}
+        className="absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+          maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+          WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+        }}
         aria-hidden
       />
 
-      <div className="container relative z-10 mx-auto px-6 pt-28 pb-28 md:pt-32 md:pb-36">
-        <div className="grid grid-cols-1 gap-16 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-20">
-          {/* ─── Left: story hook ─────────────────────────────────────── */}
-          <div className="max-w-xl">
+      {/* 3D scene — fills the viewport behind the copy */}
+      <motion.div
+        className="absolute inset-0 z-0"
+        style={{ y: sceneY, scale: sceneScale, opacity: sceneOpacity }}
+        aria-hidden
+      >
+        <ClinicStack className="absolute inset-0 h-full w-full" />
+      </motion.div>
+
+      {/* Vignette to ground typography — darker at edges only, lets the 3D show through center */}
+      <div
+        className="absolute inset-0 z-[1]"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 60% at center, transparent 0%, rgba(11, 30, 53, 0.0) 35%, rgba(11, 30, 53, 0.45) 75%, rgba(11, 30, 53, 0.7) 100%)',
+        }}
+        aria-hidden
+      />
+      {/* Light text-area scrim — keeps copy readable but lets the 3D glow through */}
+      <div
+        className="absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
+        style={{
+          width: '70vw',
+          maxWidth: '760px',
+          height: '50vh',
+          background:
+            'radial-gradient(ellipse at center, rgba(11, 30, 53, 0.30) 0%, rgba(11, 30, 53, 0.08) 60%, transparent 90%)',
+          filter: 'blur(40px)',
+        }}
+        aria-hidden
+      />
+
+      {/* Foreground content */}
+      <motion.div
+        className="relative z-10 flex h-full items-center"
+        style={{ y: contentY, opacity: contentOpacity }}
+      >
+        <div className="container mx-auto px-6">
+          <div className="mx-auto max-w-3xl text-center">
             <motion.div
-              {...fadeUp(0.05)}
-              className="mf-eyebrow inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5"
+              {...eyebrowMotion}
+              className="mf-eyebrow inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-1.5 backdrop-blur-sm"
             >
-              <Sparkles className="h-3 w-3" strokeWidth={2} style={{ color: '#5EEAD4' }} />
-              <span className="text-white/70">New &middot; Ambient AI scribe</span>
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={2} style={{ color: '#5EEAD4' }} />
+              <span className="text-white/70">The clinic operating system · Built on AI</span>
             </motion.div>
 
             <motion.h1
-              {...fadeUp(0.12)}
-              className="mf-display mt-6 text-[44px] text-white sm:text-[56px] md:text-[68px]"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              className="mf-display mt-7 text-[clamp(44px,7vw,84px)] leading-[1.02] tracking-[-0.02em] text-white"
             >
-              One timeline.
+              The clinic OS that
               <br />
-              Every patient, <span className="text-teal-bright">every rupee,</span>
-              <br />
-              every detail.
+              <span className="inline-block bg-gradient-to-r from-[#5EEAD4] via-[#2DD4BF] to-[#5EEAD4] bg-clip-text text-transparent">
+                runs itself.
+              </span>
             </motion.h1>
 
             <motion.p
-              {...fadeUp(0.2)}
-              className="mt-7 max-w-lg text-[17px] leading-relaxed text-white/70"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="mx-auto mt-7 max-w-xl text-[17px] leading-relaxed text-white/70"
             >
-              Medoflow runs your entire practice on a single surface &mdash; intake, charting,
-              scheduling, commerce, billing. No tab-switching, no handoffs.
+              Scheduling, EMR, billing, payments, an ambient AI scribe — and soon, an AI front desk
+              that answers your phone. One platform. One bill. No stitching.
             </motion.p>
 
-            <motion.div {...fadeUp(0.28)} className="mt-10 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-10 flex flex-wrap items-center justify-center gap-3"
+            >
+              <MagneticButton
                 onClick={openLogin}
-                className="mf-btn mf-btn-lg mf-btn-primary"
+                className="group inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-semibold text-[#0B1E35] shadow-[0_10px_40px_-10px_rgba(94,234,212,0.6)] transition-shadow hover:shadow-[0_14px_50px_-10px_rgba(94,234,212,0.8)]"
               >
-                Clinic login
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              <Link href="#how-it-works" className="mf-btn mf-btn-lg mf-btn-ghost">
-                See how it works
+                Start free trial
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </MagneticButton>
+
+              <Link
+                href="#how-it-works"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-6 py-3.5 text-[15px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/[0.08]"
+              >
+                See the product
               </Link>
             </motion.div>
 
             <motion.div
-              {...fadeUp(0.36)}
-              className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.7 }}
+              className="mt-8 flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px] text-white/50"
             >
-              <StatusChip onNavy>No credit card</StatusChip>
-              <StatusChip onNavy>14-day trial</StatusChip>
-              <StatusChip onNavy>HIPAA &amp; SOC2 aligned</StatusChip>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-[#5EEAD4]" />
+                No credit card
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-[#5EEAD4]" />
+                14-day trial
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-[#5EEAD4]" />
+                HIPAA &amp; SOC2 aligned
+              </span>
             </motion.div>
           </div>
-
-          {/* ─── Right: the product surface (workspace artifact in navy edge) ─ */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.25 }}
-            className="relative lg:-mr-8"
-          >
-            {/* Card stack — offset sibling hints at "one timeline, multiple views" */}
-            <div
-              className="absolute inset-0 translate-x-4 translate-y-4 rounded-[14px] bg-white/5"
-              style={{ border: '1px solid rgba(255,255,255,0.06)' }}
-              aria-hidden
-            />
-
-            <div
-              className="relative overflow-hidden rounded-[14px] border border-white/10 bg-canvas"
-              style={{ boxShadow: '0 40px 80px -30px rgba(0,0,0,0.55)' }}
-            >
-              {/* Navy welcome bar = the "edge" inside the product */}
-              <div className="flex items-center justify-between bg-navy px-5 py-3.5">
-                <div className="flex items-center gap-3">
-                  <div className="relative h-8 w-8 overflow-hidden rounded-full border border-white/20">
-                    <Image
-                      src="/doctors/doctor-male-2.jpg"
-                      alt=""
-                      fill
-                      sizes="32px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="leading-tight">
-                    <p className="mf-display text-[15px] text-white">Welcome, Dr. Chen</p>
-                    <p className="text-[11px] text-white/70">
-                      Tuesday &middot; 12 appointments today
-                    </p>
-                  </div>
-                </div>
-                <div className="hidden items-center gap-2 rounded-full border border-white/20 px-2.5 py-1 sm:flex">
-                  <span className="mf-dot mf-dot--ok" />
-                  <span className="text-[11px] font-medium text-white">Online</span>
-                </div>
-              </div>
-
-              {/* Workspace */}
-              <div className="px-5 py-5">
-                <div className="grid grid-cols-3 gap-3">
-                  {stats.map(({ icon: Icon, label, value }) => (
-                    <div key={label} className="mf-card px-3.5 py-3">
-                      <span className="mf-stat-chip">
-                        <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      </span>
-                      <p className="mf-display mt-2 text-[22px] leading-none text-navy">{value}</p>
-                      <p className="mt-1 text-[11px] text-ink-muted">{label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mf-card mt-3 overflow-hidden">
-                  <div className="flex items-center justify-between bg-canvas px-4 py-2.5">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
-                      Today
-                    </p>
-                    <button className="mf-btn mf-btn-sm mf-btn-ghost -mr-2">Full calendar</button>
-                  </div>
-                  {patientRows.map((p, i) => (
-                    <div
-                      key={p.name}
-                      className={`flex items-center justify-between px-4 py-3 ${
-                        i !== patientRows.length - 1 ? 'border-b border-hairline' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-8 w-8 overflow-hidden rounded-full border border-hairline">
-                          <Image src={p.avatar} alt="" fill sizes="32px" className="object-cover" />
-                        </div>
-                        <div>
-                          <p className="text-[13px] font-medium text-ink">{p.name}</p>
-                          <p className="text-[11px] text-ink-muted">{p.type}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[12px] font-medium text-ink">{p.time}</span>
-                        <StatusChip tone={p.tone}>{p.status}</StatusChip>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Floating micro-notification */}
-            <motion.div
-              initial={{ opacity: 0, x: 16, y: -8 }}
-              animate={{ opacity: 1, x: 0, y: [0, -4, 0] }}
-              transition={{
-                delay: 1,
-                duration: 0.5,
-                y: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
-              }}
-              className="absolute -left-6 bottom-10 hidden items-center gap-3 rounded-[12px] border border-hairline bg-white px-3.5 py-2.5 md:flex"
-              style={{ boxShadow: '0 20px 40px -20px rgba(0,0,0,0.35)' }}
-            >
-              <span className="mf-stat-chip bg-teal-wash text-teal">
-                <Wallet className="h-3.5 w-3.5" strokeWidth={1.75} />
-              </span>
-              <div className="leading-tight">
-                <p className="text-[12px] font-medium text-ink">Payment received</p>
-                <p className="text-[11px] text-ink-muted">Sarah M. &middot; $185.00</p>
-              </div>
-            </motion.div>
-          </motion.div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Scroll indicator */}
+      <motion.div
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: [0, 6, 0] }}
+        transition={{
+          opacity: { duration: 0.6, delay: 1.2 },
+          y: { duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 1.2 },
+        }}
+        className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2"
+      >
+        <div className="flex flex-col items-center gap-2 text-white/50">
+          <span className="mf-eyebrow text-[10px]">Scroll</span>
+          <ChevronDown className="h-4 w-4" strokeWidth={1.5} />
+        </div>
+      </motion.div>
     </section>
   )
 }

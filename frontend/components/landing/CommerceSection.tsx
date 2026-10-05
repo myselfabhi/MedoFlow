@@ -1,152 +1,162 @@
 'use client'
 
 /**
- * CommerceSection — chapter 6 of the narrative.
+ * CommerceSection — chapter 6.
  *
- * Role: zoom into a single capability that also unlocks revenue. Tone pivot:
- * this is the money section. Layout: left copy + a bold headline stat band;
- * right is a live checkout surface floating in a white-sub-zone on navy.
+ * Tells the revenue story. Three product surfaces visible side-by-side:
+ * the package, the membership, the commission. Animated $$$ ticker
+ * flowing from "visits" to "revenue." Customer quote anchors it.
  */
 
-import React from 'react'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { ArrowRight, Package, ShoppingBag, TrendingUp } from 'lucide-react'
-import { Stat, fadeUpInView } from './primitives'
-import { useAuthModal } from '@/components/auth/AuthModal'
+import React, { useEffect, useRef, useState } from 'react'
+import { motion, useInView } from 'framer-motion'
+import { Package, Repeat, TrendingUp, ArrowRight, Sparkles } from 'lucide-react'
+import { SectionHeader } from './primitives'
 
-type OrderLine = {
-  name: string
-  price: string
-  status: string
-  tone: 'ok' | 'warn' | 'err'
+function RevenueTicker() {
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { once: true, margin: '-15% 0px' })
+  const [value, setValue] = useState(0)
+  const target = 47280
+
+  useEffect(() => {
+    if (!inView) return
+    let raf = 0
+    const start = performance.now()
+    const dur = 2200
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setValue(Math.round(target * eased))
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [inView])
+
+  return (
+    <div ref={ref} className="text-center">
+      <p className="mf-eyebrow text-teal-bright">Average new revenue · year one</p>
+      <p className="mf-display mt-3 text-[clamp(56px,9vw,108px)] leading-none text-white">
+        +${value.toLocaleString()}
+      </p>
+      <p className="mt-3 text-[14px] text-white/60">
+        Per clinic — from packages, memberships, and recovered no-shows
+      </p>
+    </div>
+  )
 }
 
-const orderLines: OrderLine[] = [
-  { name: 'Vitamin D3 + K2', price: '$34.99', status: 'Fulfilled', tone: 'ok' },
-  { name: 'Omega-3 Fish Oil', price: '$29.99', status: 'Shipped', tone: 'ok' },
-  { name: 'Probiotic Complex', price: '$44.99', status: 'Processing', tone: 'warn' },
-]
+const products = [
+  {
+    icon: Package,
+    title: 'Session packages',
+    sub: 'Sell 10-session bundles upfront. Stripe collects. We track usage.',
+    accent: '5 sessions left',
+    example: '"10-Visit PT Pack — $450"',
+  },
+  {
+    icon: Repeat,
+    title: 'Memberships',
+    sub: 'Recurring billing on Stripe. Auto-discount on every visit.',
+    accent: '$99/mo · 23 active',
+    example: '"Wellness Member — 20% off services"',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Provider commissions',
+    sub: 'Flat-rate or % rules. Posted automatically on every invoice.',
+    accent: 'Dr. Chen · $1,240 this week',
+    example: '"15% on services, 8% on retail"',
+  },
+] as const
 
 export function CommerceSection() {
-  const { openSignup } = useAuthModal()
   return (
-    <section className="mf-zone-white relative py-28 md:py-36">
-      <div className="container mx-auto px-6">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1fr_1.05fr]">
-          {/* ─── Left: copy + revenue story ──────────────────────── */}
-          <div className="max-w-xl">
-            <motion.p {...fadeUpInView(0)} className="mf-eyebrow flex items-center gap-2">
-              <ShoppingBag className="h-3 w-3" strokeWidth={2} />
-              Chapter 06 &middot; Commerce
-            </motion.p>
+    <section className="relative overflow-hidden bg-[#0B1E35] py-32 md:py-40">
+      {/* Atmospheric glow */}
+      <div
+        className="pointer-events-none absolute -top-32 left-1/2 h-[640px] w-[640px] -translate-x-1/2 rounded-full blur-[180px]"
+        style={{ background: 'radial-gradient(circle, rgba(13,148,136,0.4), transparent 70%)' }}
+        aria-hidden
+      />
 
-            <motion.h2
-              {...fadeUpInView(0.05)}
-              className="mf-display mt-4 text-[36px] text-navy md:text-[52px]"
-            >
-              Care doesn&rsquo;t stop at checkout.{' '}
-              <span className="text-teal">Revenue starts there.</span>
-            </motion.h2>
-
-            <motion.p
-              {...fadeUpInView(0.1)}
-              className="mt-5 max-w-lg text-[16px] leading-relaxed text-ink-muted md:text-[17px]"
-            >
-              Every recommendation a provider makes &mdash; a supplement, a follow-up bundle, a
-              home-care kit &mdash; becomes a one-tap purchase. Stocked, tracked, fulfilled, and
-              reconciled without anyone leaving the chart.
-            </motion.p>
-
-            <motion.dl
-              {...fadeUpInView(0.18)}
-              className="mt-10 grid grid-cols-3 gap-6 border-y border-hairline py-8"
-            >
-              <Stat value="$18.4K" label="Avg. monthly recurring" />
-              <Stat value="42%" label="Blended margin" />
-              <Stat value="3.2×" label="Revenue per visit" />
-            </motion.dl>
-
-            <motion.div {...fadeUpInView(0.26)} className="mt-8 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={openSignup}
-                className="mf-btn mf-btn-lg mf-btn-primary"
-              >
-                Enable commerce
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              <Link href="#catalog" className="mf-btn mf-btn-lg mf-btn-outline">
-                See catalog
-              </Link>
-            </motion.div>
-          </div>
-
-          {/* ─── Right: live checkout ─────────────────────────────── */}
-          <motion.div
-            {...fadeUpInView(0.15)}
-            className="w-full max-w-md justify-self-center lg:justify-self-end"
-          >
-            <div className="relative">
-              {/* navy backing tile, hints at the app shell */}
-              <div
-                className="absolute -inset-6 -z-10 rounded-[24px] bg-navy opacity-[0.04]"
-                aria-hidden
-              />
-
-              <div className="mf-card p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="mf-eyebrow text-ink-muted">Order &middot; #4029</p>
-                    <h3 className="mf-display mt-1 text-[20px] text-ink">Quick checkout</h3>
-                  </div>
-                  <span className="flex items-center gap-1.5 text-[11px] text-teal">
-                    <span className="mf-dot mf-dot--ok" />
-                    Live
-                  </span>
-                </div>
-
-                <div className="mt-5 space-y-2">
-                  {orderLines.map((item) => (
-                    <div
-                      key={item.name}
-                      className="mf-card flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="mf-stat-chip">
-                          <Package className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </span>
-                        <div>
-                          <p className="text-[13px] font-medium text-ink">{item.name}</p>
-                          <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-ink-muted">
-                            <span className={`mf-dot mf-dot--${item.tone}`} />
-                            {item.status}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-[14px] font-medium text-ink">{item.price}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex items-center justify-between border-t border-hairline pt-4">
-                  <p className="text-[13px] text-ink-muted">Subtotal</p>
-                  <p className="mf-display text-[24px] text-navy">$109.97</p>
-                </div>
-
-                <button className="mf-btn mf-btn-primary mt-4 w-full">
-                  Charge card
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-ink-muted">
-                  <TrendingUp className="h-3 w-3" strokeWidth={1.75} />
-                  Auto-reconciles with tonight&rsquo;s payout
-                </p>
-              </div>
-            </div>
-          </motion.div>
+      <div className="container relative mx-auto px-6">
+        <div className="text-center">
+          <p className="mf-eyebrow text-teal-bright">Built to grow revenue, not just track it</p>
+          <h2 className="mf-display mx-auto mt-4 max-w-4xl text-[clamp(34px,5vw,64px)] leading-[1.05] text-white">
+            Most clinic software <span className="text-white/40">records</span> revenue.
+            <br />
+            MedoFlow <span className="text-teal-bright">generates it.</span>
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-[16px] leading-relaxed text-white/60">
+            Packages, memberships, commerce, commissions — built in. No third-party plug-ins. No CSV
+            exports to your accountant.
+          </p>
         </div>
+
+        <div className="mt-20">
+          <RevenueTicker />
+        </div>
+
+        {/* Three product surfaces */}
+        <div className="mx-auto mt-20 grid max-w-6xl grid-cols-1 gap-5 md:grid-cols-3">
+          {products.map((p, i) => {
+            const Icon = p.icon
+            return (
+              <motion.div
+                key={p.title}
+                initial={{ opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-10% 0px' }}
+                transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-colors hover:bg-white/[0.05]"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-bright/15 text-teal-bright">
+                    <Icon className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  <ArrowRight
+                    className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-teal-bright"
+                    strokeWidth={2}
+                  />
+                </div>
+
+                <h3 className="mf-display mt-5 text-[20px] text-white">{p.title}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-white/60">{p.sub}</p>
+
+                <div className="mt-5 rounded-lg bg-white/[0.04] p-3 ring-1 ring-white/5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                    Live in your clinic
+                  </p>
+                  <p className="mt-1 text-[12px] text-white/80">{p.example}</p>
+                  <p className="mt-1 text-[12px] font-semibold text-teal-bright">{p.accent}</p>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+
+        {/* Customer anchor */}
+        <motion.figure
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.3 }}
+          className="mx-auto mt-24 max-w-3xl text-center"
+        >
+          <Sparkles className="mx-auto h-5 w-5 text-teal-bright" strokeWidth={1.5} />
+          <blockquote className="mf-display mt-5 text-[clamp(20px,2.6vw,28px)] leading-[1.4] text-white">
+            "We launched a $99/mo membership in 20 minutes.
+            <br className="hidden md:block" />
+            <span className="text-teal-bright">$32K in recurring revenue</span> in the first
+            quarter."
+          </blockquote>
+          <figcaption className="mt-6 text-[14px] text-white/50">
+            <span className="font-medium text-white/80">Marcus Yeung</span> · Owner, Pine Wellness ·
+            Seattle
+          </figcaption>
+        </motion.figure>
       </div>
     </section>
   )
