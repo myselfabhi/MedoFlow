@@ -3,12 +3,14 @@
  *
  * Creates "Everwell Longevity Clinic" with a complete, believable demo world:
  *   4 providers, 15 patients, ~61 appointments, full invoicing, payments,
- *   commission records, visit records, AI scribe sessions, packages, memberships.
+ *   commission records, visit records, AI scribe sessions, packages, memberships,
+ *   plus the AI Front Desk (voice agent) config and a sample call log.
  *
  * Idempotency:
  *   Catalog items, users, providers: upsert / findFirst guard.
  *   Appointments, invoices, payments, commission records: guarded by appointment
  *   count — skipped if the clinic already has appointments.
+ *   Voice agent: config upserted on unique clinicId; call log guarded by call count.
  *   Re-running is safe for catalog/user data.
  *
  * Prerequisites:
@@ -24,6 +26,7 @@
  */
 
 import {
+  Prisma,
   PrismaClient,
   AppointmentStatus,
   PaymentStatus,
@@ -34,6 +37,10 @@ import {
   SubscriptionStatus,
   CommissionType,
   CommissionItemType,
+  VoicePersona,
+  VoiceCallStatus,
+  VoiceCallChannel,
+  VoiceCallOutcome,
 } from '@prisma/client'
 import * as argon2 from 'argon2'
 
@@ -2118,6 +2125,572 @@ async function createCompletedCommerceOrders(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 13 — AI Front Desk (voice agent): config + a realistic call log
+// ---------------------------------------------------------------------------
+
+type SeedTranscriptTurn = { role: 'assistant' | 'user'; content: string; offsetSec: number }
+type SeedCallEvent = {
+  type: 'tool_call' | 'transfer' | 'error' | 'interrupt'
+  toolName?: string
+  argsJson?: Prisma.InputJsonValue
+  resultJson?: Prisma.InputJsonValue
+  errorMessage?: string
+  offsetSec: number
+}
+type SeedVoiceCall = {
+  channel: VoiceCallChannel
+  status: VoiceCallStatus
+  outcome: VoiceCallOutcome | null
+  callerName: string
+  callerPhone: string | null
+  patientEmail?: string
+  daysAgo: number
+  hour: number
+  minute: number
+  durationSec: number
+  summary: string | null
+  transcript: SeedTranscriptTurn[]
+  events: SeedCallEvent[]
+}
+
+async function createVoiceAgentData(params: {
+  clinicId: string
+  users: Record<string, { id: string; name: string }>
+}) {
+  const { clinicId, users } = params
+  const patientId = (email: string): string | null => users[email]?.id ?? null
+
+  // Config — idempotent via the unique clinicId. Enabled, warm persona, with
+  // business hours and a clinic-specific instruction block so the admin UI
+  // (/dashboard/voice-agent → Configure) shows a fully populated example.
+  await prisma.voiceAgentConfig.upsert({
+    where: { clinicId },
+    update: {},
+    create: {
+      clinicId,
+      enabled: true,
+      persona: VoicePersona.WARM,
+      voice: 'hannah', // Groq Orpheus WARM voice (see ttsService persona mapping)
+      greeting:
+        "Thanks for calling Everwell! This is Ava, the clinic's virtual assistant. " +
+        'I can help you book or change an appointment, request a refill, or answer ' +
+        'questions about our services. How can I help you today?',
+      businessHours: {
+        mon: { open: '09:00', close: '17:00' },
+        tue: { open: '09:00', close: '17:00' },
+        wed: { open: '09:00', close: '17:00' },
+        thu: { open: '09:00', close: '17:00' },
+        fri: { open: '09:00', close: '17:00' },
+        sat: { open: '10:00', close: '14:00' },
+        sun: null,
+      },
+      afterHoursMessage:
+        "We're closed right now, but I can take a message and someone will call you " +
+        'back on the next business day — or I can help you book online. Which would you prefer?',
+      escalationPhone: '+1 (555) 010-2000',
+      capabilities: {
+        book: true,
+        reschedule: true,
+        cancel: true,
+        refill: true,
+        messages: true,
+        transfer: true,
+        info: true,
+      },
+      systemPromptExtra:
+        'Everwell is a multi-disciplinary clinic: physiotherapy, sports medicine, ' +
+        'nutrition & wellness, and mental performance. Offer new patients a complimentary ' +
+        '15-minute phone consult before their first visit. Dr. Sarah Chen leads physiotherapy; ' +
+        'Coach James Wright handles mental performance. Never give clinical advice — book a ' +
+        'visit or take a message instead.',
+    },
+  })
+
+  // Call log — skip if this clinic already has calls (matches the appointment guard).
+  const existingCalls = await prisma.voiceCall.count({ where: { clinicId } })
+  if (existingCalls > 0) {
+    console.log(`  ↩ Voice calls already exist (${existingCalls}) — config ensured, calls skipped`)
+    return
+  }
+
+  // Eight calls, one per outcome, so the call log demonstrates the full range.
+  const calls: SeedVoiceCall[] = [
+    {
+      channel: VoiceCallChannel.BROWSER,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.APPOINTMENT_BOOKED,
+      callerName: 'Emma Hartwell',
+      callerPhone: '+1 (555) 014-2201',
+      patientEmail: 'emma@everwell.demo',
+      daysAgo: 8,
+      hour: 9,
+      minute: 42,
+      durationSec: 88,
+      summary:
+        'Emma Hartwell booked an Initial Physiotherapy Assessment with Dr. Sarah Chen for Thursday at 9:30 AM. Confirmation emailed.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell! This is Ava. How can I help you today?',
+          offsetSec: 0,
+        },
+        { role: 'user', content: "Hi, I'd like to book a physio assessment.", offsetSec: 6 },
+        {
+          role: 'assistant',
+          content: 'Happy to help. Can I get your name so I can pull up your file?',
+          offsetSec: 11,
+        },
+        { role: 'user', content: 'Emma Hartwell.', offsetSec: 16 },
+        {
+          role: 'assistant',
+          content:
+            'Thanks, Emma — found you. Dr. Sarah Chen has openings for an Initial Physiotherapy Assessment. What day works?',
+          offsetSec: 22,
+        },
+        { role: 'user', content: 'Something Thursday morning?', offsetSec: 33 },
+        {
+          role: 'assistant',
+          content: 'Dr. Chen has 9:30 or 11:00 on Thursday. Which would you like?',
+          offsetSec: 39,
+        },
+        { role: 'user', content: '9:30, please.', offsetSec: 48 },
+        {
+          role: 'assistant',
+          content:
+            "Done — you're booked with Dr. Sarah Chen Thursday at 9:30 for a 60-minute assessment. A confirmation is on its way to your email. Anything else?",
+          offsetSec: 54,
+        },
+        { role: 'user', content: "No, that's everything. Thank you!", offsetSec: 72 },
+        { role: 'assistant', content: 'Have a great day, Emma!', offsetSec: 78 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'lookup_patient',
+          argsJson: { name: 'Emma Hartwell' },
+          resultJson: { found: true, patient: 'emma@everwell.demo' },
+          offsetSec: 18,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'check_availability',
+          argsJson: {
+            provider: 'Dr. Sarah Chen',
+            service: 'Initial Physiotherapy Assessment',
+            day: 'Thursday',
+          },
+          resultJson: { slots: ['09:30', '11:00'] },
+          offsetSec: 25,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'book_appointment',
+          argsJson: {
+            provider: 'Dr. Sarah Chen',
+            service: 'Initial Physiotherapy Assessment',
+            start: 'Thursday 09:30',
+          },
+          resultJson: { booked: true },
+          offsetSec: 52,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.PHONE,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.APPOINTMENT_RESCHEDULED,
+      callerName: 'Liam Nakamura',
+      callerPhone: '+1 (555) 013-8870',
+      patientEmail: 'liam@everwell.demo',
+      daysAgo: 6,
+      hour: 14,
+      minute: 5,
+      durationSec: 74,
+      summary:
+        'Liam Nakamura moved his Follow-up Physiotherapy Session from Tuesday 3:00 PM to Friday 10:30 AM with Dr. Sarah Chen.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell, this is Ava. How can I help?',
+          offsetSec: 0,
+        },
+        { role: 'user', content: 'I need to move my appointment this week.', offsetSec: 5 },
+        { role: 'assistant', content: 'Sure — can I get your name?', offsetSec: 10 },
+        { role: 'user', content: 'Liam Nakamura.', offsetSec: 14 },
+        {
+          role: 'assistant',
+          content:
+            'Thanks, Liam. I see a Follow-up Physiotherapy Session Tuesday at 3:00 PM with Dr. Chen. When would you like to move it to?',
+          offsetSec: 20,
+        },
+        { role: 'user', content: 'Is Friday morning possible?', offsetSec: 31 },
+        {
+          role: 'assistant',
+          content: 'Dr. Chen has 10:30 AM on Friday. Shall I move it there?',
+          offsetSec: 37,
+        },
+        { role: 'user', content: 'Perfect, yes.', offsetSec: 45 },
+        {
+          role: 'assistant',
+          content:
+            "All set — moved to Friday 10:30 AM. You'll get an updated confirmation. Anything else?",
+          offsetSec: 50,
+        },
+        { role: 'user', content: "That's it, thanks!", offsetSec: 64 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'lookup_patient',
+          argsJson: { name: 'Liam Nakamura' },
+          resultJson: { found: true, patient: 'liam@everwell.demo' },
+          offsetSec: 16,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'check_availability',
+          argsJson: { provider: 'Dr. Sarah Chen', day: 'Friday' },
+          resultJson: { slots: ['10:30', '13:00'] },
+          offsetSec: 33,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'book_appointment',
+          argsJson: { action: 'reschedule', to: 'Friday 10:30' },
+          resultJson: { rescheduled: true },
+          offsetSec: 47,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.BROWSER,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.APPOINTMENT_CANCELLED,
+      callerName: 'Sophia Martinez',
+      callerPhone: '+1 (555) 017-5532',
+      patientEmail: 'sophia@everwell.demo',
+      daysAgo: 5,
+      hour: 11,
+      minute: 20,
+      durationSec: 61,
+      summary:
+        'Sophia Martinez cancelled her Comprehensive Nutrition Consultation (Wednesday 2:00 PM). Within the free-cancellation window; no fee applied.',
+      transcript: [
+        { role: 'assistant', content: 'Everwell, this is Ava — how can I help?', offsetSec: 0 },
+        {
+          role: 'user',
+          content: 'I have to cancel my nutrition appointment, something came up.',
+          offsetSec: 5,
+        },
+        { role: 'assistant', content: 'No problem. Your name?', offsetSec: 12 },
+        { role: 'user', content: 'Sophia Martinez.', offsetSec: 16 },
+        {
+          role: 'assistant',
+          content:
+            "Thanks, Sophia. That's the Comprehensive Nutrition Consultation Wednesday at 2:00 PM. You're outside 24 hours, so there's no cancellation fee. Shall I cancel it?",
+          offsetSec: 22,
+        },
+        { role: 'user', content: 'Yes please. Can I rebook later?', offsetSec: 38 },
+        {
+          role: 'assistant',
+          content:
+            "Absolutely — call back any time and I'll find you a new slot. Your appointment is now cancelled. Anything else?",
+          offsetSec: 44,
+        },
+        { role: 'user', content: 'No, thank you.', offsetSec: 56 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'lookup_patient',
+          argsJson: { name: 'Sophia Martinez' },
+          resultJson: { found: true, patient: 'sophia@everwell.demo' },
+          offsetSec: 18,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'book_appointment',
+          argsJson: {
+            action: 'cancel',
+            appointment: 'Comprehensive Nutrition Consultation, Wed 14:00',
+          },
+          resultJson: { cancelled: true, fee: 0 },
+          offsetSec: 42,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.PHONE,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.REFILL_REQUESTED,
+      callerName: 'Olivia Park',
+      callerPhone: '+1 (555) 012-6690',
+      patientEmail: 'olivia@everwell.demo',
+      daysAgo: 4,
+      hour: 16,
+      minute: 48,
+      durationSec: 69,
+      summary:
+        'Olivia Park requested a refill of her anti-inflammatory prescription. Logged for Dr. Marcus Rivera to review and approve; patient told to expect a text once sent to the pharmacy.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell, this is Ava. How can I help?',
+          offsetSec: 0,
+        },
+        {
+          role: 'user',
+          content: "I'm out of my anti-inflammatory and need a refill.",
+          offsetSec: 5,
+        },
+        {
+          role: 'assistant',
+          content: 'I can get that started. Can I confirm your name and date of birth?',
+          offsetSec: 12,
+        },
+        { role: 'user', content: 'Olivia Park, March 3rd 1990.', offsetSec: 19 },
+        {
+          role: 'assistant',
+          content:
+            "Thanks, Olivia. I've logged a refill request for your anti-inflammatory. Dr. Rivera reviews these and, once approved, it's sent to your pharmacy on file. You'll get a text when it's ready. Anything else?",
+          offsetSec: 27,
+        },
+        { role: 'user', content: "That's great, thanks.", offsetSec: 58 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'lookup_patient',
+          argsJson: { name: 'Olivia Park', dob: '1990-03-03' },
+          resultJson: { found: true, patient: 'olivia@everwell.demo' },
+          offsetSec: 22,
+        },
+        {
+          type: 'tool_call',
+          toolName: 'request_refill',
+          argsJson: { medication: 'anti-inflammatory', reviewer: 'Dr. Marcus Rivera' },
+          resultJson: { logged: true, status: 'pending_provider_approval' },
+          offsetSec: 40,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.PHONE,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.MESSAGE_TAKEN,
+      callerName: 'Daniel Okafor',
+      callerPhone: '+1 (555) 019-3312',
+      daysAgo: 3,
+      hour: 19,
+      minute: 35,
+      durationSec: 52,
+      summary:
+        'After-hours call. Prospective patient Daniel Okafor asked whether the clinic treats runners with recurring knee pain. Message taken for the front desk to call back next business day.',
+      transcript: [
+        {
+          role: 'assistant',
+          content:
+            "Thanks for calling Everwell. We're closed right now, but I can take a message or help you book. What do you need?",
+          offsetSec: 0,
+        },
+        {
+          role: 'user',
+          content: "I'm a runner with ongoing knee pain — do you treat that?",
+          offsetSec: 8,
+        },
+        {
+          role: 'assistant',
+          content:
+            "We do — that's a great fit for our sports medicine and physiotherapy teams. Since we're closed, can I take your name and number for a callback?",
+          offsetSec: 15,
+        },
+        { role: 'user', content: 'Daniel Okafor, 555-019-3312.', offsetSec: 27 },
+        {
+          role: 'assistant',
+          content:
+            'Got it, Daniel. The front desk will call you tomorrow to talk options and book an assessment. Anything else?',
+          offsetSec: 34,
+        },
+        { role: 'user', content: 'Nope, thanks!', offsetSec: 46 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'take_message',
+          argsJson: {
+            name: 'Daniel Okafor',
+            phone: '+1 (555) 019-3312',
+            message:
+              'Runner with recurring knee pain — asking if the clinic treats this. Wants a callback.',
+          },
+          resultJson: { saved: true },
+          offsetSec: 40,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.BROWSER,
+      status: VoiceCallStatus.COMPLETED,
+      outcome: VoiceCallOutcome.INFO_PROVIDED,
+      callerName: 'Caller',
+      callerPhone: null,
+      daysAgo: 2,
+      hour: 10,
+      minute: 12,
+      durationSec: 43,
+      summary:
+        'Caller asked about opening hours and parking. Told hours (Mon–Fri 9–5, Sat 10–2) and that free parking is available behind the building. No booking requested.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell, this is Ava. How can I help?',
+          offsetSec: 0,
+        },
+        { role: 'user', content: 'What are your hours, and is there parking?', offsetSec: 5 },
+        {
+          role: 'assistant',
+          content:
+            "We're open Monday to Friday 9 to 5, and Saturday 10 to 2. There's free parking in the lot behind the building. Would you like to book a visit while you're here?",
+          offsetSec: 11,
+        },
+        { role: 'user', content: 'Not yet, just checking. Thanks!', offsetSec: 30 },
+        { role: 'assistant', content: 'Anytime — talk soon!', offsetSec: 36 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'get_clinic_info',
+          argsJson: { topic: 'hours_and_parking' },
+          resultJson: { hours: 'Mon-Fri 9-5, Sat 10-2', parking: 'free lot behind building' },
+          offsetSec: 8,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.PHONE,
+      status: VoiceCallStatus.TRANSFERRED,
+      outcome: VoiceCallOutcome.TRANSFERRED_TO_HUMAN,
+      callerName: 'Marcus Chen',
+      callerPhone: '+1 (555) 011-4408',
+      patientEmail: 'marcus.chen@everwell.demo',
+      daysAgo: 1,
+      hour: 13,
+      minute: 27,
+      durationSec: 96,
+      summary:
+        'Marcus Chen disputed a charge on his last invoice (partial refund not reflected). Beyond the assistant’s scope — transferred to the front desk / accounting.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell, this is Ava. How can I help?',
+          offsetSec: 0,
+        },
+        {
+          role: 'user',
+          content: 'I was charged the full amount but I was supposed to get a partial refund.',
+          offsetSec: 6,
+        },
+        { role: 'assistant', content: "I'm sorry about that. Can I get your name?", offsetSec: 14 },
+        { role: 'user', content: 'Marcus Chen.', offsetSec: 19 },
+        {
+          role: 'assistant',
+          content:
+            "Thanks, Marcus. Billing adjustments and refunds are handled by our team directly — I don't want to guess on your money. Let me connect you to the front desk now. One moment.",
+          offsetSec: 25,
+        },
+        { role: 'user', content: 'Okay, thank you.', offsetSec: 40 },
+      ],
+      events: [
+        {
+          type: 'tool_call',
+          toolName: 'lookup_patient',
+          argsJson: { name: 'Marcus Chen' },
+          resultJson: { found: true, patient: 'marcus.chen@everwell.demo' },
+          offsetSec: 21,
+        },
+        {
+          type: 'transfer',
+          toolName: 'transfer_to_human',
+          argsJson: { reason: 'billing dispute / refund', to: 'front desk' },
+          resultJson: { transferred: true },
+          offsetSec: 44,
+        },
+      ],
+    },
+    {
+      channel: VoiceCallChannel.BROWSER,
+      status: VoiceCallStatus.ABANDONED,
+      outcome: VoiceCallOutcome.NO_ACTION,
+      callerName: 'Caller',
+      callerPhone: null,
+      daysAgo: 1,
+      hour: 17,
+      minute: 3,
+      durationSec: 9,
+      summary: 'Caller hung up shortly after the greeting before stating a request.',
+      transcript: [
+        {
+          role: 'assistant',
+          content: 'Thanks for calling Everwell, this is Ava. How can I help you today?',
+          offsetSec: 0,
+        },
+        { role: 'user', content: '(call ended)', offsetSec: 9 },
+      ],
+      events: [],
+    },
+  ]
+
+  let callsCreated = 0
+  let eventsCreated = 0
+  for (const def of calls) {
+    const startedAt = daysFromNow(-def.daysAgo, def.hour, def.minute)
+    const endedAt = new Date(startedAt.getTime() + def.durationSec * 1000)
+    const transcript = def.transcript.map((t) => ({
+      role: t.role,
+      content: t.content,
+      ts: new Date(startedAt.getTime() + t.offsetSec * 1000).toISOString(),
+    }))
+
+    const call = await prisma.voiceCall.create({
+      data: {
+        clinicId,
+        channel: def.channel,
+        status: def.status,
+        outcome: def.outcome ?? undefined,
+        callerName: def.callerName,
+        callerPhone: def.callerPhone,
+        patientId: def.patientEmail ? patientId(def.patientEmail) : null,
+        startedAt,
+        endedAt,
+        durationSec: def.durationSec,
+        transcript,
+        summary: def.summary,
+      },
+    })
+    callsCreated++
+
+    for (const ev of def.events) {
+      await prisma.voiceCallEvent.create({
+        data: {
+          callId: call.id,
+          type: ev.type,
+          toolName: ev.toolName,
+          argsJson: ev.argsJson ?? undefined,
+          resultJson: ev.resultJson ?? undefined,
+          errorMessage: ev.errorMessage,
+          ts: new Date(startedAt.getTime() + ev.offsetSec * 1000),
+        },
+      })
+      eventsCreated++
+    }
+  }
+
+  console.log(
+    `  ✓ Voice agent: config enabled, ${callsCreated} calls + ${eventsCreated} events (all outcomes)`
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -2194,6 +2767,9 @@ async function main(): Promise<void> {
     frontDeskUserId,
   })
 
+  console.log('[13] AI Front Desk (voice agent) config + call log...')
+  await createVoiceAgentData({ clinicId: clinic.id, users })
+
   console.log('\n✅ Demo universe seed complete!\n')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('  Clinic:     Everwell Longevity Clinic')
@@ -2209,6 +2785,8 @@ async function main(): Promise<void> {
   console.log('  PATIENT     sophia@everwell.demo     Sophia Martinez (refund example)')
   console.log('  PATIENT     marcus.chen@everwell.demo Marcus Chen (partial refund)')
   console.log('  ... and 11 more patients')
+  console.log('')
+  console.log('  AI Front Desk: enabled · 8 demo calls at /dashboard/voice-agent')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 }
 
