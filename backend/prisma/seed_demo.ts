@@ -28,6 +28,7 @@
 import {
   Prisma,
   PrismaClient,
+  Role,
   AppointmentStatus,
   PaymentStatus,
   InvoiceStatus,
@@ -514,42 +515,93 @@ async function createMemberships(clinicId: string) {
 // ---------------------------------------------------------------------------
 
 async function createUsers(clinicId: string, passwordHash: string) {
-  const defs = [
-    // Staff
-    { email: 'alex@everwell.demo', name: 'Alex Thornton', role: 'SUPER_ADMIN' as const },
-    { email: 'jordan@everwell.demo', name: 'Jordan Walsh', role: 'FRONT_DESK' as const },
+  // A sample custom role, so the STAFF (custom-role) path is testable end to end.
+  const coordinatorRole = await prisma.customRole.upsert({
+    where: { clinicId_name: { clinicId, name: 'Clinic Coordinator' } },
+    update: {},
+    create: {
+      clinicId,
+      name: 'Clinic Coordinator',
+      description:
+        'Front-of-house coordinator: scheduling + patient management, no billing access.',
+      permissions: [
+        'appointments.view',
+        'appointments.manage',
+        'patients.view',
+        'patients.manage',
+        'forms.manage',
+      ],
+      isActive: true,
+    },
+  })
+
+  type UserDef = {
+    email: string
+    name: string
+    role: Role
+    clinicIdOverride?: string | null // undefined → this clinic; null → cross-tenant (platform admin)
+    customRoleId?: string
+  }
+
+  const defs: UserDef[] = [
+    // Platform operator — cross-tenant, not tied to a clinic
+    {
+      email: 'platform@medoflow.demo',
+      name: 'Pat Okafor',
+      role: 'PLATFORM_ADMIN',
+      clinicIdOverride: null,
+    },
+    // Clinic staff — one account per system role
+    { email: 'alex@everwell.demo', name: 'Alex Thornton', role: 'SUPER_ADMIN' },
+    { email: 'jordan@everwell.demo', name: 'Jordan Walsh', role: 'FRONT_DESK' },
+    { email: 'taylor@everwell.demo', name: 'Taylor Brooks', role: 'ACCOUNTING' },
+    { email: 'casey@everwell.demo', name: 'Casey Morgan', role: 'MARKETING' },
+    {
+      email: 'robin@everwell.demo',
+      name: 'Robin Lee',
+      role: 'STAFF',
+      customRoleId: coordinatorRole.id,
+    },
     // Provider users
-    { email: 'sarah@everwell.demo', name: 'Dr. Sarah Chen', role: 'PROVIDER' as const },
-    { email: 'marcus@everwell.demo', name: 'Dr. Marcus Rivera', role: 'PROVIDER' as const },
-    { email: 'priya@everwell.demo', name: 'Dr. Priya Patel', role: 'PROVIDER' as const },
-    { email: 'james@everwell.demo', name: 'Coach James Wright', role: 'PROVIDER' as const },
+    { email: 'sarah@everwell.demo', name: 'Dr. Sarah Chen', role: 'PROVIDER' },
+    { email: 'marcus@everwell.demo', name: 'Dr. Marcus Rivera', role: 'PROVIDER' },
+    { email: 'priya@everwell.demo', name: 'Dr. Priya Patel', role: 'PROVIDER' },
+    { email: 'james@everwell.demo', name: 'Coach James Wright', role: 'PROVIDER' },
     // Patients
-    { email: 'emma@everwell.demo', name: 'Emma Hartwell', role: 'PATIENT' as const },
-    { email: 'liam@everwell.demo', name: 'Liam Nakamura', role: 'PATIENT' as const },
-    { email: 'sophia@everwell.demo', name: 'Sophia Martinez', role: 'PATIENT' as const },
-    { email: 'marcus.chen@everwell.demo', name: 'Marcus Chen', role: 'PATIENT' as const },
-    { email: 'isabella@everwell.demo', name: 'Isabella Torres', role: 'PATIENT' as const },
-    { email: 'ryan@everwell.demo', name: 'Ryan Thompson', role: 'PATIENT' as const },
-    { email: 'olivia@everwell.demo', name: 'Olivia Park', role: 'PATIENT' as const },
-    { email: 'noah@everwell.demo', name: 'Noah Williams', role: 'PATIENT' as const },
-    { email: 'ava@everwell.demo', name: 'Ava Johnson', role: 'PATIENT' as const },
-    { email: 'ethan@everwell.demo', name: 'Ethan Brown', role: 'PATIENT' as const },
-    { email: 'mia@everwell.demo', name: 'Mia Davis', role: 'PATIENT' as const },
-    { email: 'lucas@everwell.demo', name: 'Lucas Wilson', role: 'PATIENT' as const },
-    { email: 'charlotte@everwell.demo', name: 'Charlotte Moore', role: 'PATIENT' as const },
-    { email: 'benjamin@everwell.demo', name: 'Benjamin Taylor', role: 'PATIENT' as const },
-    { email: 'zoe@everwell.demo', name: 'Zoe Anderson', role: 'PATIENT' as const },
+    { email: 'emma@everwell.demo', name: 'Emma Hartwell', role: 'PATIENT' },
+    { email: 'liam@everwell.demo', name: 'Liam Nakamura', role: 'PATIENT' },
+    { email: 'sophia@everwell.demo', name: 'Sophia Martinez', role: 'PATIENT' },
+    { email: 'marcus.chen@everwell.demo', name: 'Marcus Chen', role: 'PATIENT' },
+    { email: 'isabella@everwell.demo', name: 'Isabella Torres', role: 'PATIENT' },
+    { email: 'ryan@everwell.demo', name: 'Ryan Thompson', role: 'PATIENT' },
+    { email: 'olivia@everwell.demo', name: 'Olivia Park', role: 'PATIENT' },
+    { email: 'noah@everwell.demo', name: 'Noah Williams', role: 'PATIENT' },
+    { email: 'ava@everwell.demo', name: 'Ava Johnson', role: 'PATIENT' },
+    { email: 'ethan@everwell.demo', name: 'Ethan Brown', role: 'PATIENT' },
+    { email: 'mia@everwell.demo', name: 'Mia Davis', role: 'PATIENT' },
+    { email: 'lucas@everwell.demo', name: 'Lucas Wilson', role: 'PATIENT' },
+    { email: 'charlotte@everwell.demo', name: 'Charlotte Moore', role: 'PATIENT' },
+    { email: 'benjamin@everwell.demo', name: 'Benjamin Taylor', role: 'PATIENT' },
+    { email: 'zoe@everwell.demo', name: 'Zoe Anderson', role: 'PATIENT' },
   ]
   const map: Record<string, { id: string; name: string; email: string; role: string }> = {}
   for (const u of defs) {
+    const cid = u.clinicIdOverride === undefined ? clinicId : u.clinicIdOverride
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, clinicId, role: u.role },
-      create: { email: u.email, name: u.name, password: passwordHash, role: u.role, clinicId },
+      update: { name: u.name, clinicId: cid, role: u.role, customRoleId: u.customRoleId ?? null },
+      create: {
+        email: u.email,
+        name: u.name,
+        password: passwordHash,
+        role: u.role,
+        clinicId: cid,
+        customRoleId: u.customRoleId ?? null,
+      },
     })
     map[u.email] = user
   }
-  console.log(`  ✓ Users: ${Object.keys(map).length} upserted`)
+  console.log(`  ✓ Users: ${Object.keys(map).length} upserted (all 8 roles)`)
   return map
 }
 
@@ -2774,8 +2826,12 @@ async function main(): Promise<void> {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('  Clinic:     Everwell Longevity Clinic')
   console.log('  Password:   Demo1234!  (all accounts)\n')
-  console.log('  SUPER_ADMIN alex@everwell.demo')
-  console.log('  FRONT_DESK  jordan@everwell.demo')
+  console.log('  PLATFORM_ADMIN  platform@medoflow.demo  Pat Okafor (cross-tenant)')
+  console.log('  SUPER_ADMIN     alex@everwell.demo      Alex Thornton')
+  console.log('  FRONT_DESK      jordan@everwell.demo    Jordan Walsh')
+  console.log('  ACCOUNTING      taylor@everwell.demo    Taylor Brooks')
+  console.log('  MARKETING       casey@everwell.demo     Casey Morgan')
+  console.log('  STAFF           robin@everwell.demo     Robin Lee (Clinic Coordinator)')
   console.log('  PROVIDER    sarah@everwell.demo      Dr. Sarah Chen')
   console.log('  PROVIDER    marcus@everwell.demo     Dr. Marcus Rivera')
   console.log('  PROVIDER    priya@everwell.demo      Dr. Priya Patel')
