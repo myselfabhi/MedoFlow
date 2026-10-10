@@ -215,12 +215,20 @@ Give the user a short summary:
 | Postgres | localhost:5433                      |        |
 | Redis    | localhost:6379                      |        |
 
-**Demo login (from `seed:demo`):**
+**Demo logins (from `seed:demo`) — password `Demo1234!` for all, one per role:**
 
-- Clinic admin — `alex@everwell.demo` / `Demo1234!`
-- Front desk — `jordan@everwell.demo` / `Demo1234!`
-- Provider — `sarah@everwell.demo` / `Demo1234!`
-- Patient — `emma@everwell.demo` / `Demo1234!`
+| Role                                    | Email                    | Name           |
+| --------------------------------------- | ------------------------ | -------------- |
+| PLATFORM_ADMIN (cross-tenant)           | `platform@medoflow.demo` | Pat Okafor     |
+| SUPER_ADMIN (clinic owner)              | `alex@everwell.demo`     | Alex Thornton  |
+| FRONT_DESK                              | `jordan@everwell.demo`   | Jordan Walsh   |
+| ACCOUNTING                              | `taylor@everwell.demo`   | Taylor Brooks  |
+| MARKETING                               | `casey@everwell.demo`    | Casey Morgan   |
+| STAFF (custom role: Clinic Coordinator) | `robin@everwell.demo`    | Robin Lee      |
+| PROVIDER                                | `sarah@everwell.demo`    | Dr. Sarah Chen |
+| PATIENT                                 | `emma@everwell.demo`     | Emma Hartwell  |
+
+Other providers: `marcus@`, `priya@`, `james@everwell.demo`. 14 more patients exist (e.g. `liam@`, `sophia@`, `olivia@everwell.demo`).
 
 **Worth pointing out:**
 
